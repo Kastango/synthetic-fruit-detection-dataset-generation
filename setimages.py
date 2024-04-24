@@ -6,7 +6,7 @@ import numpy
 from tqdm import tqdm
 
 class RandomParameters:
-    def __init__(self, min_images=0, max_images=35, min_proportion=0.075, max_proportion=0.10, min_depth=75, min_visibility=0.25, hardlight_blend_power=1, overlay_blend_mode=True, num_outputs=2000, train_ratio=0.8, val_ratio=0.2, test_ratio=0.0, dev_mode=True):
+    def __init__(self, min_images=0, max_images=35, min_proportion=0.075, max_proportion=0.10, min_depth=75, min_visibility=0.25, hardlight_blend_power=1, overlay_blend_mode=True, num_outputs=2000, train_ratio=0.8, val_ratio=0.2, test_ratio=0.0, dev_mode=False):
         self.min_images = min_images
         self.max_images = max_images
         self.min_proportion = min_proportion
@@ -155,19 +155,25 @@ for output_num in range(random_parameters.num_outputs):
         random_image_np = numpy.array(random_image)
         depth_map_np = numpy.array(depth_region)
 
-        # Create a gradient based on the depth values
-        visibility_gradient = 1 - ((depth_map_np[:,:,0] - avg_depth) / std_depth)
-        visibility_gradient = numpy.clip(visibility_gradient, 0, 1)  # Normalize the gradient between 0 and 1
-
         # Calculate visibility based on z_value directly on numpy array
         visibility_mask = depth_map_np[:,:,0] <= z_value
-        visible_pixels = numpy.sum(visibility_mask)
 
-        # Apply the gradient mask to the alpha channel
-        random_image_np[:,:,3] = (random_image_np[:,:,3] * visibility_gradient).astype(numpy.uint8)
+        # Extract the original alpha channel
+        original_alpha = random_image_np[:,:,3]
+
+        # Combine the original alpha with the visibility mask
+        # Only set alpha to 255 where both original alpha is > 0 and visibility_mask is True
+        combined_alpha = numpy.where(visibility_mask & (original_alpha > 0), 255, 0)
+
+        # Apply the combined alpha mask to the alpha channel of the image
+        random_image_np[:,:,3] = combined_alpha
 
         # Convert back to Image from numpy array
         random_image = Image.fromarray(random_image_np)
+
+        # Calculate the number of visible pixels (where alpha is 255)
+        visible_pixels = numpy.sum(combined_alpha == 255)
+        total_pixels = numpy.sum(original_alpha > 0)  # Consider only originally visible pixels
 
         if visible_pixels / total_pixels >= random_parameters.min_visibility:
             background_with_opacity.paste(random_image, (x_position, y_position), random_image)
