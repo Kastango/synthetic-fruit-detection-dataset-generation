@@ -155,6 +155,18 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("intervalo de escala inválido")
     if objects["scale_mode"] not in {"cutout", "canvas"}:
         raise ValueError("scale_mode deve ser cutout ou canvas")
+    depth_scale = objects.get("depth_scale")
+    if (
+        depth_scale
+        and depth_scale.get("enabled", False)
+        and not (
+            0 < float(depth_scale["far_scale"]) <= float(depth_scale["near_scale"])
+        )
+    ):
+        raise ValueError(
+            "depth_scale requer 0 < far_scale <= near_scale (objetos mais "
+            "próximos não podem ficar menores que os mais distantes)"
+        )
     if config["annotation"]["mode"] not in {"visible", "amodal", "rect"}:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
@@ -259,6 +271,58 @@ def _bbox(mask: np.ndarray, threshold: int = 1) -> tuple[int, int, int, int] | N
     return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
 
 
+def _finish_placement(
+    fruit: Image.Image,
+    x: int,
+    y: int,
+    alpha_original: np.ndarray,
+    alpha_float: np.ndarray,
+    opaque: np.ndarray,
+    original_pixels: int,
+    canvas: Image.Image,
+    depth: np.ndarray,
+    config: dict,
+) -> dict | None:
+    placement = config["placement"]
+    region_depth = depth[y : y + fruit.height, x : x + fruit.width]
+    local_values = region_depth[opaque]
+    if not len(local_values) or float(np.median(local_values)) < float(
+        placement["min_depth"]
+    ):
+        return None
+    if placement["z_method"] == "quantile":
+        z_value = float(np.quantile(local_values, float(placement["z_quantile"])))
+    elif placement["z_method"] == "mean_plus_std":
+        z_value = float(local_values.mean()) + float(
+            placement["z_std_multiplier"]
+        ) * float(local_values.std())
+    else:
+        raise ValueError(f"z_method desconhecido: {placement['z_method']}")
+    visibility = (region_depth <= z_value).astype(np.uint8) * 255
+    blur = float(config["occlusion"]["edge_blur"])
+    if blur > 0:
+        visibility = np.asarray(
+            Image.fromarray(visibility).filter(ImageFilter.GaussianBlur(blur))
+        )
+    new_alpha = np.rint(alpha_float * visibility / 255.0).astype(np.uint8)
+    visible_pixels = int((new_alpha > 8).sum())
+    if visible_pixels / original_pixels < float(placement["min_visibility"]):
+        return None
+    region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
+    fruit = _apply_appearance(fruit, region, config["appearance"])
+    fruit.putalpha(Image.fromarray(new_alpha))
+    return {
+        "x": x,
+        "y": y,
+        "image": fruit,
+        "visible_mask": new_alpha,
+        "amodal_mask": alpha_original,
+        "rect": (0, 0, fruit.width, fruit.height),
+        "z": round(z_value, 3),
+        "visibility_at_insert": round(visible_pixels / original_pixels, 4),
+    }
+
+
 def _placement(
     canvas: Image.Image,
     depth: np.ndarray,
@@ -279,43 +343,76 @@ def _placement(
     for _ in range(int(placement["max_attempts_per_object"])):
         x = rng.randint(0, width - fruit.width)
         y = rng.randint(0, height - fruit.height)
-        region_depth = depth[y : y + fruit.height, x : x + fruit.width]
-        local_values = region_depth[opaque]
-        if not len(local_values) or float(np.median(local_values)) < float(
-            placement["min_depth"]
-        ):
+        result = _finish_placement(
+            fruit,
+            x,
+            y,
+            alpha_original,
+            alpha_float,
+            opaque,
+            original_pixels,
+            canvas,
+            depth,
+            config,
+        )
+        if result is not None:
+            return result
+    return None
+
+
+def _resolve_depth_scale(proximity: float, depth_scale: dict) -> float:
+    near = float(depth_scale["near_scale"])
+    far = float(depth_scale["far_scale"])
+    return far + (near - far) * proximity
+
+
+def _placement_with_depth_scale(
+    canvas: Image.Image,
+    depth: np.ndarray,
+    fruit: Image.Image,
+    config: dict,
+    rng: random.Random,
+    depth_scale: dict,
+) -> dict | None:
+    # A escala de referência (`_scale_cutout`) já fixou uma fração
+    # aleatória; aqui essa fração é modulada pela profundidade local do
+    # ponto de inserção escolhido, então o tamanho final só é conhecido
+    # depois de sortear x,y — ao contrário de `_placement`, que recebe um
+    # tamanho fixo e só sorteia a posição.
+    width, height = canvas.size
+    placement = config["placement"]
+    for _ in range(int(placement["max_attempts_per_object"])):
+        cx = rng.randint(0, width - 1)
+        cy = rng.randint(0, height - 1)
+        proximity = float(depth[cy, cx]) / 255.0
+        factor = _resolve_depth_scale(proximity, depth_scale)
+        scaled_width = max(1, round(fruit.width * factor))
+        scaled_height = max(1, round(fruit.height * factor))
+        if scaled_width > width or scaled_height > height:
             continue
-        if placement["z_method"] == "quantile":
-            z_value = float(np.quantile(local_values, float(placement["z_quantile"])))
-        elif placement["z_method"] == "mean_plus_std":
-            z_value = float(local_values.mean()) + float(
-                placement["z_std_multiplier"]
-            ) * float(local_values.std())
-        else:
-            raise ValueError(f"z_method desconhecido: {placement['z_method']}")
-        visibility = (region_depth <= z_value).astype(np.uint8) * 255
-        blur = float(config["occlusion"]["edge_blur"])
-        if blur > 0:
-            visibility = np.asarray(
-                Image.fromarray(visibility).filter(ImageFilter.GaussianBlur(blur))
-            )
-        new_alpha = np.rint(alpha_float * visibility / 255.0).astype(np.uint8)
-        visible_pixels = int((new_alpha > 8).sum())
-        if visible_pixels / original_pixels < float(placement["min_visibility"]):
+        attempt = fruit.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
+        x = min(max(cx - scaled_width // 2, 0), width - scaled_width)
+        y = min(max(cy - scaled_height // 2, 0), height - scaled_height)
+        alpha_original = np.asarray(attempt.getchannel("A"), dtype=np.uint8)
+        alpha_float = alpha_original.astype(np.float32)
+        opaque = alpha_original > 8
+        original_pixels = int(opaque.sum())
+        if original_pixels == 0:
             continue
-        region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
-        fruit = _apply_appearance(fruit, region, config["appearance"])
-        fruit.putalpha(Image.fromarray(new_alpha))
-        return {
-            "x": x,
-            "y": y,
-            "image": fruit,
-            "visible_mask": new_alpha,
-            "amodal_mask": alpha_original,
-            "rect": (0, 0, fruit.width, fruit.height),
-            "z": round(z_value, 3),
-            "visibility_at_insert": round(visible_pixels / original_pixels, 4),
-        }
+        result = _finish_placement(
+            attempt,
+            x,
+            y,
+            alpha_original,
+            alpha_float,
+            opaque,
+            original_pixels,
+            canvas,
+            depth,
+            config,
+        )
+        if result is not None:
+            return result
     return None
 
 
@@ -420,7 +517,13 @@ def _render_one(task: dict) -> dict:
         if fruit.width > canvas.width or fruit.height > canvas.height:
             rejected["larger_than_canvas"] += 1
             continue
-        instance = _placement(canvas, depth, fruit, config, rng)
+        depth_scale = config["objects"].get("depth_scale")
+        if depth_scale and depth_scale.get("enabled", False):
+            instance = _placement_with_depth_scale(
+                canvas, depth, fruit, config, rng, depth_scale
+            )
+        else:
+            instance = _placement(canvas, depth, fruit, config, rng)
         if instance is None:
             rejected["placement_or_visibility"] += 1
             continue

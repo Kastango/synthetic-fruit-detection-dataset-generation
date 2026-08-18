@@ -116,6 +116,42 @@ def test_generation_is_deterministic_and_labels_are_valid(tmp_path: Path) -> Non
         assert validate_yolo_text(label.read_text(), str(label)) == 1
 
 
+def test_depth_scale_config_validates_scale_bounds() -> None:
+    config = tiny_config()
+    config["objects"]["depth_scale"] = {
+        "enabled": True,
+        "near_scale": 0.5,
+        "far_scale": 1.5,
+    }
+    with pytest.raises(ValueError, match="depth_scale"):
+        validate_synthesis_config(config)
+
+
+def test_depth_scale_generation_is_deterministic_and_labels_are_valid(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["objects"]["depth_scale"] = {
+        "enabled": True,
+        "near_scale": 1.4,
+        "far_scale": 0.6,
+    }
+    first = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    manifest_before = (output / "manifest.jsonl").read_bytes()
+    second = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert (output / "manifest.jsonl").read_bytes() == manifest_before
+    for label in (output / "labels").rglob("*.txt"):
+        assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
 def test_parallel_generation_matches_single_worker(tmp_path: Path) -> None:
     assets = tmp_path / "assets"
     single = tmp_path / "single"
