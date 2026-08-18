@@ -22,7 +22,7 @@ from .common import (
     stable_hash,
 )
 
-GENERATOR_SCHEMA_VERSION = 3
+GENERATOR_SCHEMA_VERSION = 4
 ASSET_SPLIT_SCHEMA_VERSION = 2
 
 
@@ -171,6 +171,15 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
+    z_method = config["placement"]["z_method"]
+    if z_method not in {"quantile", "mean_plus_std", "center_patch"}:
+        raise ValueError(f"z_method desconhecido: {z_method}")
+    if z_method == "center_patch":
+        patch_fraction = float(config["placement"].get("z_patch_fraction", 0.2))
+        if not 0 < patch_fraction <= 1:
+            raise ValueError(
+                "placement.z_patch_fraction deve estar entre 0 (exclusivo) e 1"
+            )
     exclude_bottom = config["placement"].get("exclude_bottom_fraction", 0.0)
     if not 0 <= float(exclude_bottom) < 1:
         raise ValueError("placement.exclude_bottom_fraction deve estar entre 0 e 1")
@@ -194,6 +203,20 @@ def validate_synthesis_config(config: dict) -> None:
     depth_smooth_radius = config["occlusion"].get("depth_smooth_radius", 0.0)
     if float(depth_smooth_radius) < 0:
         raise ValueError("occlusion.depth_smooth_radius não pode ser negativo")
+    mask_threshold = config["occlusion"].get("mask_threshold")
+    if mask_threshold is not None and not 0 < float(mask_threshold) < 1:
+        raise ValueError("occlusion.mask_threshold deve estar entre 0 e 1 (exclusivos)")
+    contact_shadow = config["occlusion"].get("contact_shadow")
+    if contact_shadow and contact_shadow.get("enabled", False):
+        strength = float(contact_shadow.get("strength", 0.0))
+        radius_fraction = float(contact_shadow.get("radius_fraction", 0.04))
+        if not 0 <= strength <= 1:
+            raise ValueError("occlusion.contact_shadow.strength deve estar entre 0 e 1")
+        if not 0 < radius_fraction <= 0.5:
+            raise ValueError(
+                "occlusion.contact_shadow.radius_fraction deve estar entre 0 "
+                "(exclusivo) e 0.5"
+            )
 
 
 @lru_cache(maxsize=8)
@@ -347,6 +370,44 @@ def _apply_appearance(
     return _apply_appearance_hardlight(fruit, background_region, appearance)
 
 
+def _apply_occlusion_contact_shadow(
+    fruit: Image.Image,
+    visibility: np.ndarray,
+    opaque: np.ndarray,
+    occlusion: dict,
+) -> Image.Image:
+    contact_shadow = occlusion.get("contact_shadow")
+    if not contact_shadow or not contact_shadow.get("enabled", False):
+        return fruit
+    # Uma folha que passa à frente não produz apenas um recorte geométrico:
+    # ela também bloqueia parte da luz na faixa imediatamente vizinha da
+    # fruta ainda visível. Desfocar apenas a região realmente ocluída gera
+    # essa penumbra curta sem escurecer o contorno externo do recorte.
+    occluded = opaque.astype(np.float32) * (1.0 - visibility.astype(np.float32) / 255)
+    if not np.any(occluded > 0):
+        return fruit
+    radius = max(
+        0.5,
+        min(fruit.size) * float(contact_shadow.get("radius_fraction", 0.04)),
+    )
+    shadow = (
+        np.asarray(
+            Image.fromarray(np.rint(occluded * 255).astype(np.uint8)).filter(
+                ImageFilter.GaussianBlur(radius)
+            ),
+            dtype=np.float32,
+        )
+        / 255.0
+    )
+    gain = 1.0 - float(contact_shadow.get("strength", 0.0)) * shadow
+    rgb = np.asarray(fruit.convert("RGB"), dtype=np.float32)
+    shaded = Image.fromarray(
+        np.clip(rgb * gain[..., None], 0, 255).astype(np.uint8)
+    ).convert("RGBA")
+    shaded.putalpha(fruit.getchannel("A"))
+    return shaded
+
+
 def _bbox(mask: np.ndarray, threshold: int = 1) -> tuple[int, int, int, int] | None:
     ys, xs = np.nonzero(mask >= threshold)
     if len(xs) == 0:
@@ -365,34 +426,77 @@ def _finish_placement(
     canvas: Image.Image,
     depth: np.ndarray,
     config: dict,
+    anchor: tuple[int, int] | None = None,
 ) -> dict | None:
     placement = config["placement"]
     region_depth = depth[y : y + fruit.height, x : x + fruit.width]
     local_values = region_depth[opaque]
-    if not len(local_values) or float(np.median(local_values)) < float(
-        placement["min_depth"]
-    ):
+    if not len(local_values):
         return None
     if placement["z_method"] == "quantile":
+        placement_values = local_values
         z_value = float(np.quantile(local_values, float(placement["z_quantile"])))
     elif placement["z_method"] == "mean_plus_std":
+        placement_values = local_values
         z_value = float(local_values.mean()) + float(
             placement["z_std_multiplier"]
         ) * float(local_values.std())
+    elif placement["z_method"] == "center_patch":
+        # O Z da fruta deve vir do ponto onde ela foi ancorada, não de um
+        # quantil calculado sobre toda a sua silhueta. O quantil local força
+        # quase a mesma fração de oclusão em toda inserção (por exemplo, q=.65
+        # oculta aproximadamente 35%), mesmo quando não há uma camada física
+        # coerente à frente. Uma pequena mediana ao redor da âncora é robusta
+        # a ruído de um pixel sem perder a interpretação de eixo Z.
+        anchor_x, anchor_y = anchor or (fruit.width // 2, fruit.height // 2)
+        patch_size = max(
+            1,
+            round(
+                min(fruit.width, fruit.height)
+                * float(placement.get("z_patch_fraction", 0.2))
+            ),
+        )
+        half_before = patch_size // 2
+        half_after = patch_size - half_before
+        left = max(0, anchor_x - half_before)
+        right = min(fruit.width, anchor_x + half_after)
+        top = max(0, anchor_y - half_before)
+        bottom = min(fruit.height, anchor_y + half_after)
+        patch_opaque = opaque[top:bottom, left:right]
+        placement_values = region_depth[top:bottom, left:right][patch_opaque]
+        if not len(placement_values):
+            placement_values = local_values
+        z_value = float(np.median(placement_values)) + float(
+            placement.get("z_offset", 0.0)
+        )
+        z_value = float(np.clip(z_value, 0.0, 255.0))
     else:
         raise ValueError(f"z_method desconhecido: {placement['z_method']}")
+    if float(np.median(placement_values)) < float(placement["min_depth"]):
+        return None
     visibility = (region_depth <= z_value).astype(np.uint8) * 255
     blur = float(config["occlusion"]["edge_blur"])
     if blur > 0:
         visibility = np.asarray(
             Image.fromarray(visibility).filter(ImageFilter.GaussianBlur(blur))
         )
+    mask_threshold = config["occlusion"].get("mask_threshold")
+    if mask_threshold is not None:
+        # O notebook de origem suaviza a topologia da máscara e depois a
+        # binariza. Sem esta etapa, boa parte da fruta fica semitransparente
+        # e o fundo escuro aparece como manchas em vez de oclusão geométrica.
+        visibility = (visibility > round(255 * float(mask_threshold))).astype(
+            np.uint8
+        ) * 255
     new_alpha = np.rint(alpha_float * visibility / 255.0).astype(np.uint8)
     visible_pixels = int((new_alpha > 8).sum())
     if visible_pixels / original_pixels < float(placement["min_visibility"]):
         return None
     region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
     fruit = _apply_appearance(fruit, region, config["appearance"])
+    fruit = _apply_occlusion_contact_shadow(
+        fruit, visibility, opaque, config["occlusion"]
+    )
     fruit.putalpha(Image.fromarray(new_alpha))
     return {
         "x": x,
@@ -442,6 +546,7 @@ def _placement(
             canvas,
             depth,
             config,
+            anchor=(fruit.width // 2, fruit.height // 2),
         )
         if result is not None:
             return result
@@ -501,6 +606,7 @@ def _placement_with_depth_scale(
             canvas,
             depth,
             config,
+            anchor=(cx - x, cy - y),
         )
         if result is not None:
             return result

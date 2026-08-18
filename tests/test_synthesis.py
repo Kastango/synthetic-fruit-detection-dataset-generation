@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
 from PIL import Image
 
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
+    _finish_placement,
     create_asset_split,
     generate_dataset,
     validate_synthesis_config,
@@ -231,6 +233,125 @@ def test_depth_smooth_radius_generation_is_deterministic_and_labels_are_valid(
     assert (output / "manifest.jsonl").read_bytes() == manifest_before
     for label in (output / "labels").rglob("*.txt"):
         assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "message"),
+    [
+        ("z_patch_fraction", 0.0, "z_patch_fraction"),
+        ("mask_threshold", 1.0, "mask_threshold"),
+    ],
+)
+def test_center_patch_occlusion_config_validates_bounds(
+    key: str, value: float, message: str
+) -> None:
+    config = tiny_config()
+    config["placement"]["z_method"] = "center_patch"
+    if key == "z_patch_fraction":
+        config["placement"][key] = value
+    else:
+        config["occlusion"][key] = value
+    with pytest.raises(ValueError, match=message):
+        validate_synthesis_config(config)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [("strength", 1.1), ("radius_fraction", 0.0)],
+)
+def test_contact_shadow_config_validates_bounds(key: str, value: float) -> None:
+    config = tiny_config()
+    config["occlusion"]["contact_shadow"] = {
+        "enabled": True,
+        "strength": 0.45,
+        "radius_fraction": 0.04,
+        key: value,
+    }
+    with pytest.raises(ValueError, match=key):
+        validate_synthesis_config(config)
+
+
+def test_center_patch_anchors_z_and_binarizes_blurred_mask() -> None:
+    fruit = Image.new("RGBA", (9, 9), (230, 130, 20, 255))
+    canvas = Image.new("RGB", (9, 9), (30, 90, 40))
+    depth = np.full((9, 9), 30, dtype=np.uint8)
+    depth[:, 5:] = 180
+    depth[4, 4] = 100
+    alpha = np.asarray(fruit.getchannel("A"), dtype=np.uint8)
+    config = tiny_config()
+    config["placement"].update(
+        {
+            "z_method": "center_patch",
+            "z_patch_fraction": 0.1,
+            "z_offset": 0.0,
+            "min_visibility": 0.0,
+        }
+    )
+    config["occlusion"].update({"edge_blur": 1.5, "mask_threshold": 0.5})
+
+    result = _finish_placement(
+        fruit,
+        0,
+        0,
+        alpha,
+        alpha.astype(np.float32),
+        alpha > 8,
+        int((alpha > 8).sum()),
+        canvas,
+        depth,
+        config,
+        anchor=(4, 4),
+    )
+
+    assert result is not None
+    assert result["z"] == 100.0
+    assert set(np.unique(result["visible_mask"])) <= {0, 255}
+
+
+def test_contact_shadow_darkens_only_next_to_occluded_region() -> None:
+    fruit = Image.new("RGBA", (15, 15), (200, 120, 40, 255))
+    canvas = Image.new("RGB", fruit.size, (30, 90, 40))
+    depth = np.full(fruit.size[::-1], 30, dtype=np.uint8)
+    depth[:, 8:] = 180
+    alpha = np.asarray(fruit.getchannel("A"), dtype=np.uint8)
+    config = tiny_config()
+    config["placement"].update(
+        {
+            "z_method": "center_patch",
+            "z_patch_fraction": 0.1,
+            "min_visibility": 0.0,
+        }
+    )
+    config["occlusion"].update(
+        {
+            "mask_threshold": 0.5,
+            "contact_shadow": {
+                "enabled": True,
+                "strength": 0.6,
+                "radius_fraction": 0.2,
+            },
+        }
+    )
+
+    result = _finish_placement(
+        fruit,
+        0,
+        0,
+        alpha,
+        alpha.astype(np.float32),
+        alpha > 8,
+        int((alpha > 8).sum()),
+        canvas,
+        depth,
+        config,
+        anchor=(3, 7),
+    )
+
+    assert result is not None
+    rendered = np.asarray(result["image"].convert("RGB"))
+    assert rendered[7, 7].mean() < rendered[7, 1].mean()
+    assert result["visible_mask"][7, 7] == 255
+    assert result["visible_mask"][7, 10] == 0
 
 
 def test_scene_grading_config_validates_positive_factors() -> None:

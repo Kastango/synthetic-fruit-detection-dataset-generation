@@ -6,11 +6,15 @@ images:
 canvas: [720, 960]
 objects:
   min: 1
-  # Densidade original (35): a redução testada em trial001 melhorou o
-  # sintético mas piorou o mAP real (n=115), então não é adotada aqui.
-  max: 35
-  min_scale: 0.035
-  max_scale: 0.12
+  # Nas 115 imagens reais de desenvolvimento há em média 16.1 frutas por
+  # cena (mediana 15, q90 28). O intervalo uniforme 1–30 reproduz essa
+  # densidade sem a cauda excessiva do limite anterior de 35.
+  max: 30
+  # O maior lado das caixas reais tem mediana 3.66% do canvas e q90 7.37%.
+  # A faixa base abaixo, modulada pela profundidade local, produziu 4.17% e
+  # 6.67% no lote sintético de inspeção (40 cenas).
+  min_scale: 0.02
+  max_scale: 0.065
   scale_mode: canvas
   # Revertido para 180 (valor original). Uma inspeção rápida sugeriu que
   # cicatriz-sempre-pra-cima seria mais realista, mas checando mais fotos
@@ -18,53 +22,64 @@ objects:
   # ou nem fica visível — não há um "pra cima" canônico. Reduzir a rotação
   # também cortaria diversidade de pose que ajuda o YOLO a generalizar.
   rotation_degrees: 180
+  depth_scale:
+    enabled: true
+    near_scale: 1.3
+    far_scale: 0.6
 placement:
   min_depth: 20
   min_visibility: 0.25
   max_attempts_per_object: 100
-  z_method: quantile
-  z_quantile: 0.65
-  # O mapa de profundidade (ZoeDepth) às vezes classifica grama/chão aberto
-  # como mais "perto" que a própria copa (ex.: névoa perto da câmera),
-  # levando frutas a flutuar sobre grama sem planta hospedeira. Nem
-  # variância de profundidade nem verdor/textura RGB separaram bem grama de
-  # folhagem nos testes feitos; a faixa inferior do quadro é onde o chão
-  # aparece nas fotos deste pool, então essa faixa fica fora da área de
-  # colocação. Confirmado por inspeção visual (IMG_3509.jpg).
+  # O Z vem da mediana de uma pequena vizinhança no ponto de ancoragem. O
+  # quantil anterior sobre toda a silhueta impunha mecanicamente cerca de
+  # 35% de oclusão a quase toda fruta, independentemente da geometria local.
+  z_method: center_patch
+  z_patch_fraction: 0.2
+  # Pequena tolerância em direção à câmera evita que ruído residual do mapa
+  # elimine a fruta inteira, mantendo oclusões variadas (52–76% visíveis nas
+  # variantes depuradas) em vez de uma fração fixa.
+  z_offset: 10
+  # A faixa inferior concentra chão/grama e fica fora da área de ancoragem.
   exclude_bottom_fraction: 0.15
 appearance:
   hardlight_power: 0.65
-  # A ideia original do hardlight (conforme o usuário) é usar a cor média do
-  # local de inserção só para estimar sombra/claridade, não para "tingir" a
-  # fruta. hue_power/saturation_power em 0 isola exatamente esse efeito;
-  # value_power mais alto reforça a resposta de luz/sombra local. Corrige o
-  # efeito "adesivo colado" do hard-light puro, confirmado por inspeção
-  # visual direta comparando com data/real_yolo e os recortes de estúdio em
-  # data/assets/regenerated/pictures_trimmed. hue_power>0 tingia a fruta de
-  # verde em fundos dominados por folhagem — por isso fica em 0.
+  # O alvo hard-light varia por pixel e conserva a forma/sombra do recorte;
+  # potências pequenas de H/S e moderada de V integram a fruta à luz local
+  # sem deixá-la verde ou marrom. Dessaturação e offsets adicionais foram
+  # rejeitados tanto visualmente quanto por KID pareado.
   hsv_cast:
     enabled: true
-    hue_power: 0.0
-    saturation_power: 0.0
-    value_power: 0.4
+    use_hardlight_target: true
+    hue_power: 0.08
+    saturation_power: 0.12
+    value_power: 0.35
 occlusion:
   edge_blur: 1.5
+  # Suaviza ruído fino do DepthPro antes de decidir a topologia da oclusão.
+  depth_smooth_radius: 1.2
+  # Como no notebook de origem: blur morfológico seguido de limiar binário.
+  # Sem o limiar, o fundo vazava como manchas semitransparentes na fruta.
+  mask_threshold: 0.5
+  # Folhas à frente projetam uma penumbra curta sobre a parte ainda visível.
+  contact_shadow:
+    enabled: true
+    strength: 0.45
+    radius_fraction: 0.04
 annotation:
   mode: visible
   min_box_pixels: 2
 output:
   jpeg_quality: 95
-  # O pool de 228 fundos é uniformemente nublado/à altura dos olhos (não há
-  # subconjunto parecido com as fotos reais ensolaradas escondido nele,
-  # confirmado revisando todos os 228 em contact sheets). Sem poder trazer
-  # fundos novos (fora do escopo), um realce global de contraste/saturação/
-  # nitidez na cena já composta aproxima o "punch" visual do observado nas
-  # fotos reais.
+  # Aplicado só ao fundo, antes das frutas. A calibração train+val mostrou
+  # que o ajuste anterior tornava a cena neon (saturação mediana 146 e
+  # desvio de luminância 64.6, contra 83.5 e 43.6 no real). Este ajuste
+  # preserva a saturação, reduz a exposição dos fundos nublados e usa
+  # nitidez discreta.
   scene_grading:
     enabled: true
-    contrast: 1.25
-    saturation: 1.35
-    brightness: 1.05
+    contrast: 1.2
+    saturation: 1.0
+    brightness: 0.82
     sharpen_radius: 2.0
-    sharpen_percent: 60
+    sharpen_percent: 25
     sharpen_threshold: 2
