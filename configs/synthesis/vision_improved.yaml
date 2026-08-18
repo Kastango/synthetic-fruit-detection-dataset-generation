@@ -37,13 +37,12 @@ placement:
   z_patch_fraction: 0.2
   # Negativo desloca o Z para longe da câmera, aumentando a oclusão: com
   # z_offset=10 a mediana de visibilidade por instância ficava em 89% (mais
-  # de 25% das inserções saíam 100% visíveis, quase sem oclusão). O usuário
-  # pediu casos mais difíceis de propósito — um detector que aprende com
-  # oclusão pesada deve generalizar melhor para os casos fáceis. -15 dá
-  # média 44%/mediana 41% de visibilidade por instância (medido em 60 cenas,
-  # 891 instâncias, nenhuma imagem ficou sem anotação); abaixo de -20 o
-  # ganho satura porque min_visibility=0.25 passa a rejeitar o excesso.
-  z_offset: -15
+  # de 25% das inserções saíam 100% visíveis, quase sem oclusão). -15 (44%
+  # média/41% mediana) ficou pesado demais na inspeção visual do usuário;
+  # -4 dá média 49%/mediana 46% (60 cenas, medido via
+  # fruit_pipeline.synthesis._finish_placement), oclusão notavelmente mais
+  # pesada que o padrão original sem parecer degenerada.
+  z_offset: -4
   # A faixa inferior concentra chão/grama e fica fora da área de ancoragem.
   exclude_bottom_fraction: 0.15
 appearance:
@@ -51,13 +50,16 @@ appearance:
   # O alvo hard-light varia por pixel e conserva a forma/sombra do recorte;
   # potências pequenas de H/S e moderada de V integram a fruta à luz local
   # sem deixá-la verde ou marrom. Dessaturação e offsets adicionais foram
-  # rejeitados tanto visualmente quanto por KID pareado.
+  # rejeitados tanto visualmente quanto por KID pareado. Pesos elevados de
+  # 0.08/0.12/0.35 para 0.12/0.18/0.45 a pedido do usuário, para reforçar a
+  # coesão com a cena; confirmado visualmente sem reintroduzir o tingimento
+  # esverdeado observado com pesos de matiz muito altos (>=0.3).
   hsv_cast:
     enabled: true
     use_hardlight_target: true
-    hue_power: 0.08
-    saturation_power: 0.12
-    value_power: 0.35
+    hue_power: 0.12
+    saturation_power: 0.18
+    value_power: 0.45
 occlusion:
   edge_blur: 1.5
   # Suaviza ruído fino do DepthPro antes de decidir a topologia da oclusão.
