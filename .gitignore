@@ -1,0 +1,15 @@
+.DS_Store
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+*.egg-info/
+
+# Dados, pesos e resultados são reproduzíveis, mas grandes demais para Git.
+data/
+artifacts/
+runs/
+*.pt
+*.onnx
+*.part

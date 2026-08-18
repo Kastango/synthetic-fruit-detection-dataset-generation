@@ -1,0 +1,40 @@
+project:
+  seed: 42
+  class_names: [poncan]
+
+paths:
+  archives: data/archives
+  raw: data/raw
+  assets: data/assets/prepared
+  regenerated_assets: data/assets/regenerated
+  real_source: data/real_source
+  real_yolo: data/real_yolo
+  generated: data/generated
+  artifacts: artifacts
+  runs: runs
+
+real_dataset:
+  expected_images: 130
+  expected_boxes: 2093
+  train_images: 100
+  val_images: 15
+  test_images: 15
+  devices: [iphone, pixel]
+
+asset_split:
+  train_ratio: 0.8
+  seed: 42
+
+depth:
+  # O checkpoint NK combina domínios internos e externos.
+  model: Intel/zoedepth-nyu-kitti
+  revision: f364d4c7936e91f465abba182208dd68142bf0ca
+  prediction_is_distance: true
+  lower_percentile: 2.0
+  upper_percentile: 98.0
+  closest_is_white: true
+
+segmentation:
+  model: isnet-general-use
+  alpha_threshold: 8
+  output_size: 1024

@@ -1,0 +1,33 @@
+name: confirmatory_pool
+seed: 42
+images:
+  # Pool mestre: dez blocos aninhados de 104 cenas.
+  train: 1040
+  # Validação fixa, independente do tamanho 1x–10x usado no treino.
+  val: 260
+# A fonte tem aspecto 3:4. Em treino com imgsz=960, o YOLO consome 720x960
+# antes do padding; renderizar acima disso só acrescenta resize e I/O.
+canvas: [720, 960]
+objects:
+  min: 1
+  max: 35
+  min_scale: 0.035
+  max_scale: 0.12
+  scale_mode: canvas
+  rotation_degrees: 180
+placement:
+  min_depth: 20
+  min_visibility: 0.25
+  max_attempts_per_object: 100
+  z_method: quantile
+  z_quantile: 0.65
+appearance:
+  hardlight_power: 0.65
+occlusion:
+  edge_blur: 1.5
+annotation:
+  mode: visible
+  # Equivale aproximadamente a 4 px no canvas piloto 1500x2000 depois do resize.
+  min_box_pixels: 2
+output:
+  jpeg_quality: 95

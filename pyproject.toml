@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "synthetic-fruit-pipeline"
+version = "0.1.0"
+description = "Pipeline reprodutível para geração sintética e detecção de poncãs"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "numpy==1.26.4",
+  "Pillow==11.3.0",
+  "PyYAML==6.0.2",
+  "tqdm==4.67.1",
+]
+
+[project.optional-dependencies]
+train = ["ultralytics==8.3.0"]
+preprocess = [
+  "rembg[cpu]==2.0.67",
+  "torch==2.5.1",
+  "torchvision==0.20.1",
+  "transformers==4.48.3",
+]
+dev = ["pytest==8.4.1"]
+
+[tool.setuptools]
+packages = ["fruit_pipeline"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+

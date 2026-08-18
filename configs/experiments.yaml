@@ -1,0 +1,56 @@
+# Grade piloto para validar a infraestrutura. Não usar isoladamente para claims
+# causais; o desenho confirmatório está documentado no README.md.
+protocol:
+  ultralytics_version: 8.3.0
+  metric: map50_95
+  # O teste real só é aberto por scripts/evaluate_test.py depois da seleção.
+  validation: data/real_yolo/images/val
+  test: data/real_yolo/images/test
+  class_names: [poncan]
+
+conditions:
+  real_baseline:
+    train:
+      - data/real_yolo/images/train
+    manifests:
+      - artifacts/real_split.json
+  synthetic_depth:
+    train:
+      - data/generated/depth_robust/images/train
+    manifests:
+      - data/generated/depth_robust/manifest.jsonl
+
+models: [yolov8n.pt, yolov8s.pt]
+seeds: [41, 42, 43]
+
+defaults:
+  epochs: 100
+  imgsz: 640
+  batch: 16
+  patience: 20
+  optimizer: SGD
+  pretrained: true
+  deterministic: true
+  workers: 8
+  device: cuda
+  # Baseline sem augmentation. Ative cada eixo depois de congelar este resultado.
+  close_mosaic: 0
+  hsv_h: 0.0
+  hsv_s: 0.0
+  hsv_v: 0.0
+  degrees: 0.0
+  translate: 0.0
+  scale: 0.0
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.0
+  mosaic: 0.0
+  mixup: 0.0
+  copy_paste: 0.0
+
+# Primeiro varia somente otimização. Augmentation deve ser adicionada depois,
+# explicitamente, sem modificar os arquivos em data/real_source.
+grid:
+  lr0: [0.01, 0.005]
+  weight_decay: [0.0005]
