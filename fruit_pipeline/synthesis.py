@@ -171,6 +171,9 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
+    exclude_bottom = config["placement"].get("exclude_bottom_fraction", 0.0)
+    if not 0 <= float(exclude_bottom) < 1:
+        raise ValueError("placement.exclude_bottom_fraction deve estar entre 0 e 1")
     appearance = config["appearance"]
     obsolete = {"light_probability", "light_power"} & set(appearance)
     if obsolete:
@@ -401,9 +404,14 @@ def _placement(
     if original_pixels == 0:
         return None
     placement = config["placement"]
+    exclude_bottom = float(placement.get("exclude_bottom_fraction", 0.0))
     for _ in range(int(placement["max_attempts_per_object"])):
         x = rng.randint(0, width - fruit.width)
         y = rng.randint(0, height - fruit.height)
+        if exclude_bottom > 0 and (y + fruit.height / 2) > height * (
+            1 - exclude_bottom
+        ):
+            continue
         result = _finish_placement(
             fruit,
             x,
@@ -442,9 +450,12 @@ def _placement_with_depth_scale(
     # tamanho fixo e só sorteia a posição.
     width, height = canvas.size
     placement = config["placement"]
+    exclude_bottom = float(placement.get("exclude_bottom_fraction", 0.0))
     for _ in range(int(placement["max_attempts_per_object"])):
         cx = rng.randint(0, width - 1)
         cy = rng.randint(0, height - 1)
+        if exclude_bottom > 0 and cy > height * (1 - exclude_bottom):
+            continue
         proximity = float(depth[cy, cx]) / 255.0
         factor = _resolve_depth_scale(proximity, depth_scale)
         scaled_width = max(1, round(fruit.width * factor))

@@ -59,6 +59,30 @@ def tiny_config() -> dict:
     }
 
 
+def test_exclude_bottom_fraction_validates_bounds() -> None:
+    config = tiny_config()
+    config["placement"]["exclude_bottom_fraction"] = 1.5
+    with pytest.raises(ValueError, match="exclude_bottom_fraction"):
+        validate_synthesis_config(config)
+
+
+def test_exclude_bottom_fraction_keeps_instances_out_of_bottom_band(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["images"] = {"train": 20, "val": 0}
+    config["placement"]["exclude_bottom_fraction"] = 0.3
+    generate_dataset(assets, output, config, train_ratio=0.5, split_seed=42, workers=1)
+    canvas_height = config["canvas"][1]
+    for label in (output / "labels" / "train").glob("*.txt"):
+        for line in label.read_text().splitlines():
+            _, _, center_y, _, _height = line.split()
+            assert float(center_y) * canvas_height < canvas_height * 0.85
+
+
 def test_light_texture_options_are_rejected() -> None:
     config = tiny_config()
     config["appearance"]["light_probability"] = 0.5

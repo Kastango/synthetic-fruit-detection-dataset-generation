@@ -24,6 +24,14 @@ placement:
   max_attempts_per_object: 100
   z_method: quantile
   z_quantile: 0.65
+  # O mapa de profundidade (ZoeDepth) às vezes classifica grama/chão aberto
+  # como mais "perto" que a própria copa (ex.: névoa perto da câmera),
+  # levando frutas a flutuar sobre grama sem planta hospedeira. Nem
+  # variância de profundidade nem verdor/textura RGB separaram bem grama de
+  # folhagem nos testes feitos; a faixa inferior do quadro é onde o chão
+  # aparece nas fotos deste pool, então essa faixa fica fora da área de
+  # colocação. Confirmado por inspeção visual (IMG_3509.jpg).
+  exclude_bottom_fraction: 0.15
 appearance:
   hardlight_power: 0.65
   # A ideia original do hardlight (conforme o usuário) é usar a cor média do
