@@ -12,11 +12,12 @@ objects:
   min_scale: 0.035
   max_scale: 0.12
   scale_mode: canvas
-  # Reduzido de 180 para 20: rotação livre faz a cicatriz do cabinho apontar
-  # em qualquer direção, inclusive de cabeça para baixo — fisicamente
-  # implausível, poncãs reais sempre penduram com o cabinho para cima.
-  # Confirmado por inspeção visual direta.
-  rotation_degrees: 20
+  # Revertido para 180 (valor original). Uma inspeção rápida sugeriu que
+  # cicatriz-sempre-pra-cima seria mais realista, mas checando mais fotos
+  # reais (img_2062.jpg, img_2058.jpg) o cabinho aparece em ângulos variados
+  # ou nem fica visível — não há um "pra cima" canônico. Reduzir a rotação
+  # também cortaria diversidade de pose que ajuda o YOLO a generalizar.
+  rotation_degrees: 180
 placement:
   min_depth: 20
   min_visibility: 0.25
