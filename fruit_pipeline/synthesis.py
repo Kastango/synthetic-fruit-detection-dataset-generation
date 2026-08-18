@@ -168,7 +168,7 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("appearance.hardlight_power deve estar entre 0 e 1")
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=8)
 def _open_background_pair_cached(
     background_path: str, depth_path: str, size: tuple[int, int]
 ) -> tuple[Image.Image, Image.Image]:
@@ -200,7 +200,7 @@ def _open_background_pair(
     return background.copy(), depth
 
 
-@lru_cache(maxsize=16)
+@lru_cache(maxsize=128)
 def _open_cutout_cached(path: str) -> Image.Image:
     with Image.open(path) as opened:
         return opened.convert("RGBA")
