@@ -9,7 +9,7 @@ que orienta a pesquisa é:
 > detector de poncãs?
 
 A pipeline preserva as fontes, reconstrói recortes e mapas de profundidade,
-gera cenas parametrizáveis e executa grades YOLO em servidor. O teste real
+gera cenas parametrizáveis e executa grades de detectores em servidor. O teste real
 permanece fechado enquanto decisões metodológicas, geradores, arquiteturas e
 hiperparâmetros são definidos.
 
@@ -53,23 +53,62 @@ são aninhados: `2x` contém `1x`, `3x` contém `2x` e assim por diante. Dessa
 forma, aumentar o volume não troca silenciosamente frutas, fundos ou parâmetros
 por amostras mais favoráveis.
 
-Todos os tratamentos serão executados com `yolo11s.pt` e `yolo26s.pt`, ambos
-pré-treinados e com entrada 960. O split e o pool sintético usam semente de dados
-42; as sementes de treinamento são 41 e 42. A matriz confirmatória contém:
+### Famílias de detectores e tamanho de entrada
+
+Todos os tratamentos serão executados com três checkpoints pré-treinados em
+COCO:
+
+| Família | Checkpoint | Parâmetros | FLOPs em 640 | Motivo da escolha |
+|---|---|---:|---:|---|
+| YOLO26 | `yolo26s.pt` | 9,5 M | 20,7 B | versão pequena com STAL, voltada também à atribuição de alvos pequenos |
+| YOLOv8 | `yolov8s.pt` | 11,2 M | 28,6 B | porte próximo ao YOLO26s e baseline consolidado |
+| RT-DETR | `rtdetr-l.pt` | 32 M | 110 B | menor checkpoint RT-DETR pré-treinado distribuído pela Ultralytics |
+
+Os números são referências em COCO a 640 publicadas nas páginas oficiais do
+[YOLO26](https://docs.ultralytics.com/models/yolo26),
+[YOLOv8](https://docs.ultralytics.com/models/yolov8) e
+[RT-DETR](https://docs.ultralytics.com/models/rtdetr), complementadas pelo
+[model zoo oficial do RT-DETR](https://github.com/lyuwenyu/RT-DETR#model-zoo);
+não são resultados deste estudo. O RT-DETR-L é maior que os dois YOLO. Portanto,
+resultados absolutos não serão usados para atribuir diferenças somente à
+arquitetura ou ao número de parâmetros. A inferência principal compara
+`synthetic-5x` e `manual-full` dentro de cada família.
+
+O ambiente confirmatório fixa `ultralytics==8.4.121`. O hash de cada checkpoint
+COCO de entrada será registrado antes dos treinos. O RT-DETR-L conserva as seis
+camadas do decoder (`eval_idx=5`) e as 300 queries padrão; reduções voltadas à
+velocidade de inferência não entram no experimento.
+
+O tamanho de entrada será `imgsz=960`, com `multi_scale=0`, no treino, na
+validação e no teste. Nas 2.093 caixas reais auditadas, uma projeção que preserva
+a razão de aspecto deixa 20,0% das poncãs com lado mínimo abaixo de 12 pixels em
+640 e apenas 3,3% em 960; abaixo de 16 pixels, as proporções são 48,0% e 12,0%.
+Usar 1280 aumentaria novamente o custo e ampliaria as cenas sintéticas, cujo
+maior lado já é gerado em 960, sem acrescentar detalhe real. A Ultralytics
+preserva a razão de aspecto no pré-processamento dos YOLO, mas usa entrada
+quadrada no RT-DETR; cada transformação nativa será idêntica entre as condições
+da mesma família e registrada como parte da implementação do detector.
+
+O split e o pool sintético usam semente de dados 42; as sementes de treinamento
+são 41 e 42. A matriz confirmatória contém:
 
 ```text
-7 condições × 2 arquiteturas × 2 sementes = 28 treinamentos
+7 condições × 3 famílias × 2 sementes = 42 treinamentos
 ```
 
-As sementes são pareadas entre condições e a ordem das execuções é embaralhada.
-Os dois resultados são apresentados individualmente, além da média: duas
-sementes são o mínimo operacional e não estimam com precisão toda a variação
-entre treinamentos.
+As sementes são pareadas entre condições dentro de cada família e a ordem das
+execuções é embaralhada. Os dois resultados são apresentados individualmente,
+além da média: duas sementes são o mínimo operacional e não estimam com precisão
+toda a variação entre treinamentos.
 
-O número de passos do otimizador, a política de augmentation, a regra de
-checkpoint e os demais hiperparâmetros são mantidos fixos. Usar o mesmo número
-de épocas seria uma análise diferente, pois daria mais atualizações às bases
-maiores.
+O número de passos do otimizador pode ser específico para cada família, mas é
+mantido idêntico entre todas as condições de dados daquela família. A política
+de augmentation, a regra de checkpoint e os demais hiperparâmetros comparáveis
+também permanecem fixos. Usar o mesmo número de épocas seria uma análise
+diferente, pois daria mais atualizações às bases maiores. YOLO26s e YOLOv8s usam
+execução determinística; o RT-DETR mantém as sementes pareadas, mas registra
+`deterministic=false`, pois seu `grid_sample` não é compatível com o modo
+determinístico do PyTorch na implementação da Ultralytics.
 
 A augmentation é aplicada online e não aumenta a contagem `1x`–`10x`. Todas as
 condições recebem a mesma política: variação HSV, translação, escala,
@@ -85,7 +124,7 @@ pipeline converte os 10% finais no `close_mosaic` correspondente ao número de
 
 O dataset externo anotado de poncãs será usado integralmente como teste. Nenhuma
 de suas imagens poderá orientar treinamento, validação, escolha de parâmetros ou
-construção dos ativos sintéticos. Os 28 modelos serão avaliados nas mesmas
+construção dos ativos sintéticos. Os 42 modelos serão avaliados nas mesmas
 imagens em uma única abertura planejada do teste.
 
 Cada família seleciona checkpoints apenas com sua validação de origem: real para
@@ -98,9 +137,11 @@ A métrica primária é mAP@0.5:0.95. Para `synthetic-5x`, calcula-se a diferen�
 em relação a `manual-full` com bootstrap pareado por imagem. Há evidência de
 substituição quando o limite inferior do intervalo de confiança de 95% fica
 acima de `-delta`, a margem prática que será congelada antes da avaliação.
-Superioridade exige que esse limite seja maior que zero. A conclusão principal
-deve se sustentar em YOLO11s e YOLO26s; resultado em apenas uma arquitetura será
-descrito como dependente do modelo.
+Superioridade exige que esse limite seja maior que zero. A substituição será
+descrita como robusta entre famílias somente se o critério de não inferioridade
+for satisfeito separadamente por YOLO26s, YOLOv8s e RT-DETR-L. Qualquer padrão
+discordante será descrito como dependente da família, sem selecionar a conclusão
+mais favorável.
 
 As métricas secundárias são mAP@0.5, precisão, revocação, F1, AP por tamanho e
 erro de contagem por imagem. O limiar usado para precisão, revocação e F1 é
@@ -143,7 +184,7 @@ materializado na pipeline.
 Python 3.11 ou 3.12 é necessário. O script cria e reutiliza `.venv`.
 
 Os comandos abaixo validam a infraestrutura existente. A matriz confirmatória
-com os cinco volumes sintéticos e as duas versões do YOLO ainda será
+com os cinco volumes sintéticos e as três famílias de detectores ainda será
 materializada em configurações próprias antes dos treinos finais.
 
 ```bash

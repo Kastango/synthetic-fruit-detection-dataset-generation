@@ -1,7 +1,7 @@
 # Grade piloto para validar a infraestrutura. Não usar isoladamente para claims
 # causais; o desenho confirmatório está documentado no README.md.
 protocol:
-  ultralytics_version: 8.3.0
+  ultralytics_version: 8.4.121
   metric: map50_95
   # O teste real só é aberto por scripts/evaluate_test.py depois da seleção.
   validation: data/real_yolo/images/val

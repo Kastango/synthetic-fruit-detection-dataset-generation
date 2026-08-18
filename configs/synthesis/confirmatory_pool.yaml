@@ -5,8 +5,8 @@ images:
   train: 1040
   # Validação fixa, independente do tamanho 1x–10x usado no treino.
   val: 260
-# A fonte tem aspecto 3:4. Em treino com imgsz=960, o YOLO consome 720x960
-# antes do padding; renderizar acima disso só acrescenta resize e I/O.
+# A fonte tem aspecto 3:4. O maior lado já corresponde ao imgsz=960 congelado;
+# renderizar acima disso só acrescentaria resize e I/O à base sintética.
 canvas: [720, 960]
 objects:
   min: 1

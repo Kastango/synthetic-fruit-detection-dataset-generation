@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-train = ["ultralytics==8.3.0"]
+train = ["ultralytics==8.4.121"]
 preprocess = [
   "rembg[cpu]==2.0.67",
   "torch==2.5.1",
@@ -30,4 +30,3 @@ packages = ["fruit_pipeline"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-
