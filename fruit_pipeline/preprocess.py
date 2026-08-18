@@ -143,14 +143,16 @@ class DepthEstimator:
         inputs = self.processor(images=image, return_tensors="pt")
         inputs = {key: value.to(self.device) for key, value in inputs.items()}
         with torch.inference_mode():
-            predicted = self.model(**inputs).predicted_depth
-        resized = torch.nn.functional.interpolate(
-            predicted.unsqueeze(1),
-            size=(image.height, image.width),
-            mode="bicubic",
-            align_corners=False,
-        ).squeeze()
-        depth = resized.detach().float().cpu().numpy()
+            outputs = self.model(**inputs)
+        # post_process_depth_estimation aplica a semântica oficial de cada
+        # modelo (remoção de padding, calibração de escala a partir do campo
+        # de visão previsto pelo DepthPro, etc.); interpolar diretamente o
+        # tensor bruto ignoraria essa calibração e pode gerar profundidade
+        # incorreta para modelos que não são apenas "redimensionar".
+        processed = self.processor.post_process_depth_estimation(
+            outputs, target_sizes=[(image.height, image.width)]
+        )
+        depth = processed[0]["predicted_depth"].detach().float().cpu().numpy()
         finite = np.isfinite(depth)
         if not finite.any():
             raise RuntimeError("o modelo produziu um mapa de profundidade não finito")

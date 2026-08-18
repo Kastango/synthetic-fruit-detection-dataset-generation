@@ -20,7 +20,7 @@ preprocess = [
   "rembg[cpu]==2.0.67",
   "torch==2.5.1",
   "torchvision==0.20.1",
-  "transformers==4.48.3",
+  "transformers==5.15.0",
 ]
 metrics = [
   "torch==2.5.1",

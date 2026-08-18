@@ -26,12 +26,23 @@ asset_split:
   seed: 42
 
 depth:
-  # O checkpoint NK combina domínios internos e externos.
-  model: Intel/zoedepth-nyu-kitti
-  revision: f364d4c7936e91f465abba182208dd68142bf0ca
+  # DepthPro (Apple, 2024) traça bordas finas de vegetação com muito mais
+  # detalhe que o ZoeDepth (checkpoint anterior, mantido no histórico do
+  # git). Confirmado por inspeção visual direta: o mapa antigo classificava
+  # névoa/chão próximos da câmera como mais "perto" que o tronco da árvore
+  # e não capturava galhos/folhas individuais; o DepthPro resolve os dois
+  # problemas na mesma foto de teste (IMG_3509.jpg). Requer
+  # transformers>=5 (model_type "depth_pro" não existe em 4.x).
+  model: apple/DepthPro-hf
+  revision: de816c8ce7168afcb231f96d501d72b869d0beda
   prediction_is_distance: true
   lower_percentile: 2.0
-  upper_percentile: 98.0
+  # DepthPro prevê distância métrica real e tem cauda longa (pixels de céu
+  # às vezes leem 800+ metros); 98 deixava o percentil superior tão alto
+  # que toda a vegetação relevante (2-10m) ficava espremida perto de 255.
+  # 85 preserva gradiente de cinza na folhagem/tronco próximos, que é o que
+  # importa para colocação e oclusão. Testado em IMG_3509.jpg.
+  upper_percentile: 85.0
   closest_is_white: true
 
 segmentation:
