@@ -35,10 +35,15 @@ placement:
   # 35% de oclusão a quase toda fruta, independentemente da geometria local.
   z_method: center_patch
   z_patch_fraction: 0.2
-  # Pequena tolerância em direção à câmera evita que ruído residual do mapa
-  # elimine a fruta inteira, mantendo oclusões variadas (52–76% visíveis nas
-  # variantes depuradas) em vez de uma fração fixa.
-  z_offset: 10
+  # Negativo desloca o Z para longe da câmera, aumentando a oclusão: com
+  # z_offset=10 a mediana de visibilidade por instância ficava em 89% (mais
+  # de 25% das inserções saíam 100% visíveis, quase sem oclusão). O usuário
+  # pediu casos mais difíceis de propósito — um detector que aprende com
+  # oclusão pesada deve generalizar melhor para os casos fáceis. -15 dá
+  # média 44%/mediana 41% de visibilidade por instância (medido em 60 cenas,
+  # 891 instâncias, nenhuma imagem ficou sem anotação); abaixo de -20 o
+  # ganho satura porque min_visibility=0.25 passa a rejeitar o excesso.
+  z_offset: -15
   # A faixa inferior concentra chão/grama e fica fora da área de ancoragem.
   exclude_bottom_fraction: 0.15
 appearance:
