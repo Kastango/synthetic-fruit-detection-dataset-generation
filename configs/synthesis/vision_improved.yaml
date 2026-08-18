@@ -12,7 +12,11 @@ objects:
   min_scale: 0.035
   max_scale: 0.12
   scale_mode: canvas
-  rotation_degrees: 180
+  # Reduzido de 180 para 20: rotação livre faz a cicatriz do cabinho apontar
+  # em qualquer direção, inclusive de cabeça para baixo — fisicamente
+  # implausível, poncãs reais sempre penduram com o cabinho para cima.
+  # Confirmado por inspeção visual direta.
+  rotation_degrees: 20
 placement:
   min_depth: 20
   min_visibility: 0.25
