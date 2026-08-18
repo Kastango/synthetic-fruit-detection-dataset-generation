@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from fruit_pipeline.common import project_path
+from fruit_pipeline.common import atomic_write_json, project_path
 from fruit_pipeline.realism import (
     collect_real_images,
     extract_inception_features,
@@ -49,6 +49,7 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--name", required=True)
     parser.add_argument("--force-real-stats", action="store_true")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
     real_yolo_root = project_path(args.real_yolo_root)
@@ -76,6 +77,8 @@ def main() -> None:
         "real_images": 115,
         "fid": round(fid, 4),
     }
+    if args.output:
+        atomic_write_json(project_path(args.output), result)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 

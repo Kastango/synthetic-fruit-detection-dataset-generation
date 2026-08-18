@@ -24,12 +24,12 @@ for seed in 41 42; do
   "${venv_python}" "${project_dir}/scripts/evaluate_on_real_val.py" \
     --checkpoint "${project_dir}/runs/optimization/training/${trial_id}-s${seed}__s${seed}/weights/best.pt" \
     --name "${trial_id}-s${seed}" --include-train --device cpu \
-    > "${summary_dir}/${trial_id}-s${seed}-real.json"
+    --output "${summary_dir}/${trial_id}-s${seed}-real.json"
 done
 
 "${venv_python}" "${project_dir}/scripts/compute_realism_gap.py" \
   --synthetic-dir "${project_dir}/data/generated/optimization/${trial_id}-s41/images/val" \
   --name "${trial_id}" --device cpu \
-  > "${summary_dir}/${trial_id}-fid.json"
+  --output "${summary_dir}/${trial_id}-fid.json"
 
 "${venv_python}" "${project_dir}/scripts/summarize_candidate.py" --trial-id "${trial_id}"

@@ -16,7 +16,12 @@ from pathlib import Path
 
 import yaml
 
-from fruit_pipeline.common import atomic_write_text, image_files, project_path
+from fruit_pipeline.common import (
+    atomic_write_json,
+    atomic_write_text,
+    image_files,
+    project_path,
+)
 
 
 def main() -> None:
@@ -30,6 +35,11 @@ def main() -> None:
         "--include-train",
         action="store_true",
         help="soma images/train ao conjunto de avaliação (115 imagens no total)",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="grava o JSON de resultado neste caminho (stdout tem logs do YOLO misturados)",
     )
     args = parser.parse_args()
 
@@ -82,6 +92,8 @@ def main() -> None:
             "map50_95": round(float(metrics.box.map), 6),
         },
     }
+    if args.output:
+        atomic_write_json(project_path(args.output), result)
     print(json.dumps(result, indent=2, ensure_ascii=False))
 
 
