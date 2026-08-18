@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 import yaml
-from PIL import Image, ImageChops, ImageFilter, ImageOps, ImageStat
+from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps, ImageStat
 
 from .common import (
     IMAGE_SUFFIXES,
@@ -183,6 +183,11 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("hue_power", "saturation_power", "value_power"):
             if not 0 <= float(hsv_cast[key]) <= 1:
                 raise ValueError(f"appearance.hsv_cast.{key} deve estar entre 0 e 1")
+    grading = config["output"].get("scene_grading")
+    if grading and grading.get("enabled", False):
+        for key in ("contrast", "saturation", "brightness"):
+            if key in grading and float(grading[key]) <= 0:
+                raise ValueError(f"output.scene_grading.{key} deve ser positivo")
 
 
 @lru_cache(maxsize=8)
@@ -515,6 +520,35 @@ def _label_for(
     return f"0 {center_x:.8f} {center_y:.8f} {box_width:.8f} {box_height:.8f}"
 
 
+def _apply_scene_grading(canvas: Image.Image, grading: dict) -> Image.Image:
+    # Os 228 fundos foram fotografados sob luz difusa/nublada, num ângulo à
+    # altura dos olhos; as fotos reais anotadas são ensolaradas, céu azul
+    # saturado, vistas de baixo para cima na copa. Não há como reproduzir a
+    # composição/iluminação sem introduzir ativos externos (fora do escopo),
+    # mas contraste, saturação e nitidez mais altos na cena inteira aproximam
+    # o "punch" visual da cena composta do observado nas fotos reais.
+    graded = canvas
+    contrast = float(grading.get("contrast", 1.0))
+    if contrast != 1.0:
+        graded = ImageEnhance.Contrast(graded).enhance(contrast)
+    saturation = float(grading.get("saturation", 1.0))
+    if saturation != 1.0:
+        graded = ImageEnhance.Color(graded).enhance(saturation)
+    brightness = float(grading.get("brightness", 1.0))
+    if brightness != 1.0:
+        graded = ImageEnhance.Brightness(graded).enhance(brightness)
+    sharpen_percent = int(grading.get("sharpen_percent", 0))
+    if sharpen_percent > 0:
+        graded = graded.filter(
+            ImageFilter.UnsharpMask(
+                radius=float(grading.get("sharpen_radius", 2.0)),
+                percent=sharpen_percent,
+                threshold=int(grading.get("sharpen_threshold", 2)),
+            )
+        )
+    return graded
+
+
 def _save_jpeg_atomic(image: Image.Image, path: Path, quality: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.stem}.tmp.jpg")
@@ -603,6 +637,9 @@ def _render_one(task: dict) -> dict:
             labels.append(label)
         else:
             rejected["final_box_too_small"] += 1
+    grading = config["output"].get("scene_grading")
+    if grading and grading.get("enabled", False):
+        canvas = _apply_scene_grading(canvas, grading)
     _save_jpeg_atomic(canvas, image_path, int(config["output"]["jpeg_quality"]))
     atomic_write_text(
         label_path, "\n".join(labels) + ("\n" if labels else ""), durable=False
