@@ -26,16 +26,19 @@ placement:
   z_quantile: 0.65
 appearance:
   hardlight_power: 0.65
-  # Preserva a luminância (sombra/brilho) original do recorte e só desloca
-  # matiz/saturação em direção à cor ambiente local. Corrige o efeito
-  # "adesivo colado" do hard-light puro, confirmado por inspeção visual
-  # direta comparando com data/real_yolo e os recortes de estúdio em
-  # data/assets/regenerated/pictures_trimmed.
+  # A ideia original do hardlight (conforme o usuário) é usar a cor média do
+  # local de inserção só para estimar sombra/claridade, não para "tingir" a
+  # fruta. hue_power/saturation_power em 0 isola exatamente esse efeito;
+  # value_power mais alto reforça a resposta de luz/sombra local. Corrige o
+  # efeito "adesivo colado" do hard-light puro, confirmado por inspeção
+  # visual direta comparando com data/real_yolo e os recortes de estúdio em
+  # data/assets/regenerated/pictures_trimmed. hue_power>0 tingia a fruta de
+  # verde em fundos dominados por folhagem — por isso fica em 0.
   hsv_cast:
     enabled: true
-    hue_power: 0.05
-    saturation_power: 0.1
-    value_power: 0.25
+    hue_power: 0.0
+    saturation_power: 0.0
+    value_power: 0.4
 occlusion:
   edge_blur: 1.5
 annotation:
