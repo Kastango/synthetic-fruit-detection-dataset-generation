@@ -178,6 +178,11 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError(f"texturas de iluminação não são suportadas; remova {options}")
     if not 0 <= float(appearance["hardlight_power"]) <= 1:
         raise ValueError("appearance.hardlight_power deve estar entre 0 e 1")
+    hsv_cast = appearance.get("hsv_cast")
+    if hsv_cast and hsv_cast.get("enabled", False):
+        for key in ("hue_power", "saturation_power", "value_power"):
+            if not 0 <= float(hsv_cast[key]) <= 1:
+                raise ValueError(f"appearance.hsv_cast.{key} deve estar entre 0 e 1")
 
 
 @lru_cache(maxsize=8)
@@ -245,7 +250,7 @@ def _scale_cutout(
     return image.resize(size, Image.Resampling.LANCZOS)
 
 
-def _apply_appearance(
+def _apply_appearance_hardlight(
     fruit: Image.Image,
     background_region: Image.Image,
     appearance: dict,
@@ -262,6 +267,57 @@ def _apply_appearance(
     result = rgb.convert("RGBA")
     result.putalpha(alpha)
     return result
+
+
+def _apply_appearance_hsv_cast(
+    fruit: Image.Image,
+    background_region: Image.Image,
+    hsv_cast: dict,
+) -> Image.Image:
+    # Os recortes são fotos de estúdio com luz difusa uniforme; o fundo real
+    # tem luz solar direcional. Um hard-light plano contra a cor média do
+    # fundo apaga o brilho/sombra natural da fruta. Aqui a luminância (V)
+    # original é preservada quase inteira e só o matiz/saturação (H, S) são
+    # puxados em direção à cor ambiente local, então a fruta mantém sua
+    # forma tridimensional mas ganha a temperatura de cor da cena.
+    alpha = fruit.getchannel("A")
+    mean = tuple(
+        round(value) for value in ImageStat.Stat(background_region.convert("RGB")).mean
+    )
+    bg_h, bg_s, bg_v = Image.new("RGB", (1, 1), mean).convert("HSV").getpixel((0, 0))
+    fruit_h, fruit_s, fruit_v = fruit.convert("RGB").convert("HSV").split()
+    h_array = np.asarray(fruit_h, dtype=np.float32)
+    s_array = np.asarray(fruit_s, dtype=np.float32)
+    v_array = np.asarray(fruit_v, dtype=np.float32)
+    hue_power = min(max(float(hsv_cast["hue_power"]), 0.0), 1.0)
+    saturation_power = min(max(float(hsv_cast["saturation_power"]), 0.0), 1.0)
+    value_power = min(max(float(hsv_cast["value_power"]), 0.0), 1.0)
+    hue_diff = ((bg_h - h_array + 128) % 256) - 128
+    h_new = (h_array + hue_diff * hue_power) % 256
+    s_new = s_array + (bg_s - s_array) * saturation_power
+    v_new = v_array + (bg_v - v_array) * value_power
+    blended = Image.merge(
+        "HSV",
+        [
+            Image.fromarray(np.clip(h_new, 0, 255).astype(np.uint8)),
+            Image.fromarray(np.clip(s_new, 0, 255).astype(np.uint8)),
+            Image.fromarray(np.clip(v_new, 0, 255).astype(np.uint8)),
+        ],
+    ).convert("RGB")
+    result = blended.convert("RGBA")
+    result.putalpha(alpha)
+    return result
+
+
+def _apply_appearance(
+    fruit: Image.Image,
+    background_region: Image.Image,
+    appearance: dict,
+) -> Image.Image:
+    hsv_cast = appearance.get("hsv_cast")
+    if hsv_cast and hsv_cast.get("enabled", False):
+        return _apply_appearance_hsv_cast(fruit, background_region, hsv_cast)
+    return _apply_appearance_hardlight(fruit, background_region, appearance)
 
 
 def _bbox(mask: np.ndarray, threshold: int = 1) -> tuple[int, int, int, int] | None:
