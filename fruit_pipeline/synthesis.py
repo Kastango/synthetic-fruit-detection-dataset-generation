@@ -191,6 +191,9 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("contrast", "saturation", "brightness"):
             if key in grading and float(grading[key]) <= 0:
                 raise ValueError(f"output.scene_grading.{key} deve ser positivo")
+    depth_smooth_radius = config["occlusion"].get("depth_smooth_radius", 0.0)
+    if float(depth_smooth_radius) < 0:
+        raise ValueError("occlusion.depth_smooth_radius não pode ser negativo")
 
 
 @lru_cache(maxsize=8)
@@ -286,14 +289,30 @@ def _apply_appearance_hsv_cast(
     # tem luz solar direcional. Um hard-light plano contra a cor média do
     # fundo apaga o brilho/sombra natural da fruta. Aqui a luminância (V)
     # original é preservada quase inteira e só o matiz/saturação (H, S) são
-    # puxados em direção à cor ambiente local, então a fruta mantém sua
-    # forma tridimensional mas ganha a temperatura de cor da cena.
+    # puxados em direção a um alvo derivado da cor ambiente local, então a
+    # fruta mantém sua forma tridimensional mas ganha a temperatura de cor
+    # da cena.
     alpha = fruit.getchannel("A")
+    rgb = fruit.convert("RGB")
     mean = tuple(
         round(value) for value in ImageStat.Stat(background_region.convert("RGB")).mean
     )
-    bg_h, bg_s, bg_v = Image.new("RGB", (1, 1), mean).convert("HSV").getpixel((0, 0))
-    fruit_h, fruit_s, fruit_v = fruit.convert("RGB").convert("HSV").split()
+    if hsv_cast.get("use_hardlight_target", False):
+        # O hard-light já responde de forma não linear ao valor de cada
+        # pixel da fruta (clareia onde já é claro, escurece onde é escuro),
+        # em vez de puxar tudo para um único valor plano. Usar seu
+        # resultado como alvo por pixel do matiz/saturação recupera parte
+        # da coesão visual do hard-light original sem achatar a luminância.
+        target = ImageChops.hard_light(rgb, Image.new("RGB", fruit.size, mean))
+        target_h, target_s, target_v = target.convert("HSV").split()
+        bg_h = np.asarray(target_h, dtype=np.float32)
+        bg_s = np.asarray(target_s, dtype=np.float32)
+        bg_v = np.asarray(target_v, dtype=np.float32)
+    else:
+        bg_h, bg_s, bg_v = (
+            Image.new("RGB", (1, 1), mean).convert("HSV").getpixel((0, 0))
+        )
+    fruit_h, fruit_s, fruit_v = rgb.convert("HSV").split()
     h_array = np.asarray(fruit_h, dtype=np.float32)
     s_array = np.asarray(fruit_s, dtype=np.float32)
     v_array = np.asarray(fruit_v, dtype=np.float32)
@@ -601,6 +620,15 @@ def _render_one(task: dict) -> dict:
         # aproximar o "punch" do fundo nublado do observado nas fotos reais,
         # não realçar a fruta de novo.
         canvas = _apply_scene_grading(canvas, grading)
+    depth_smooth_radius = float(config["occlusion"].get("depth_smooth_radius", 0.0))
+    if depth_smooth_radius > 0:
+        # Estimadores de profundidade de alta resolução (ex. DepthPro)
+        # captam ruído pixel a pixel que gera oclusões "mosqueadas" em vez
+        # de manchas coerentes de folha/galho. Um blur leve no mapa de
+        # profundidade (não na imagem final) funde esse ruído em regiões
+        # maiores antes do limiar de visibilidade, sem afetar a nitidez da
+        # cena composta.
+        depth_image = depth_image.filter(ImageFilter.GaussianBlur(depth_smooth_radius))
     depth = np.asarray(depth_image, dtype=np.uint8)
     requested = rng.randint(
         int(config["objects"]["min"]), int(config["objects"]["max"])
