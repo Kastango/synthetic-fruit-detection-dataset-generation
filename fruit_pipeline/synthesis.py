@@ -581,6 +581,15 @@ def _render_one(task: dict) -> dict:
     canvas, depth_image = _open_background_pair(
         Path(pair["image"]), Path(pair["depth"]), canvas_size
     )
+    grading = config["output"].get("scene_grading")
+    if grading and grading.get("enabled", False):
+        # Aplicado só no fundo, antes de colar qualquer fruta: um realce
+        # aplicado na cena inteira já composta também "esculpe" as frutas
+        # já ajustadas pelo hsv_cast, empilhando saturação/nitidez até
+        # ficarem artificiais (achado de revisão visual). O objetivo é só
+        # aproximar o "punch" do fundo nublado do observado nas fotos reais,
+        # não realçar a fruta de novo.
+        canvas = _apply_scene_grading(canvas, grading)
     depth = np.asarray(depth_image, dtype=np.uint8)
     requested = rng.randint(
         int(config["objects"]["min"]), int(config["objects"]["max"])
@@ -637,9 +646,6 @@ def _render_one(task: dict) -> dict:
             labels.append(label)
         else:
             rejected["final_box_too_small"] += 1
-    grading = config["output"].get("scene_grading")
-    if grading and grading.get("enabled", False):
-        canvas = _apply_scene_grading(canvas, grading)
     _save_jpeg_atomic(canvas, image_path, int(config["output"]["jpeg_quality"]))
     atomic_write_text(
         label_path, "\n".join(labels) + ("\n" if labels else ""), durable=False
