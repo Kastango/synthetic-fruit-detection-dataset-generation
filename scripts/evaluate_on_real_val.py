@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Avalia um checkpoint no split de validação real (real-assisted).
+"""Avalia um checkpoint no split de desenvolvimento real (real-assisted).
 
 Ferramenta interna do loop de otimização: usa apenas
-data/real_yolo/images/val (15 imagens). Nunca referencia o split de teste
-real, que permanece reservado para a avaliação confirmatória final.
+data/real_yolo/images/val (15 imagens) ou, com --include-train,
+val+train (115 imagens) para reduzir o ruído da métrica. Nunca referencia
+o split de teste real, que permanece reservado para a avaliação
+confirmatória final.
 """
 
 from __future__ import annotations
@@ -14,7 +16,7 @@ from pathlib import Path
 
 import yaml
 
-from fruit_pipeline.common import atomic_write_text, project_path
+from fruit_pipeline.common import atomic_write_text, image_files, project_path
 
 
 def main() -> None:
@@ -24,6 +26,11 @@ def main() -> None:
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--name", required=True)
     parser.add_argument("--project", default="runs/optimization/real_val")
+    parser.add_argument(
+        "--include-train",
+        action="store_true",
+        help="soma images/train ao conjunto de avaliação (115 imagens no total)",
+    )
     args = parser.parse_args()
 
     import ultralytics
@@ -32,10 +39,21 @@ def main() -> None:
     real_root = project_path(args.real_yolo_root)
     data_yaml_path = project_path(args.project) / f"{args.name}.yaml"
     data_yaml_path.parent.mkdir(parents=True, exist_ok=True)
+    if args.include_train:
+        images = image_files(real_root / "images" / "val") + image_files(
+            real_root / "images" / "train"
+        )
+        list_path = data_yaml_path.with_suffix(".txt")
+        atomic_write_text(
+            list_path, "\n".join(str(path.resolve()) for path in images) + "\n"
+        )
+        val_target = str(list_path)
+    else:
+        val_target = "images/val"
     value = {
         "path": str(real_root.resolve()),
         "train": "images/val",
-        "val": "images/val",
+        "val": val_target,
         "names": {0: "poncan"},
     }
     atomic_write_text(
@@ -56,6 +74,7 @@ def main() -> None:
         "name": args.name,
         "checkpoint": str(args.checkpoint),
         "ultralytics_version": ultralytics.__version__,
+        "eval_set": "real_train_val_115" if args.include_train else "real_val_15",
         "real_val": {
             "precision": round(float(metrics.box.mp), 6),
             "recall": round(float(metrics.box.mr), 6),

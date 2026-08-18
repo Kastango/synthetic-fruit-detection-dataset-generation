@@ -23,7 +23,8 @@ objects:
     far_scale: 0.7
 placement:
   min_depth: 20
-  min_visibility: 0.25
+  # Herda o incumbente da fase 2 (trial002): visibilidade mínima elevada.
+  min_visibility: 0.4
   max_attempts_per_object: 100
   z_method: quantile
   z_quantile: 0.65
