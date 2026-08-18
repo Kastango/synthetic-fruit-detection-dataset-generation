@@ -1,0 +1,54 @@
+name: confirmatory_pool
+seed: 42
+images:
+  train: 1040
+  val: 260
+canvas: [720, 960]
+objects:
+  min: 1
+  # Densidade original (35): a redução testada em trial001 melhorou o
+  # sintético mas piorou o mAP real (n=115), então não é adotada aqui.
+  max: 35
+  min_scale: 0.035
+  max_scale: 0.12
+  scale_mode: canvas
+  rotation_degrees: 180
+placement:
+  min_depth: 20
+  min_visibility: 0.25
+  max_attempts_per_object: 100
+  z_method: quantile
+  z_quantile: 0.65
+appearance:
+  hardlight_power: 0.65
+  # Preserva a luminância (sombra/brilho) original do recorte e só desloca
+  # matiz/saturação em direção à cor ambiente local. Corrige o efeito
+  # "adesivo colado" do hard-light puro, confirmado por inspeção visual
+  # direta comparando com data/real_yolo e os recortes de estúdio em
+  # data/assets/regenerated/pictures_trimmed.
+  hsv_cast:
+    enabled: true
+    hue_power: 0.05
+    saturation_power: 0.1
+    value_power: 0.25
+occlusion:
+  edge_blur: 1.5
+annotation:
+  mode: visible
+  min_box_pixels: 2
+output:
+  jpeg_quality: 95
+  # O pool de 228 fundos é uniformemente nublado/à altura dos olhos (não há
+  # subconjunto parecido com as fotos reais ensolaradas escondido nele,
+  # confirmado revisando todos os 228 em contact sheets). Sem poder trazer
+  # fundos novos (fora do escopo), um realce global de contraste/saturação/
+  # nitidez na cena já composta aproxima o "punch" visual do observado nas
+  # fotos reais.
+  scene_grading:
+    enabled: true
+    contrast: 1.25
+    saturation: 1.35
+    brightness: 1.05
+    sharpen_radius: 2.0
+    sharpen_percent: 60
+    sharpen_threshold: 2
