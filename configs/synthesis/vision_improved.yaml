@@ -38,11 +38,16 @@ placement:
   # Negativo desloca o Z para longe da câmera, aumentando a oclusão: com
   # z_offset=10 a mediana de visibilidade por instância ficava em 89% (mais
   # de 25% das inserções saíam 100% visíveis, quase sem oclusão). -15 (44%
-  # média/41% mediana) ficou pesado demais na inspeção visual do usuário;
-  # -4 dá média 49%/mediana 46% (60 cenas, medido via
-  # fruit_pipeline.synthesis._finish_placement), oclusão notavelmente mais
-  # pesada que o padrão original sem parecer degenerada.
-  z_offset: -4
+  # média/41% mediana) ficou pesado demais na inspeção visual do usuário; -4
+  # sem jitter ficou bom na severidade média, mas um offset fixo desloca o
+  # limiar igualmente em toda inserção — quase nenhuma fruta saía sem
+  # nenhuma oclusão, porque a variação vinha só da geometria local (estreita).
+  z_offset: -5
+  # z_offset_jitter sorteia o offset por tentativa em [-5-30, -5+30]. Com
+  # isso, 24% das inserções saem >=97% visíveis (era ~0% com offset fixo) e
+  # a cauda pesada continua presente (p10=32%, p25=44%); média 67%/mediana
+  # 63% (60 cenas, medido via fruit_pipeline.synthesis._finish_placement).
+  z_offset_jitter: 30
   # A faixa inferior concentra chão/grama e fica fora da área de ancoragem.
   exclude_bottom_fraction: 0.15
 appearance:
@@ -60,6 +65,13 @@ appearance:
     hue_power: 0.12
     saturation_power: 0.18
     value_power: 0.45
+    # Sem piso, uma fruta ancorada numa região bem escura tinha o próprio
+    # valor (V) puxado quase todo para o alvo escuro e "derretia" num blob
+    # marrom irreconhecível (exemplo mandado pelo usuário). 0.6 mantém pelo
+    # menos 60% do brilho original do pixel, então a fruta escurece na
+    # sombra sem perder a cor identificável; não afeta regiões claras (onde
+    # o alvo já é mais claro que o original).
+    min_value_ratio: 0.6
 occlusion:
   edge_blur: 1.5
   # Suaviza ruído fino do DepthPro antes de decidir a topologia da oclusão.
