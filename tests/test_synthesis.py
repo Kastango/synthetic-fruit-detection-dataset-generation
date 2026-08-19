@@ -236,6 +236,34 @@ def test_depth_smooth_radius_generation_is_deterministic_and_labels_are_valid(
         assert validate_yolo_text(label.read_text(), str(label)) == 1
 
 
+def test_edge_feather_radius_validates_non_negative() -> None:
+    config = tiny_config()
+    config["occlusion"]["edge_feather_radius"] = -1.0
+    with pytest.raises(ValueError, match="edge_feather_radius"):
+        validate_synthesis_config(config)
+
+
+def test_edge_feather_radius_generation_is_deterministic_and_labels_are_valid(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["occlusion"]["edge_feather_radius"] = 0.8
+    first = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    manifest_before = (output / "manifest.jsonl").read_bytes()
+    second = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert (output / "manifest.jsonl").read_bytes() == manifest_before
+    for label in (output / "labels").rglob("*.txt"):
+        assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
 @pytest.mark.parametrize(
     ("key", "value", "message"),
     [

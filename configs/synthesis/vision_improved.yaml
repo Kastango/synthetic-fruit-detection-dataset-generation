@@ -79,6 +79,11 @@ occlusion:
   # Como no notebook de origem: blur morfológico seguido de limiar binário.
   # Sem o limiar, o fundo vazava como manchas semitransparentes na fruta.
   mask_threshold: 0.5
+  # edge_blur decide a FORMA da oclusão e é rebinarizado por mask_threshold;
+  # sem mais nada isso deixa um corte geométrico abrupto (usuário notou e
+  # pediu um gradiente na borda). Este segundo blur, bem menor, roda depois
+  # do limiar e só amacia a serrilha de poucos pixels da borda já decidida.
+  edge_feather_radius: 0.8
   # Folhas à frente projetam uma penumbra curta sobre a parte ainda visível.
   contact_shadow:
     enabled: true

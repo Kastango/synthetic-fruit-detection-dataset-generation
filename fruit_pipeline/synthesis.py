@@ -30,7 +30,7 @@ from .common import (
     stable_hash,
 )
 
-GENERATOR_SCHEMA_VERSION = 4
+GENERATOR_SCHEMA_VERSION = 5
 ASSET_SPLIT_SCHEMA_VERSION = 2
 
 
@@ -221,6 +221,9 @@ def validate_synthesis_config(config: dict) -> None:
     mask_threshold = config["occlusion"].get("mask_threshold")
     if mask_threshold is not None and not 0 < float(mask_threshold) < 1:
         raise ValueError("occlusion.mask_threshold deve estar entre 0 e 1 (exclusivos)")
+    edge_feather_radius = config["occlusion"].get("edge_feather_radius", 0.0)
+    if float(edge_feather_radius) < 0:
+        raise ValueError("occlusion.edge_feather_radius não pode ser negativo")
     contact_shadow = config["occlusion"].get("contact_shadow")
     if contact_shadow and contact_shadow.get("enabled", False):
         strength = float(contact_shadow.get("strength", 0.0))
@@ -252,7 +255,13 @@ def _open_background_pair_cached(
     if background.size != depth.size and background.size == depth.size[::-1]:
         background = background.rotate(-90, expand=True)
     background = background.resize(size, Image.Resampling.LANCZOS)
-    depth = depth.resize(size, Image.Resampling.BILINEAR)
+    # BILINEAR só amostra uma vizinhança 2x2 e ignora a taxa de redução; numa
+    # queda de ~4x (a fonte sai de ~4000px, o canvas é 720-960px) isso
+    # equivale a subamostrar e perde exatamente o detalhe fino de folha/galho
+    # que justificou trocar para o DepthPro. LANCZOS pondera a área
+    # correspondente da imagem original e preserva bordas de profundidade
+    # nitidamente melhor nessa mesma proporção.
+    depth = depth.resize(size, Image.Resampling.LANCZOS)
     return background, depth
 
 
@@ -523,6 +532,20 @@ def _finish_placement(
         visibility = (visibility > round(255 * float(mask_threshold))).astype(
             np.uint8
         ) * 255
+    edge_feather_radius = float(config["occlusion"].get("edge_feather_radius", 0.0))
+    if edge_feather_radius > 0:
+        # edge_blur suaviza a máscara ANTES do limiar e decide a forma da
+        # oclusão; num recorte pequeno (poucas dezenas de px) esse blur é
+        # uma fração grande do objeto, então precisa ser rebinarizado para
+        # não sobrar mancha semitransparente larga. Este segundo blur, bem
+        # menor, roda DEPOIS do limiar e só amacia a serrilha de poucos
+        # pixels da borda já decidida — um gradiente estreito em vez de um
+        # corte geométrico abrupto, sem reabrir a mancha larga.
+        visibility = np.asarray(
+            Image.fromarray(visibility).filter(
+                ImageFilter.GaussianBlur(edge_feather_radius)
+            )
+        )
     new_alpha = np.rint(alpha_float * visibility / 255.0).astype(np.uint8)
     visible_pixels = int((new_alpha > 8).sum())
     if visible_pixels / original_pixels < float(placement["min_visibility"]):
