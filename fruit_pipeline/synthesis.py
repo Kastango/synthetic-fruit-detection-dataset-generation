@@ -10,7 +10,15 @@ from pathlib import Path
 
 import numpy as np
 import yaml
-from PIL import Image, ImageChops, ImageEnhance, ImageFilter, ImageOps, ImageStat
+from PIL import (
+    Image,
+    ImageChops,
+    ImageDraw,
+    ImageEnhance,
+    ImageFilter,
+    ImageOps,
+    ImageStat,
+)
 
 from .common import (
     IMAGE_SUFFIXES,
@@ -180,6 +188,9 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "placement.z_patch_fraction deve estar entre 0 (exclusivo) e 1"
             )
+        z_offset_jitter = float(config["placement"].get("z_offset_jitter", 0.0))
+        if z_offset_jitter < 0:
+            raise ValueError("placement.z_offset_jitter não pode ser negativo")
     exclude_bottom = config["placement"].get("exclude_bottom_fraction", 0.0)
     if not 0 <= float(exclude_bottom) < 1:
         raise ValueError("placement.exclude_bottom_fraction deve estar entre 0 e 1")
@@ -195,6 +206,10 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("hue_power", "saturation_power", "value_power"):
             if not 0 <= float(hsv_cast[key]) <= 1:
                 raise ValueError(f"appearance.hsv_cast.{key} deve estar entre 0 e 1")
+        if not 0 <= float(hsv_cast.get("min_value_ratio", 0.0)) <= 1:
+            raise ValueError(
+                "appearance.hsv_cast.min_value_ratio deve estar entre 0 e 1"
+            )
     grading = config["output"].get("scene_grading")
     if grading and grading.get("enabled", False):
         for key in ("contrast", "saturation", "brightness"):
@@ -346,6 +361,14 @@ def _apply_appearance_hsv_cast(
     h_new = (h_array + hue_diff * hue_power) % 256
     s_new = s_array + (bg_s - s_array) * saturation_power
     v_new = v_array + (bg_v - v_array) * value_power
+    min_value_ratio = min(max(float(hsv_cast.get("min_value_ratio", 0.0)), 0.0), 1.0)
+    if min_value_ratio > 0:
+        # Em regiões muito escuras, puxar o valor todo para o alvo derrete a
+        # fruta num blob marrom indistinguível do fundo — a cor real de uma
+        # fruta na sombra continua identificável, só menos brilhante. Um piso
+        # relativo ao valor original evita esse colapso sem tocar em regiões
+        # claras (onde bg_v > v_array e o piso não é atingido).
+        v_new = np.maximum(v_new, v_array * min_value_ratio)
     blended = Image.merge(
         "HSV",
         [
@@ -427,6 +450,7 @@ def _finish_placement(
     depth: np.ndarray,
     config: dict,
     anchor: tuple[int, int] | None = None,
+    rng: random.Random | None = None,
 ) -> dict | None:
     placement = config["placement"]
     region_depth = depth[y : y + fruit.height, x : x + fruit.width]
@@ -466,9 +490,20 @@ def _finish_placement(
         placement_values = region_depth[top:bottom, left:right][patch_opaque]
         if not len(placement_values):
             placement_values = local_values
-        z_value = float(np.median(placement_values)) + float(
-            placement.get("z_offset", 0.0)
-        )
+        z_offset = float(placement.get("z_offset", 0.0))
+        z_offset_jitter = float(placement.get("z_offset_jitter", 0.0))
+        if z_offset_jitter > 0:
+            # Um offset fixo desloca o limiar igualmente em toda inserção,
+            # então quase nenhuma fruta sai totalmente visível nem totalmente
+            # oculta: a variação vem só da geometria local, que é estreita.
+            # Sortear o offset por tentativa (mesmo rng da posição, then
+            # determinístico pela seed) alarga essa distribuição para incluir
+            # os dois extremos.
+            sampler = rng or random.Random()
+            z_offset = sampler.uniform(
+                z_offset - z_offset_jitter, z_offset + z_offset_jitter
+            )
+        z_value = float(np.median(placement_values)) + z_offset
         z_value = float(np.clip(z_value, 0.0, 255.0))
     else:
         raise ValueError(f"z_method desconhecido: {placement['z_method']}")
@@ -547,6 +582,7 @@ def _placement(
             depth,
             config,
             anchor=(fruit.width // 2, fruit.height // 2),
+            rng=rng,
         )
         if result is not None:
             return result
@@ -607,6 +643,7 @@ def _placement_with_depth_scale(
             depth,
             config,
             anchor=(cx - x, cy - y),
+            rng=rng,
         )
         if result is not None:
             return result
@@ -692,6 +729,41 @@ def _save_jpeg_atomic(image: Image.Image, path: Path, quality: int) -> None:
     temporary.replace(path)
 
 
+def _build_debug_panel(
+    canvas: Image.Image, depth_image: Image.Image, instances: list[dict]
+) -> Image.Image:
+    # Lado a lado: imagem final | mapa de profundidade (já suavizado, o que
+    # o limiar de visibilidade realmente enxerga) com a máscara de cada
+    # fruta sobreposta, verde onde ficou visível e vermelho onde a
+    # profundidade cortou. Isso mostra exatamente por que cada oclusão
+    # ficou do jeito que ficou, sem precisar reconstruir o cálculo à mão.
+    depth_rgb = depth_image.convert("RGB").resize(canvas.size)
+    draw = ImageDraw.Draw(depth_rgb, "RGBA")
+    for instance in instances:
+        x, y = instance["x"], instance["y"]
+        visible_mask = instance["visible_mask"]
+        amodal_mask = instance["amodal_mask"]
+        height, width = visible_mask.shape
+        occluded = (amodal_mask > 8) & (visible_mask <= 8)
+        visible = visible_mask > 8
+        tint = np.zeros((height, width, 4), dtype=np.uint8)
+        tint[visible] = (40, 220, 90, 130)
+        tint[occluded] = (230, 40, 40, 160)
+        tint_image = Image.fromarray(tint)
+        depth_rgb.paste(tint_image, (x, y), tint_image)
+        visibility_percent = round(
+            100 * float(instance.get("visibility_at_insert", 0.0))
+        )
+        draw.rectangle(
+            [x, y, x + width - 1, y + height - 1], outline=(255, 255, 0, 220), width=1
+        )
+        draw.text((x + 2, y + 2), f"{visibility_percent}%", fill=(255, 255, 0, 255))
+    panel = Image.new("RGB", (canvas.width * 2 + 4, canvas.height), (20, 20, 20))
+    panel.paste(canvas, (0, 0))
+    panel.paste(depth_rgb, (canvas.width + 4, 0))
+    return panel
+
+
 def _render_one(task: dict) -> dict:
     split_name = task["split"]
     index = task["index"]
@@ -700,10 +772,13 @@ def _render_one(task: dict) -> dict:
     image_path = output / "images" / split_name / f"{name}.jpg"
     label_path = output / "labels" / split_name / f"{name}.txt"
     metadata_path = output / "metadata" / split_name / f"{name}.json"
+    debug = bool(task.get("debug", False))
+    debug_path = output / "images_debug" / split_name / f"{name}_debug.jpg"
     if (
         image_path.exists()
         and label_path.exists()
         and metadata_path.exists()
+        and (not debug or debug_path.exists())
         and not task["force"]
     ):
         return json.loads(metadata_path.read_text(encoding="utf-8"))
@@ -795,6 +870,9 @@ def _render_one(task: dict) -> dict:
     atomic_write_text(
         label_path, "\n".join(labels) + ("\n" if labels else ""), durable=False
     )
+    if debug:
+        panel = _build_debug_panel(canvas, depth_image, instances)
+        _save_jpeg_atomic(panel, debug_path, int(config["output"]["jpeg_quality"]))
     record = {
         "id": name,
         "split": split_name,
@@ -837,6 +915,7 @@ def _render_compact(task: tuple[str, int, int]) -> dict:
             "config": _WORKER_CONTEXT["config"],
             "assets": _WORKER_CONTEXT["assets"][split_name],
             "force": _WORKER_CONTEXT["force"],
+            "debug": _WORKER_CONTEXT["debug"],
         }
     )
 
@@ -859,6 +938,7 @@ def generate_dataset(
     split_seed: int,
     workers: int = 1,
     force: bool = False,
+    debug: bool = False,
 ) -> dict:
     validate_synthesis_config(config)
     asset_split = create_asset_split(
@@ -935,6 +1015,7 @@ def generate_dataset(
         "config": config,
         "assets": assets_by_split,
         "force": force,
+        "debug": debug,
     }
     _clear_image_caches()
     if workers <= 1:

@@ -9,6 +9,7 @@ from PIL import Image
 
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
+    _apply_appearance_hsv_cast,
     _finish_placement,
     create_asset_split,
     generate_dataset,
@@ -422,6 +423,113 @@ def test_depth_scale_generation_is_deterministic_and_labels_are_valid(
     assert (output / "manifest.jsonl").read_bytes() == manifest_before
     for label in (output / "labels").rglob("*.txt"):
         assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
+def test_z_offset_jitter_validates_non_negative() -> None:
+    config = tiny_config()
+    config["placement"]["z_method"] = "center_patch"
+    config["placement"]["z_offset_jitter"] = -1.0
+    with pytest.raises(ValueError, match="z_offset_jitter"):
+        validate_synthesis_config(config)
+
+
+def test_z_offset_jitter_generation_is_deterministic(tmp_path: Path) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["placement"]["z_method"] = "center_patch"
+    config["placement"]["z_offset_jitter"] = 40.0
+    first = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    manifest_before = (output / "manifest.jsonl").read_bytes()
+    second = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert (output / "manifest.jsonl").read_bytes() == manifest_before
+
+
+def test_min_value_ratio_validates_bounds() -> None:
+    config = tiny_config()
+    config["appearance"]["hsv_cast"] = {
+        "enabled": True,
+        "hue_power": 0.1,
+        "saturation_power": 0.1,
+        "value_power": 0.5,
+        "min_value_ratio": 1.5,
+    }
+    with pytest.raises(ValueError, match="min_value_ratio"):
+        validate_synthesis_config(config)
+
+
+def test_min_value_ratio_floors_darkening_toward_dark_target() -> None:
+    fruit = Image.new("RGBA", (8, 8), (200, 120, 40, 255))
+    dark_region = Image.new("RGB", (8, 8), (5, 5, 5))
+    unfloored = _apply_appearance_hsv_cast(
+        fruit,
+        dark_region,
+        {
+            "use_hardlight_target": True,
+            "hue_power": 0.1,
+            "saturation_power": 0.1,
+            "value_power": 0.9,
+            "min_value_ratio": 0.0,
+        },
+    )
+    floored = _apply_appearance_hsv_cast(
+        fruit,
+        dark_region,
+        {
+            "use_hardlight_target": True,
+            "hue_power": 0.1,
+            "saturation_power": 0.1,
+            "value_power": 0.9,
+            "min_value_ratio": 0.6,
+        },
+    )
+    unfloored_v = np.asarray(unfloored.convert("HSV"))[..., 2].astype(np.float32)
+    floored_v = np.asarray(floored.convert("HSV"))[..., 2].astype(np.float32)
+    original_v = np.asarray(fruit.convert("RGB").convert("HSV"))[..., 2].astype(
+        np.float32
+    )
+    assert floored_v.mean() > unfloored_v.mean()
+    assert floored_v.mean() >= original_v.mean() * 0.6 - 1.0
+
+
+def test_debug_panel_is_generated_without_changing_main_output(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    without_debug = tmp_path / "without_debug"
+    with_debug = tmp_path / "with_debug"
+    build_assets(assets)
+    config = tiny_config()
+    generate_dataset(
+        assets, without_debug, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    generate_dataset(
+        assets,
+        with_debug,
+        config,
+        train_ratio=0.5,
+        split_seed=42,
+        workers=1,
+        debug=True,
+    )
+    for relative in sorted(
+        path.relative_to(without_debug)
+        for path in without_debug.rglob("*")
+        if path.is_file() and path.parts[-2] in {"train", "val"}
+    ):
+        assert (without_debug / relative).read_bytes() == (
+            with_debug / relative
+        ).read_bytes()
+    debug_images = list((with_debug / "images_debug").rglob("*.jpg"))
+    assert len(debug_images) == 3
+    with Image.open(debug_images[0]) as panel:
+        assert panel.width == config["canvas"][0] * 2 + 4
 
 
 def test_parallel_generation_matches_single_worker(tmp_path: Path) -> None:
