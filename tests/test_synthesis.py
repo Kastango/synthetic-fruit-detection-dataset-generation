@@ -208,6 +208,47 @@ def test_hsv_cast_hardlight_target_is_deterministic_and_labels_are_valid(
         assert validate_yolo_text(label.read_text(), str(label)) == 1
 
 
+def test_value_power_jitter_validates_non_negative() -> None:
+    config = tiny_config()
+    config["appearance"]["hsv_cast"] = {
+        "enabled": True,
+        "hue_power": 0.1,
+        "saturation_power": 0.1,
+        "value_power": 0.4,
+        "value_power_jitter": -0.1,
+    }
+    with pytest.raises(ValueError, match="value_power_jitter"):
+        validate_synthesis_config(config)
+
+
+def test_value_power_jitter_generation_is_deterministic_and_labels_are_valid(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["appearance"]["hsv_cast"] = {
+        "enabled": True,
+        "use_hardlight_target": True,
+        "hue_power": 0.1,
+        "saturation_power": 0.1,
+        "value_power": 0.45,
+        "value_power_jitter": 0.3,
+    }
+    first = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    manifest_before = (output / "manifest.jsonl").read_bytes()
+    second = generate_dataset(
+        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert (output / "manifest.jsonl").read_bytes() == manifest_before
+    for label in (output / "labels").rglob("*.txt"):
+        assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
 def test_depth_smooth_radius_validates_non_negative() -> None:
     config = tiny_config()
     config["occlusion"]["depth_smooth_radius"] = -1.0

@@ -210,6 +210,10 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "appearance.hsv_cast.min_value_ratio deve estar entre 0 e 1"
             )
+        if float(hsv_cast.get("value_power_jitter", 0.0)) < 0:
+            raise ValueError(
+                "appearance.hsv_cast.value_power_jitter não pode ser negativo"
+            )
     grading = config["output"].get("scene_grading")
     if grading and grading.get("enabled", False):
         for key in ("contrast", "saturation", "brightness"):
@@ -331,6 +335,7 @@ def _apply_appearance_hsv_cast(
     fruit: Image.Image,
     background_region: Image.Image,
     hsv_cast: dict,
+    rng: random.Random | None = None,
 ) -> Image.Image:
     # Os recortes são fotos de estúdio com luz difusa uniforme; o fundo real
     # tem luz solar direcional. Um hard-light plano contra a cor média do
@@ -365,7 +370,19 @@ def _apply_appearance_hsv_cast(
     v_array = np.asarray(fruit_v, dtype=np.float32)
     hue_power = min(max(float(hsv_cast["hue_power"]), 0.0), 1.0)
     saturation_power = min(max(float(hsv_cast["saturation_power"]), 0.0), 1.0)
-    value_power = min(max(float(hsv_cast["value_power"]), 0.0), 1.0)
+    value_power = float(hsv_cast["value_power"])
+    value_power_jitter = float(hsv_cast.get("value_power_jitter", 0.0))
+    if value_power_jitter > 0:
+        # Um value_power fixo dá a mesma resposta de luz/sombra pra toda
+        # fruta; a variação observada nas fotos reais é maior (algumas bem
+        # mais claras ou mais escuras que a média). Sortear por instância
+        # (mesmo rng da posição, determinístico pela seed) alarga o
+        # espalhamento sem mudar o valor médio de value_power no conjunto.
+        sampler = rng or random.Random()
+        value_power = sampler.uniform(
+            value_power - value_power_jitter, value_power + value_power_jitter
+        )
+    value_power = min(max(value_power, 0.0), 1.0)
     hue_diff = ((bg_h - h_array + 128) % 256) - 128
     h_new = (h_array + hue_diff * hue_power) % 256
     s_new = s_array + (bg_s - s_array) * saturation_power
@@ -395,10 +412,11 @@ def _apply_appearance(
     fruit: Image.Image,
     background_region: Image.Image,
     appearance: dict,
+    rng: random.Random | None = None,
 ) -> Image.Image:
     hsv_cast = appearance.get("hsv_cast")
     if hsv_cast and hsv_cast.get("enabled", False):
-        return _apply_appearance_hsv_cast(fruit, background_region, hsv_cast)
+        return _apply_appearance_hsv_cast(fruit, background_region, hsv_cast, rng)
     return _apply_appearance_hardlight(fruit, background_region, appearance)
 
 
@@ -551,7 +569,7 @@ def _finish_placement(
     if visible_pixels / original_pixels < float(placement["min_visibility"]):
         return None
     region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
-    fruit = _apply_appearance(fruit, region, config["appearance"])
+    fruit = _apply_appearance(fruit, region, config["appearance"], rng=rng)
     fruit = _apply_occlusion_contact_shadow(
         fruit, visibility, opaque, config["occlusion"]
     )

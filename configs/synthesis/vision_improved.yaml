@@ -65,6 +65,13 @@ appearance:
     hue_power: 0.12
     saturation_power: 0.18
     value_power: 0.45
+    # value_power fixo dava a mesma resposta de luz/sombra pra toda fruta; o
+    # usuário notou que a média está boa mas faltam frutas notavelmente mais
+    # claras/escuras. 0.3 sorteia value_power por instância em [0.15,0.75],
+    # aumentando o desvio padrão do brilho médio por fruta de 21.6 para 24.2
+    # (60 cenas, medido pelo canal V de cada instância) sem mudar a média
+    # (92.6 -> 93.6).
+    value_power_jitter: 0.3
     # Sem piso, uma fruta ancorada numa região bem escura tinha o próprio
     # valor (V) puxado quase todo para o alvo escuro e "derretia" num blob
     # marrom irreconhecível (exemplo mandado pelo usuário). 0.6 mantém pelo
