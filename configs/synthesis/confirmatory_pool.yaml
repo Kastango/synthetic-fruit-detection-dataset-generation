@@ -17,7 +17,7 @@ objects:
     far_scale: 0.6
 placement:
   min_depth: 20
-  min_visibility: 0.25
+  min_visibility: 0.15
   max_attempts_per_object: 100
   z_method: center_patch
   z_patch_fraction: 0.2

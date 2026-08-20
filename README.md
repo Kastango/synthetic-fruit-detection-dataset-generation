@@ -49,8 +49,10 @@ O teste externo só é preparado depois que essa seleção é congelada em
 
 A métrica principal é mAP@0.5:0.95. O relatório também inclui precisão,
 revocação, F1, mAP@0.5, mAP@0.75, AP por IoU, tempo de inferência e erros de
-contagem. Resultados sintéticos superiores a `manual-full` são destacados no
-relatório final.
+contagem, curvas de treinamento e um mapa de calor das anotações de cada
+conjunto. Os dados completos da análise também são exportados em CSV e reunidos
+em `analysis_csv.zip`. Resultados sintéticos superiores a `manual-full` são
+destacados no relatório final.
 
 ## Estado atual
 
@@ -65,11 +67,6 @@ relatório final.
 | `datanotation.zip` | treino e validação manual | 130 imagens, 2.093 caixas YOLO, sendo 82 fotos do iPhone 13 mini e 48 do Pixel 6a |
 | ativos sintéticos | condição controlada e geração de cenas | 127 fotos de frutas, 228 fundos e seus mapas de profundidade |
 | `UTA_CSE_Dataset.zip` | teste externo | split oficial do CitDet com 119 imagens e 10.082 caixas |
-
-`datanotation.zip` preserva a resolução original das câmeras e não contém
-duplicatas ou augmentation. A exportação `'Ponca 3 v2.zip` não é utilizada,
-pois mistura imagens reais processadas, imagens sintéticas e augmentation do
-Roboflow.
 
 Os arquivos necessários são baixados automaticamente e validados por tamanho e
 SHA-256. Os endereços e hashes estão em
