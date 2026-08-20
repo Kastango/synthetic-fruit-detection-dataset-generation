@@ -301,6 +301,7 @@ def download_http(
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.exists() and not force:
         _verify_download(destination, expected_bytes, expected_sha256)
+        print(f"reutilizando arquivo validado: {destination}")
         return destination
     partial = destination.with_suffix(destination.suffix + ".part")
     for attempt in range(1, 4):

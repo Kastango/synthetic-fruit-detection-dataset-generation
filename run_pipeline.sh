@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+export PYTHONUNBUFFERED=1
 
 project_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 stage="${1:-help}"

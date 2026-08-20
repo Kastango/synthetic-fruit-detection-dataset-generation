@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from fruit_pipeline.common import ROOT, automatic_workers, load_yaml, project_path
+from fruit_pipeline.progress import run_stage
 
 
 class Workflow:
@@ -17,6 +18,9 @@ class Workflow:
         )
         self.pipeline = load_yaml(project_path(args.pipeline_config))
         self.experiment = load_yaml(project_path(args.experiment_config))
+        self.state_path = (
+            project_path(self.pipeline["paths"]["artifacts"]) / "pipeline_state.json"
+        )
         self.external_name = args.external_name or str(
             self.experiment["protocol"]["external_test"]
         )
@@ -32,7 +36,7 @@ class Workflow:
     def run(self, title: str, command: list[str]) -> None:
         print(f"\n== {title} ==\n{' '.join(command)}", flush=True)
         if not self.args.dry_run:
-            subprocess.run(command, cwd=ROOT, check=True)
+            run_stage(title, command, cwd=ROOT, state_path=self.state_path)
 
     def download(self, source: str) -> None:
         command = self.command("download_data.py", source)

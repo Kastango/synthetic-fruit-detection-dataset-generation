@@ -6,6 +6,7 @@ from fruit_pipeline.common import ROOT, load_yaml
 from fruit_pipeline.download import (
     SOURCES,
     _remove_ignored_prepared_assets,
+    download_http,
     download_real_source,
     selected_sources,
 )
@@ -83,3 +84,24 @@ def test_manual_download_uses_configured_google_drive_url(
 
     assert result.read_bytes() == payload
     assert seen_drive_ids == ["manual-drive-id"]
+
+
+def test_http_download_reuses_valid_archive(tmp_path, monkeypatch, capsys) -> None:
+    destination = tmp_path / "dataset.zip"
+    payload = b"already downloaded"
+    destination.write_bytes(payload)
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("a rede não deveria ser acessada")
+
+    monkeypatch.setattr(download_module.urllib.request, "urlopen", fail_if_called)
+
+    result = download_http(
+        "https://example.test/dataset.zip",
+        destination,
+        expected_bytes=len(payload),
+        expected_sha256=hashlib.sha256(payload).hexdigest(),
+    )
+
+    assert result == destination
+    assert "reutilizando arquivo validado" in capsys.readouterr().out

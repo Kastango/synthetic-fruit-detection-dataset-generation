@@ -99,15 +99,6 @@ Execute o experimento completo:
 `--unlock-test` autoriza a avaliação externa depois que os checkpoints forem
 selecionados. Sem essa opção, a pipeline termina após a seleção.
 
-Se um arquivo já estiver disponível no servidor, informe-o diretamente:
-
-```bash
-./run_pipeline.sh all \
-  --real-source /datasets/datanotation.zip \
-  --external-source /datasets/UTA_CSE_Dataset.zip \
-  --device 0 --accept-data-terms --unlock-test
-```
-
 O número de processos auxiliares é escolhido automaticamente a partir dos CPUs
 disponíveis.
 
@@ -120,8 +111,13 @@ disponíveis.
 5. Preparar o teste externo e avaliar todos os modelos.
 6. Gerar o relatório consolidado.
 
-A execução pode ser retomada. Dados já preparados, treinamentos concluídos e
-checkpoints intermediários são reutilizados.
+A execução pode ser retomada repetindo o mesmo comando. Downloads parciais
+continuam de onde pararam; arquivos e datasets completos são validados e
+reutilizados; treinamentos interrompidos retomam do último checkpoint.
+
+A pipeline informa a etapa atual a cada cinco minutos. O ETA usa o tempo da
+mesma etapa em execuções anteriores no servidor e fica disponível depois do
+primeiro registro completo.
 
 ## Outros conjuntos de teste
 
