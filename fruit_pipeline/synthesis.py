@@ -269,6 +269,13 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "occlusion.cast_shadow.light_angle_jitter_degrees não pode ser negativo"
             )
+        shapes = cast_shadow.get("shapes", _SHADOW_SHAPES)
+        unknown_shapes = set(shapes) - set(_SHADOW_SHAPES)
+        if not shapes or unknown_shapes:
+            raise ValueError(
+                f"occlusion.cast_shadow.shapes deve ser um subconjunto não vazio "
+                f"de {_SHADOW_SHAPES}"
+            )
 
 
 @lru_cache(maxsize=8)
@@ -506,6 +513,67 @@ def _apply_occlusion_contact_shadow(
     return shaded
 
 
+def _shadow_shape_ellipse(
+    width: int, height: int, angle: float, coverage: float, offset_fraction: float
+) -> np.ndarray:
+    center_x = width / 2.0 + math.cos(angle) * width * offset_fraction
+    center_y = height / 2.0 + math.sin(angle) * height * offset_fraction
+    scale = math.sqrt(coverage) * 0.75
+    radius_x = max(width * scale, 1.0)
+    radius_y = max(height * scale, 1.0)
+    ys, xs = np.mgrid[0:height, 0:width]
+    ellipse = ((xs - center_x) / radius_x) ** 2 + ((ys - center_y) / radius_y) ** 2
+    return ellipse <= 1.0
+
+
+def _shadow_shape_band(
+    width: int,
+    height: int,
+    angle: float,
+    coverage: float,
+    offset_fraction: float,
+    rng: random.Random,
+) -> np.ndarray:
+    # Faixa alongada perpendicular à luz, imitando a sombra de um galho ou
+    # nervura fina cruzando a fruta, em vez de uma mancha arredondada.
+    center_x = width / 2.0 + math.cos(angle) * width * offset_fraction
+    center_y = height / 2.0 + math.sin(angle) * height * offset_fraction
+    band_angle = angle + math.pi / 2 + rng.uniform(-0.35, 0.35)
+    band_width = max(width, height) * coverage
+    ys, xs = np.mgrid[0:height, 0:width]
+    perpendicular = -(xs - center_x) * math.sin(band_angle) + (
+        ys - center_y
+    ) * math.cos(band_angle)
+    return np.abs(perpendicular) <= band_width / 2.0
+
+
+def _shadow_shape_blob(
+    width: int,
+    height: int,
+    angle: float,
+    coverage: float,
+    offset_fraction: float,
+    rng: random.Random,
+) -> np.ndarray:
+    # União de 2-3 lóbulos circulares deslocados: silhueta mais irregular
+    # que uma elipse única, mais parecida com sombra de folhas dispersas.
+    base_x = width / 2.0 + math.cos(angle) * width * offset_fraction
+    base_y = height / 2.0 + math.sin(angle) * height * offset_fraction
+    ys, xs = np.mgrid[0:height, 0:width]
+    lobes = rng.randint(2, 3)
+    lobe_scale = math.sqrt(max(coverage / lobes, 0.05) * 1.6) * 0.6
+    radius = max(min(width, height) * lobe_scale, 1.0)
+    mask = np.zeros((height, width), dtype=bool)
+    for _ in range(lobes):
+        lobe_x = base_x + rng.uniform(-width * 0.25, width * 0.25)
+        lobe_y = base_y + rng.uniform(-height * 0.25, height * 0.25)
+        mask |= ((xs - lobe_x) ** 2 + (ys - lobe_y) ** 2) <= radius**2
+    return mask
+
+
+_SHADOW_SHAPES = ("ellipse", "band", "blob")
+
+
 def _apply_cast_shadow(
     fruit: Image.Image,
     opaque: np.ndarray,
@@ -523,9 +591,10 @@ def _apply_cast_shadow(
     # dezenas de pixels o mapa não tem resolução pra desenhar uma silhueta
     # com contraste real, e a "sombra" saía quase uniforme (escurecia tudo
     # por igual, sem parte clara/parte escura) — visualmente imperceptível.
-    # Uma elipse suave procedural garante contraste real dentro da fruta;
-    # o deslocamento do centro na direção da luz ainda dá uma noção de
-    # ângulo (a sombra cai do lado oposto à luz, como autossombra).
+    # Formas procedurais garantem contraste real dentro da fruta; o
+    # deslocamento na direção da luz ainda dá uma noção de ângulo (a sombra
+    # cai do lado oposto à luz, como autossombra). Várias formas (não só
+    # elipse) aumentam a variabilidade visual entre instâncias.
     base_angle = float(cast_shadow.get("light_angle_degrees", 315.0))
     angle_jitter = float(cast_shadow.get("light_angle_jitter_degrees", 20.0))
     angle = math.radians(base_angle + rng.uniform(-angle_jitter, angle_jitter))
@@ -534,14 +603,17 @@ def _apply_cast_shadow(
         float(cast_shadow.get("max_coverage", 0.6)),
     )
     offset_fraction = float(cast_shadow.get("offset_fraction", 0.35))
-    center_x = width / 2.0 + math.cos(angle) * width * offset_fraction
-    center_y = height / 2.0 + math.sin(angle) * height * offset_fraction
-    scale = math.sqrt(coverage) * 0.75
-    radius_x = max(width * scale, 1.0)
-    radius_y = max(height * scale, 1.0)
-    ys, xs = np.mgrid[0:height, 0:width]
-    ellipse = ((xs - center_x) / radius_x) ** 2 + ((ys - center_y) / radius_y) ** 2
-    shadow_mask = (ellipse <= 1.0).astype(np.uint8) * 255
+    shapes = cast_shadow.get("shapes", _SHADOW_SHAPES)
+    shape = rng.choice(shapes)
+    if shape == "ellipse":
+        mask = _shadow_shape_ellipse(width, height, angle, coverage, offset_fraction)
+    elif shape == "band":
+        mask = _shadow_shape_band(width, height, angle, coverage, offset_fraction, rng)
+    elif shape == "blob":
+        mask = _shadow_shape_blob(width, height, angle, coverage, offset_fraction, rng)
+    else:
+        raise ValueError(f"occlusion.cast_shadow.shapes desconhecido: {shape}")
+    shadow_mask = mask.astype(np.uint8) * 255
     blur_radius = float(cast_shadow.get("blur_radius", 3.0))
     if blur_radius > 0:
         shadow_mask = np.asarray(
