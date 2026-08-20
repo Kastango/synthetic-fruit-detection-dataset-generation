@@ -214,6 +214,10 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "appearance.hsv_cast.value_power_jitter não pode ser negativo"
             )
+        if not 0 <= float(hsv_cast.get("bright_flatten_strength", 0.0)) <= 1:
+            raise ValueError(
+                "appearance.hsv_cast.bright_flatten_strength deve estar entre 0 e 1"
+            )
     grading = config["output"].get("scene_grading")
     if grading and grading.get("enabled", False):
         for key in ("contrast", "saturation", "brightness"):
@@ -239,6 +243,23 @@ def validate_synthesis_config(config: dict) -> None:
                 "occlusion.contact_shadow.radius_fraction deve estar entre 0 "
                 "(exclusivo) e 0.5"
             )
+    cast_shadow = config["occlusion"].get("cast_shadow")
+    if cast_shadow and cast_shadow.get("enabled", False):
+        probability = float(cast_shadow.get("probability", 0.4))
+        strength = float(cast_shadow.get("strength", 0.25))
+        min_quantile = float(cast_shadow.get("min_quantile", 0.25))
+        max_quantile = float(cast_shadow.get("max_quantile", 0.6))
+        blur_radius = float(cast_shadow.get("blur_radius", 3.0))
+        if not 0 <= probability <= 1:
+            raise ValueError("occlusion.cast_shadow.probability deve estar entre 0 e 1")
+        if not 0 <= strength <= 1:
+            raise ValueError("occlusion.cast_shadow.strength deve estar entre 0 e 1")
+        if not 0 <= min_quantile < max_quantile <= 1:
+            raise ValueError(
+                "occlusion.cast_shadow requer 0 <= min_quantile < max_quantile <= 1"
+            )
+        if blur_radius < 0:
+            raise ValueError("occlusion.cast_shadow.blur_radius não pode ser negativo")
 
 
 @lru_cache(maxsize=8)
@@ -383,10 +404,28 @@ def _apply_appearance_hsv_cast(
             value_power - value_power_jitter, value_power + value_power_jitter
         )
     value_power = min(max(value_power, 0.0), 1.0)
+    value_power_effective = value_power
+    saturation_power_effective = saturation_power
+    bright_flatten_strength = min(
+        max(float(hsv_cast.get("bright_flatten_strength", 0.0)), 0.0), 1.0
+    )
+    if bright_flatten_strength > 0:
+        # Perto do céu/luz estourada, a fruta real perde relevo e satura
+        # menos (estoura de exposição) — o usuário pediu que ela fique mais
+        # "chapada" nessas regiões, sem mudar o comportamento em fundos
+        # médios/escuros, que já estão bons. brightness_factor cresce só
+        # onde o alvo (bg_v) já é bem claro, e empurra value/saturation_power
+        # em direção a 1.0 (adoção quase total do alvo) proporcionalmente.
+        brightness_factor = np.clip(
+            np.asarray(bg_v, dtype=np.float32) / 255.0, 0.0, 1.0
+        )
+        boost = bright_flatten_strength * brightness_factor
+        value_power_effective = value_power + (1.0 - value_power) * boost
+        saturation_power_effective = saturation_power + (1.0 - saturation_power) * boost
     hue_diff = ((bg_h - h_array + 128) % 256) - 128
     h_new = (h_array + hue_diff * hue_power) % 256
-    s_new = s_array + (bg_s - s_array) * saturation_power
-    v_new = v_array + (bg_v - v_array) * value_power
+    s_new = s_array + (bg_s - s_array) * saturation_power_effective
+    v_new = v_array + (bg_v - v_array) * value_power_effective
     min_value_ratio = min(max(float(hsv_cast.get("min_value_ratio", 0.0)), 0.0), 1.0)
     if min_value_ratio > 0:
         # Em regiões muito escuras, puxar o valor todo para o alvo derrete a
@@ -450,6 +489,50 @@ def _apply_occlusion_contact_shadow(
         / 255.0
     )
     gain = 1.0 - float(contact_shadow.get("strength", 0.0)) * shadow
+    rgb = np.asarray(fruit.convert("RGB"), dtype=np.float32)
+    shaded = Image.fromarray(
+        np.clip(rgb * gain[..., None], 0, 255).astype(np.uint8)
+    ).convert("RGBA")
+    shaded.putalpha(fruit.getchannel("A"))
+    return shaded
+
+
+def _apply_cast_shadow(
+    fruit: Image.Image,
+    region_depth: np.ndarray,
+    opaque: np.ndarray,
+    occlusion: dict,
+    rng: random.Random,
+) -> Image.Image:
+    cast_shadow = occlusion.get("cast_shadow")
+    if not cast_shadow or not cast_shadow.get("enabled", False):
+        return fruit
+    probability = min(max(float(cast_shadow.get("probability", 0.4)), 0.0), 1.0)
+    if rng.random() > probability:
+        return fruit
+    local_values = region_depth[opaque]
+    if not len(local_values):
+        return fruit
+    # Sorteia um limiar independente da oclusão real (que decide o que é
+    # removido), dentro da faixa de profundidade observada sob a própria
+    # fruta — luz de dossel real projeta manchas de sombra sobre frutas que
+    # não estão geometricamente ocluídas por nada. Usar a estrutura de
+    # profundidade local (em vez de uma mancha genérica) mantém a sombra
+    # com formato plausível para aquela cena específica.
+    quantile = rng.uniform(
+        float(cast_shadow.get("min_quantile", 0.25)),
+        float(cast_shadow.get("max_quantile", 0.6)),
+    )
+    shadow_z = float(np.quantile(local_values, quantile))
+    shadow_mask = (region_depth > shadow_z).astype(np.uint8) * 255
+    blur_radius = float(cast_shadow.get("blur_radius", 3.0))
+    if blur_radius > 0:
+        shadow_mask = np.asarray(
+            Image.fromarray(shadow_mask).filter(ImageFilter.GaussianBlur(blur_radius))
+        )
+    shadow = shadow_mask.astype(np.float32) / 255.0
+    strength = min(max(float(cast_shadow.get("strength", 0.25)), 0.0), 1.0)
+    gain = 1.0 - strength * shadow
     rgb = np.asarray(fruit.convert("RGB"), dtype=np.float32)
     shaded = Image.fromarray(
         np.clip(rgb * gain[..., None], 0, 255).astype(np.uint8)
@@ -573,6 +656,10 @@ def _finish_placement(
     fruit = _apply_occlusion_contact_shadow(
         fruit, visibility, opaque, config["occlusion"]
     )
+    if rng is not None:
+        fruit = _apply_cast_shadow(
+            fruit, region_depth, opaque, config["occlusion"], rng
+        )
     fruit.putalpha(Image.fromarray(new_alpha))
     return {
         "x": x,
