@@ -9,7 +9,7 @@ from fruit_pipeline.preprocess import preprocess_assets
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Reconstrói fundos normalizados, recortes DIS e mapas ZoeDepth."
+        description="Reconstrói fundos normalizados, recortes DIS e mapas de profundidade."
     )
     parser.add_argument(
         "--stage", choices=("all", "normalize", "segment", "depth"), default="all"

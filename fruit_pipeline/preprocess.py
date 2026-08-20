@@ -15,6 +15,8 @@ from .common import (
     sha256_file,
 )
 
+FRUIT_BBOX_MANIFEST = "fruit_bboxes.json"
+
 
 def _save_image_atomic(image: Image.Image, path: Path, **save_options: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -68,15 +70,21 @@ def segment_fruits(
     model_name = str(segmentation_config["model"])
     threshold = int(segmentation_config["alpha_threshold"])
     output_size = int(segmentation_config["output_size"])
-    session = new_session(model_name)
+    bbox_path = target.parent / FRUIT_BBOX_MANIFEST
+    bboxes: dict[str, dict] = (
+        json.loads(bbox_path.read_text(encoding="utf-8")) if bbox_path.exists() else {}
+    )
+    session = None
     records = []
     for input_path in image_files(source):
-        output_path = target / f"{input_path.stem.lower()}-trimmed.png"
-        if output_path.exists() and not force:
+        stem = input_path.stem.lower()
+        output_path = target / f"{stem}-trimmed.png"
+        if output_path.exists() and not force and stem in bboxes:
             records.append(
                 {"input": str(input_path), "output": str(output_path), "reused": True}
             )
             continue
+        session = session or new_session(model_name)
         with Image.open(input_path) as opened:
             image = ImageOps.exif_transpose(opened).convert("RGB")
             result = remove(image, session=session).convert("RGBA")
@@ -84,6 +92,18 @@ def segment_fruits(
         ys, xs = np.nonzero(alpha > threshold)
         if len(xs) == 0:
             raise RuntimeError(f"segmentação vazia: {input_path}")
+        # Bbox no referencial da foto bruta (após exif_transpose), preservada
+        # para materializar a condição de treino "controlled" a partir das
+        # fotos originais em vez do recorte já cortado abaixo.
+        bboxes[stem] = {
+            "bbox": [
+                int(xs.min()),
+                int(ys.min()),
+                int(xs.max()) + 1,
+                int(ys.max()) + 1,
+            ],
+            "image_size": list(image.size),
+        }
         result = result.crop(
             (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
         )
@@ -107,6 +127,7 @@ def segment_fruits(
         )
     if not records:
         raise FileNotFoundError(f"nenhuma foto de fruta encontrada em {source}")
+    atomic_write_json(bbox_path, bboxes)
     return records
 
 

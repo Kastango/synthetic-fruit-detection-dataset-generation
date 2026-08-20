@@ -1,0 +1,91 @@
+protocol:
+  artifact_subdir: confirmatory
+  runs_subdir: confirmatory
+  ultralytics_version: 8.4.121
+  validation: data/real_yolo_confirmatory/images/val
+  external_test: citdet
+  test: data/external_tests/citdet/images/test
+  class_names: [poncan]
+
+conditions:
+  manual-full:
+    train: [data/real_yolo_confirmatory/images/train]
+    manifests: [artifacts/real_split_confirmatory.json]
+  controlled:
+    train: [data/real_controlled/images/train]
+    validation: data/real_controlled/images/val
+    manifests: [artifacts/controlled_split.json]
+  synthetic-1x:
+    train: [data/generated/synthetic-1x/images/train]
+    validation: data/generated/synthetic-1x/images/val
+    manifests: [data/generated/synthetic-1x/manifest.jsonl]
+  synthetic-2x:
+    train: [data/generated/synthetic-2x/images/train]
+    validation: data/generated/synthetic-2x/images/val
+    manifests: [data/generated/synthetic-2x/manifest.jsonl]
+  synthetic-3x:
+    train: [data/generated/synthetic-3x/images/train]
+    validation: data/generated/synthetic-3x/images/val
+    manifests: [data/generated/synthetic-3x/manifest.jsonl]
+  synthetic-5x:
+    train: [data/generated/synthetic-5x/images/train]
+    validation: data/generated/synthetic-5x/images/val
+    manifests: [data/generated/synthetic-5x/manifest.jsonl]
+  synthetic-10x:
+    train: [data/generated/synthetic-10x/images/train]
+    validation: data/generated/synthetic-10x/images/val
+    manifests: [data/generated/synthetic-10x/manifest.jsonl]
+
+models:
+  - name: yolo26s
+    checkpoint: yolo26s.pt
+    parameters:
+      batch: 8
+      nbs: 8
+      optimizer: SGD
+      lr0: 0.01
+      deterministic: true
+  - name: yolov8s
+    checkpoint: yolov8s.pt
+    parameters:
+      batch: 8
+      nbs: 8
+      optimizer: SGD
+      lr0: 0.01
+      deterministic: true
+  - name: rtdetr-l
+    checkpoint: rtdetr-l.pt
+    parameters:
+      batch: 4
+      nbs: 4
+      optimizer: AdamW
+      lr0: 0.0001
+      deterministic: false
+
+seeds: [41, 42]
+
+defaults:
+  epochs: 50
+  patience: 30
+  close_mosaic: 5
+  imgsz: 960
+  amp: true
+  pretrained: true
+  max_det: 1000
+  device: cuda
+  cache: false
+  multi_scale: 0.0
+  weight_decay: 0.0005
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  degrees: 0.0
+  translate: 0.1
+  scale: 0.5
+  shear: 0.0
+  perspective: 0.0
+  flipud: 0.0
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+  copy_paste: 0.0

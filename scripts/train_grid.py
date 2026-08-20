@@ -5,19 +5,20 @@ import argparse
 import json
 
 from fruit_pipeline.common import load_yaml, project_path
-from fruit_pipeline.training import run_grid
+from fruit_pipeline.training import run_grid, scoped_experiment_root
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Executa a grade YOLO em processos isolados e retomáveis."
     )
-    parser.add_argument("--config", default="configs/experiments.yaml")
+    parser.add_argument("--config", default="configs/confirmatory.yaml")
     parser.add_argument("--pipeline-config", default="configs/pipeline.yaml")
     parser.add_argument("--condition", action="append")
     parser.add_argument("--model", action="append")
     parser.add_argument("--max-runs", type=int)
     parser.add_argument("--device")
+    parser.add_argument("--workers", type=int)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--continue-on-error", action="store_true")
@@ -26,11 +27,14 @@ def main() -> None:
     pipeline = load_yaml(project_path(args.pipeline_config))
     results = run_grid(
         experiment,
-        runs_root=project_path(pipeline["paths"]["runs"]),
+        runs_root=scoped_experiment_root(
+            project_path(pipeline["paths"]["runs"]), experiment, "runs"
+        ),
         condition_filters=args.condition,
         model_filters=args.model,
         max_runs=args.max_runs,
         device=args.device,
+        workers=args.workers,
         dry_run=args.dry_run,
         force=args.force,
         continue_on_error=args.continue_on_error,

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import random
 import shutil
 import tempfile
 import zipfile
@@ -14,6 +15,15 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"})
+
+
+def automatic_workers(cpu_count: int | None = None) -> int:
+    if cpu_count is None:
+        try:
+            cpu_count = len(os.sched_getaffinity(0))
+        except (AttributeError, OSError):
+            cpu_count = os.cpu_count() or 1
+    return min(8, max(1, cpu_count // 2))
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -68,6 +78,29 @@ def atomic_write_json(path: Path, value: Any, *, durable: bool = True) -> None:
         json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
         durable=durable,
     )
+
+
+def deterministic_split(
+    paths: list[Path], ratio: float, seed: int, namespace: str
+) -> dict[str, list[Path]]:
+    """Divide paths em treino/validação de forma determinística e reprodutível."""
+    shuffled = sorted(paths)
+    random.Random(seed + int(stable_hash(namespace, 8), 16)).shuffle(shuffled)
+    train_count = round(len(shuffled) * ratio)
+    if len(shuffled) > 1:
+        train_count = min(max(train_count, 1), len(shuffled) - 1)
+    return {
+        "train": sorted(shuffled[:train_count]),
+        "val": sorted(shuffled[train_count:]),
+    }
+
+
+def link_or_copy(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target.hardlink_to(source)
+    except OSError:
+        shutil.copy2(source, target)
 
 
 def image_files(directory: Path) -> list[Path]:

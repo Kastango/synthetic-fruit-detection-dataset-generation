@@ -5,16 +5,17 @@ import argparse
 import json
 
 from fruit_pipeline.common import load_yaml, project_path
-from fruit_pipeline.training import evaluate_selected
+from fruit_pipeline.training import evaluate_selected, scoped_experiment_root
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Abre uma única vez o teste real para os modelos já selecionados."
     )
-    parser.add_argument("--config", default="configs/experiments.yaml")
+    parser.add_argument("--config", default="configs/confirmatory.yaml")
     parser.add_argument("--pipeline-config", default="configs/pipeline.yaml")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--external-name")
     parser.add_argument("--unlock-test", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
@@ -25,10 +26,22 @@ def main() -> None:
         )
     experiment = load_yaml(project_path(args.config))
     pipeline = load_yaml(project_path(args.pipeline_config))
+    if args.external_name:
+        experiment["protocol"]["external_test"] = args.external_name
+        experiment["protocol"]["test"] = str(
+            project_path(pipeline["paths"]["external_tests"])
+            / args.external_name
+            / "images"
+            / "test"
+        )
     report = evaluate_selected(
         experiment,
-        project_path(pipeline["paths"]["runs"]),
-        project_path(pipeline["paths"]["artifacts"]),
+        scoped_experiment_root(
+            project_path(pipeline["paths"]["runs"]), experiment, "runs"
+        ),
+        scoped_experiment_root(
+            project_path(pipeline["paths"]["artifacts"]), experiment, "artifact"
+        ),
         device=args.device,
         force=args.force,
     )

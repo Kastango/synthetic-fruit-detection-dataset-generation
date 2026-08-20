@@ -22,11 +22,6 @@ preprocess = [
   "torchvision==0.20.1",
   "transformers==5.15.0",
 ]
-metrics = [
-  "torch==2.5.1",
-  "torchvision==0.20.1",
-  "scipy==1.14.1",
-]
 dev = ["pytest==8.4.1"]
 
 [tool.setuptools]

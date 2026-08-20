@@ -30,17 +30,16 @@ O split usa semente 42 e estratificação proporcional por aparelho:
 
 | Split | Total | iPhone | Pixel | Caixas |
 |---|---:|---:|---:|---:|
-| treino | 100 | 64 | 36 | 1.628 |
-| validação | 15 | 9 | 6 | 220 |
-| teste | 15 | 9 | 6 | 245 |
+| treino | 104 | 66 | 38 | 1.642 |
+| validação | 26 | 16 | 10 | 451 |
 
-O ZIP não inclui um manifesto de partição. A divisão 100/15/15 materializada
-pela pipeline é determinística, estratificada por aparelho e adequada para
-testes operacionais. Segundo o registro da coleta, imagens com nomes ou horários
-próximos correspondem a árvores, sessões ou cenas suficientemente distintas.
-Por isso, a imagem é tratada como unidade experimental, sem agrupamento inferido
-a partir da proximidade temporal. Essa premissa deve permanecer declarada no
-protocolo e no relatório do estudo.
+O teste confirmatório é integralmente externo. O ZIP não inclui um manifesto de
+partição; a pipeline materializa o split acima de forma determinística.
+
+O ZIP manual não deve ser versionado. A pipeline registra a URL fornecida,
+tamanho e SHA-256 em `configs/pipeline.yaml`, baixa o arquivo automaticamente e
+valida sua identidade antes da importação. Um arquivo já disponível também pode
+ser informado com `--real-source`.
 
 ## Exportação Roboflow excluída como fonte
 
@@ -80,3 +79,34 @@ as 130 imagens reais com anotações.
 A licença do projeto cobre o código, mas o repositório de origem não declara de
 forma inequívoca a licença dos arquivos de campo. Por isso o download exige
 `--accept-data-terms` e os dados ficam fora do Git.
+
+## Teste externo
+
+O teste padrão é o split oficial do
+[CitDet](https://mavmatrix.uta.edu/cse_datasets/1/). O arquivo auditado contém
+um ZIP de treino e outro de teste; a pipeline abre somente `CitDet-test.zip` e
+converte suas caixas COCO para uma classe YOLO. As máscaras incluídas no pacote
+não substituem as anotações de detecção.
+
+| Verificação | Resultado |
+|---|---:|
+| ZIP externo | 1.103.158.596 bytes |
+| SHA-256 | `15610a71de5540baf23f70b6c66123c30859ce42e0846dc843c21d277bfe71b1` |
+| Imagens no teste | 119 |
+| Caixas no teste | 10.082 |
+| Formato de origem | COCO JSON |
+| Licença declarada | CC BY-NC-SA 4.0 |
+
+O portal oficial pode apresentar um desafio WAF para downloads não interativos.
+O downloader tenta o endpoint oficial e, se necessário, aceita o mesmo ZIP por
+`--external-source`. Tamanho e hash são verificados antes da extração. O teste
+só pode ser materializado depois que `model_selection.json` existe.
+
+O importador não é específico do CitDet: um diretório ou ZIP YOLO, COCO ou CVAT
+pode ser registrado com outro nome. O conjunto
+[Oranges in the field](https://data.mendeley.com/datasets/93f32zgkxz/1) é uma
+alternativa pública com 5.025 imagens de 640×640 e licença CC BY-NC 3.0, mas seu
+volume torna a preparação e a avaliação mais caras. O dataset descrito no
+[artigo ELD-YOLO](https://www.mdpi.com/2223-7747/14/11/1729) não foi adotado:
+o próprio artigo informa que as 2.388 imagens não estão disponíveis
+publicamente e exigem contato com os autores.

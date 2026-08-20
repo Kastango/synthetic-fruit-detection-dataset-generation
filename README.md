@@ -1,364 +1,160 @@
-# Pipeline experimental para detecção de poncãs com dados sintéticos
+# Detecção de poncãs com dados sintéticos
 
-Este repositório implementa uma linha experimental reprodutível para estudar o
-uso de imagens sintéticas no treinamento de detectores de poncãs. A pergunta
-que orienta a pesquisa é:
+Pipeline reprodutível para investigar se imagens sintéticas podem substituir
+imagens manualmente anotadas no treinamento de detectores de poncãs.
 
-> Sob um protocolo fixo de avaliação externa em imagens reais, dados sintéticos
-> conseguem substituir imagens manualmente anotadas no treinamento de um
-> detector de poncãs?
+## Experimento
 
-A pipeline preserva as fontes, reconstrói recortes e mapas de profundidade,
-gera cenas parametrizáveis e executa grades de detectores em servidor. O teste real
-permanece fechado enquanto decisões metodológicas, geradores, arquiteturas e
-hiperparâmetros são definidos.
+O experimento compara sete condições de treinamento:
 
-## Pergunta e hipótese principal
+| Condição | Imagens de treino | Conteúdo |
+|---|---:|---|
+| `manual-full` | 104 | fotografias de campo anotadas manualmente |
+| `controlled` | 284 | frutas fotografadas em ambiente controlado e fundos negativos |
+| `synthetic-1x` | 104 | cenas sintéticas |
+| `synthetic-2x` | 208 | cenas sintéticas |
+| `synthetic-3x` | 312 | cenas sintéticas |
+| `synthetic-5x` | 520 | condição sintética principal |
+| `synthetic-10x` | 1.040 | análise de saturação |
 
-A pesquisa investiga substituição, não complementação. O experimento principal
-não mistura fotografias reais anotadas com cenas sintéticas no treinamento.
-Uma condição híbrida responderia a outra pergunta e, por isso, está fora deste
-desenho.
+Os conjuntos sintéticos são aninhados: `2x` contém `1x`, `3x` contém `2x` e
+assim por diante. O pool completo possui 1.040 imagens de treino e 260 de
+validação.
 
-A hipótese principal é que `synthetic-5x`, treinado exclusivamente com imagens
-sintéticas, seja não inferior a `manual-full` no teste externo. `Synthetic-1x`,
-`2x`, `3x` e `10x` formam uma curva de escala para mostrar se o desempenho
-cresce, satura ou piora com o aumento do conjunto gerado. A condição
-`controlled` separa o efeito de fotografar frutas reais em ambiente controlado
-do efeito de compô-las em cenas sintéticas de pomar.
+Cada condição é treinada com três detectores:
 
-## Desenho experimental
+| Família | Checkpoint |
+|---|---|
+| YOLO26 | `yolo26s.pt` |
+| YOLOv8 | `yolov8s.pt` |
+| RT-DETR | `rtdetr-l.pt` |
 
-As 130 imagens próprias anotadas serão divididas em 104 imagens de treino e 26
-de validação, com estratificação por aparelho. Logo, `1x` corresponde a 104
-imagens de treino. Cada fotografia de campo é uma unidade experimental: segundo
-o registro da coleta, nomes ou horários próximos correspondem a árvores,
-sessões ou cenas suficientemente distintas. Nas fotografias controladas, vistas
-da mesma fruta física permanecem no mesmo lado da divisão quando essa identidade
-puder ser recuperada.
-
-| Família | Condição | Imagens de treino | Conteúdo |
-|---|---|---:|---|
-| manual | `manual-full` | 104 | fotografias de campo com caixas manuais |
-| controlada | `controlled` | após auditoria | frutas controladas e folhagens negativas |
-| sintética | `synthetic-1x` | 104 | somente cenas geradas |
-| sintética | `synthetic-2x` | 208 | somente cenas geradas |
-| sintética | `synthetic-3x` | 312 | somente cenas geradas |
-| sintética | `synthetic-5x` | 520 | condição sintética principal |
-| sintética | `synthetic-10x` | 1.040 | avaliação de saturação |
-
-O gerador produzirá um pool mestre com 1.040 cenas de treino em dez blocos
-balanceados de 104 e uma validação sintética fixa de 260 imagens. Os conjuntos
-são aninhados: `2x` contém `1x`, `3x` contém `2x` e assim por diante. Dessa
-forma, aumentar o volume não troca silenciosamente frutas, fundos ou parâmetros
-por amostras mais favoráveis.
-
-### Famílias de detectores e tamanho de entrada
-
-Todos os tratamentos serão executados com três checkpoints pré-treinados em
-COCO:
-
-| Família | Checkpoint | Parâmetros | FLOPs em 640 | Motivo da escolha |
-|---|---|---:|---:|---|
-| YOLO26 | `yolo26s.pt` | 9,5 M | 20,7 B | versão pequena com STAL, voltada também à atribuição de alvos pequenos |
-| YOLOv8 | `yolov8s.pt` | 11,2 M | 28,6 B | porte próximo ao YOLO26s e baseline consolidado |
-| RT-DETR | `rtdetr-l.pt` | 32 M | 110 B | menor checkpoint RT-DETR pré-treinado distribuído pela Ultralytics |
-
-Os números são referências em COCO a 640 publicadas nas páginas oficiais do
-[YOLO26](https://docs.ultralytics.com/models/yolo26),
-[YOLOv8](https://docs.ultralytics.com/models/yolov8) e
-[RT-DETR](https://docs.ultralytics.com/models/rtdetr), complementadas pelo
-[model zoo oficial do RT-DETR](https://github.com/lyuwenyu/RT-DETR#model-zoo);
-não são resultados deste estudo. O RT-DETR-L é maior que os dois YOLO. Portanto,
-resultados absolutos não serão usados para atribuir diferenças somente à
-arquitetura ou ao número de parâmetros. A inferência principal compara
-`synthetic-5x` e `manual-full` dentro de cada família.
-
-O ambiente confirmatório fixa `ultralytics==8.4.121`. O hash de cada checkpoint
-COCO de entrada será registrado antes dos treinos. O RT-DETR-L conserva as seis
-camadas do decoder (`eval_idx=5`) e as 300 queries padrão; reduções voltadas à
-velocidade de inferência não entram no experimento.
-
-O tamanho de entrada será `imgsz=960`, com `multi_scale=0`, no treino, na
-validação e no teste. Nas 2.093 caixas reais auditadas, uma projeção que preserva
-a razão de aspecto deixa 20,0% das poncãs com lado mínimo abaixo de 12 pixels em
-640 e apenas 3,3% em 960; abaixo de 16 pixels, as proporções são 48,0% e 12,0%.
-Usar 1280 aumentaria novamente o custo e ampliaria as cenas sintéticas, cujo
-maior lado já é gerado em 960, sem acrescentar detalhe real. A Ultralytics
-preserva a razão de aspecto no pré-processamento dos YOLO, mas usa entrada
-quadrada no RT-DETR; cada transformação nativa será idêntica entre as condições
-da mesma família e registrada como parte da implementação do detector.
-
-O split e o pool sintético usam semente de dados 42; as sementes de treinamento
-são 41 e 42. A matriz confirmatória contém:
+Cada treinamento executa no máximo 50 épocas e pode parar antes caso a validação
+não melhore por 30 épocas. Todos usam entrada `960`, a mesma política de
+augmentation e as sementes 41 e 42. A matriz completa contém:
 
 ```text
-7 condições × 3 famílias × 2 sementes = 42 treinamentos
+7 condições × 3 detectores × 2 sementes = 42 treinamentos
 ```
 
-As sementes são pareadas entre condições dentro de cada família e a ordem das
-execuções é embaralhada. Os dois resultados são apresentados individualmente,
-além da média: duas sementes são o mínimo operacional e não estimam com precisão
-toda a variação entre treinamentos.
+## Avaliação
 
-O número de passos do otimizador pode ser específico para cada família, mas é
-mantido idêntico entre todas as condições de dados daquela família. A política
-de augmentation, a regra de checkpoint e os demais hiperparâmetros comparáveis
-também permanecem fixos. Usar o mesmo número de épocas seria uma análise
-diferente, pois daria mais atualizações às bases maiores. YOLO26s e YOLOv8s usam
-execução determinística; o RT-DETR mantém as sementes pareadas, mas registra
-`deterministic=false`, pois seu `grid_sample` não é compatível com o modo
-determinístico do PyTorch na implementação da Ultralytics.
+O teste externo usa as 119 imagens e 10.082 caixas do split oficial de teste do
+[CitDet](https://mavmatrix.uta.edu/cse_datasets/1/). O split de treino do CitDet
+não é utilizado.
 
-A augmentation é aplicada online e não aumenta a contagem `1x`–`10x`. Todas as
-condições recebem a mesma política: variação HSV, translação, escala,
-espelhamento horizontal e mosaic durante o treinamento. O mosaic é desligado no
-último 10% das atualizações para estabilizar o ajuste final; as demais
-transformações permanecem ativas, como no protocolo de referência. Rotação,
-cisalhamento, perspectiva, espelhamento vertical, mixup e copy-paste ficam
-desligados. Como as condições usam quantidades diferentes de imagens, a
-pipeline converte os 10% finais no `close_mosaic` correspondente ao número de
-épocas de cada execução.
+Os checkpoints são selecionados pela validação correspondente a cada condição.
+O teste externo só é preparado depois que essa seleção é congelada em
+`model_selection.json`.
 
-## Avaliação externa e critério de substituição
+A métrica principal é mAP@0.5:0.95. O relatório também inclui precisão,
+revocação, F1, mAP@0.5, mAP@0.75, AP por IoU, tempo de inferência e erros de
+contagem. Resultados sintéticos superiores a `manual-full` são destacados no
+relatório final.
 
-O dataset externo anotado de poncãs será usado integralmente como teste. Nenhuma
-de suas imagens poderá orientar treinamento, validação, escolha de parâmetros ou
-construção dos ativos sintéticos. Os 42 modelos serão avaliados nas mesmas
-imagens em uma única abertura planejada do teste.
+## Estado atual
 
-Cada família seleciona checkpoints apenas com sua validação de origem: real para
-`manual-full`, controlada para `controlled` e sintética para `synthetic-1x`–
-`10x`. Usar a validação real para selecionar um detector sintético tornaria essa
-condição assistida por anotações manuais e invalidaria a alegação de
-substituição.
+- Pipeline confirmatória implementada e validada por testes automatizados.
+- Dry-run confirmado com 42 treinamentos.
+- Treinamento confirmatório e avaliação final ainda não executados.
 
-A métrica primária é mAP@0.5:0.95. Para `synthetic-5x`, calcula-se a diferença
-em relação a `manual-full` com bootstrap pareado por imagem. Há evidência de
-substituição quando o limite inferior do intervalo de confiança de 95% fica
-acima de `-delta`, a margem prática que será congelada antes da avaliação.
-Superioridade exige que esse limite seja maior que zero. A substituição será
-descrita como robusta entre famílias somente se o critério de não inferioridade
-for satisfeito separadamente por YOLO26s, YOLOv8s e RT-DETR-L. Qualquer padrão
-discordante será descrito como dependente da família, sem selecionar a conclusão
-mais favorável.
+## Dados
 
-As métricas secundárias são mAP@0.5, precisão, revocação, F1, AP por tamanho e
-erro de contagem por imagem. O limiar usado para precisão, revocação e F1 é
-escolhido na validação de origem e congelado antes do teste. Caixas da mesma
-imagem nunca são tratadas como observações estatísticas independentes.
+| Fonte | Uso | Conteúdo |
+|---|---|---|
+| `datanotation.zip` | treino e validação manual | 130 imagens, 2.093 caixas YOLO, sendo 82 fotos do iPhone 13 mini e 48 do Pixel 6a |
+| ativos sintéticos | condição controlada e geração de cenas | 127 fotos de frutas, 228 fundos e seus mapas de profundidade |
+| `UTA_CSE_Dataset.zip` | teste externo | split oficial do CitDet com 119 imagens e 10.082 caixas |
 
-## Fases e estado do estudo
+`datanotation.zip` preserva a resolução original das câmeras e não contém
+duplicatas ou augmentation. A exportação `'Ponca 3 v2.zip` não é utilizada,
+pois mistura imagens reais processadas, imagens sintéticas e augmentation do
+Roboflow.
 
-1. **Auditoria dos dados: concluída.** As fontes reais e sintéticas foram
-   identificadas, verificadas e registradas por hash.
-2. **Piloto computacional: pronto.** Download, pré-processamento, síntese,
-   treino, seleção e avaliação podem ser exercitados de ponta a ponta.
-3. **Desenho confirmatório: definido.** Restam materializar as sete condições,
-   escolher e auditar o dataset externo e congelar a margem de não inferioridade.
-4. **Avaliação final: não iniciada.** O teste reservado não deve orientar
-   alterações de método ou parâmetros.
+Os arquivos necessários são baixados automaticamente e validados por tamanho e
+SHA-256. Os endereços e hashes estão em
+[`configs/pipeline.yaml`](configs/pipeline.yaml). A auditoria completa está em
+[`docs/DATASETS.md`](docs/DATASETS.md).
 
-## Estado dos dados
+## Execução
 
-Dois ZIPs locais foram auditados:
+Requer Python 3.11 ou 3.12 e uma GPU compatível com CUDA. O script abaixo cria o
+ambiente virtual, instala as dependências e executa a pipeline.
 
-- `datanotation.zip` é a base real original: 130 imagens, 130 rótulos YOLO,
-  2.093 caixas, 82 fotos do iPhone 13 mini e 48 do Pixel 6a. Todas estão na
-  resolução da câmera, não há duplicatas nem sinais de augmentation. SHA-256:
-  `28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3`.
-- `'Ponca 3 v2.zip` não é uma fonte bruta. É uma exportação Roboflow com
-  resize 1280×1280, bordas refletidas e augmentation de exposição. Seus 5.330
-  arquivos incluem 5.200 imagens sintéticas e 130 reais processadas.
-
-O pacote público de ativos contém 228 fundos, seus mapas de profundidade e 127
-recortes usados pela pipeline. Ele não contém as 130 imagens reais anotadas. Consulte
-[docs/DATASETS.md](docs/DATASETS.md) para a auditoria e a procedência completas.
-
-O dataset externo anotado ainda precisa ser escolhido e auditado. Até essa
-etapa terminar, não existe resultado confirmatório nem conjunto final de teste
-materializado na pipeline.
-
-## Início rápido do piloto operacional
-
-Python 3.11 ou 3.12 é necessário. O script cria e reutiliza `.venv`.
-
-Os comandos abaixo validam a infraestrutura existente. A matriz confirmatória
-com os cinco volumes sintéticos e as três famílias de detectores ainda será
-materializada em configurações próprias antes dos treinos finais.
+Confira a configuração sem baixar dados ou iniciar treinos:
 
 ```bash
-# 1. Importar os originais e materializar o split piloto 100/15/15.
-./run_pipeline.sh import-real --real-source ../datanotation.zip
-
-# 2. Obter os ativos sintéticos já preparados (aprox. 1,4 GB).
-./run_pipeline.sh download-prepared --accept-data-terms
-
-# 3. Separar fundos e recortes de treino/validação e gerar uma configuração candidata.
-./run_pipeline.sh split-assets
-./run_pipeline.sh synthesize --workers 8 \
-  --synthesis-config configs/synthesis/depth_robust.yaml
-
-# 4. Auditar tudo antes de usar GPU.
-./run_pipeline.sh validate
-.venv/bin/python scripts/render_yolo_samples.py
-
-# 5. Inspecionar a grade, depois treiná-la.
-./run_pipeline.sh train --dry-run --device 0
-./run_pipeline.sh train --device 0
-
-# 6. Selecionar pela validação real. Este passo ainda não lê o teste.
-./run_pipeline.sh select
-
-# 7. Somente após congelar o protocolo confirmatório, abrir o teste uma vez.
-./run_pipeline.sh test --device 0 --unlock-test
+./run_pipeline.sh all --dry-run --device 0 --accept-data-terms
 ```
 
-`configs/experiments.yaml` começa sem augmentation: `mosaic`, HSV, flip,
-translação e escala estão zerados. Isso produz o baseline a partir das imagens
-brutas do piloto. As configurações confirmatórias substituirão esses zeros pela
-política fixa descrita acima; augmentation não será um eixo da grade. As
-operações são aplicadas online pelo YOLO e nunca sobrescrevem
-`data/real_source`.
-
-## Reconstruir recortes e profundidade
-
-O pacote pronto permite iniciar rapidamente. Para reproduzir o
-pré-processamento desde as fotos brutas:
+Execute o experimento completo:
 
 ```bash
-./run_pipeline.sh download-raw --accept-data-terms
-./run_pipeline.sh preprocess --device 0
-
-# Usar os recursos reconstruídos em vez do pacote preparado.
-./run_pipeline.sh split-assets --asset-root data/assets/regenerated
-./run_pipeline.sh synthesize --asset-root data/assets/regenerated \
-  --workers 8 --synthesis-config configs/synthesis/depth_robust.yaml
+./run_pipeline.sh all \
+  --device 0 \
+  --accept-data-terms \
+  --unlock-test
 ```
 
-A segmentação usa IS-Net/DIS por meio do `rembg`. A profundidade usa ZoeDepth
-com revisão fixa do checkpoint. Os mapas são salvos em escala de cinza com as
-regiões próximas em branco, como esperado pelo gerador.
+`--unlock-test` autoriza a avaliação externa depois que os checkpoints forem
+selecionados. Sem essa opção, a pipeline termina após a seleção.
 
-## Configuração sintética piloto
-
-`depth_robust.yaml` é a configuração candidata usada para validar a pipeline.
-Ela combina escala relativa ao fundo, rotação de frutas, tentativas
-limitadas, bordas de oclusão suavizadas e caixas calculadas sobre os pixels
-visíveis.
-
-Não há ativos separados de iluminação. A adaptação de cor de cada recorte é
-calculada diretamente a partir da região do fundo onde a fruta será inserida.
-
-Cada imagem recebe uma semente derivada da configuração, split e índice. A
-geração pode ser interrompida e retomada sem alterar as amostras restantes.
-`manifest.jsonl` registra fundo, mapa, recortes, semente e rejeições de cada
-saída. Fundos e recortes de validação são disjuntos dos usados no treino.
-
-## Geração confirmatória e desempenho
-
-[`confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml) gera o pool
-aninhado de 1.040 imagens de treino e 260 de validação em 720×960, que é a
-resolução efetivamente consumida antes do padding do treino com `imgsz=960`.
-O gerador agrupa tarefas pelo fundo escolhido, mantém caches limitados por
-processo para fundos, profundidade e frutas e envia aos workers somente
-o identificador de cada cena. Sidecars regeneráveis usam rename atômico sem
-forçar sincronização individual em disco; manifestos e resumos finais continuam
-com escrita durável.
+Se um arquivo já estiver disponível no servidor, informe-o diretamente:
 
 ```bash
-./run_pipeline.sh synthesize --workers 8 \
-  --synthesis-config configs/synthesis/confirmatory_pool.yaml
-
-# Medir 1, 4 e 8 workers com os ativos e o filesystem do servidor.
-.venv/bin/python scripts/benchmark_synthesis.py \
-  --asset-root data/assets/prepared \
-  --workers 1 --workers 4 --workers 8 \
-  --output artifacts/synthesis_benchmark.json
+./run_pipeline.sh all \
+  --real-source /datasets/datanotation.zip \
+  --external-source /datasets/UTA_CSE_Dataset.zip \
+  --device 0 --accept-data-terms --unlock-test
 ```
 
-O benchmark não preserva as imagens temporárias. Compare a mediana de pelo menos
-três repetições e escolha o número de workers pelo maior throughput estável, não
-apenas pela quantidade de CPUs.
+O número de processos auxiliares é escolhido automaticamente a partir dos CPUs
+disponíveis.
 
-## Otimização autônoma
+## Etapas da pipeline
 
-A skill pessoal `$tune-synthetic-fruit-detector` conduz buscas limitadas de
-parâmetros do gerador e do detector, promove candidatos por etapas e pode
-otimizar o código quando um perfil demonstra um gargalo. Cada execução exige
-orçamento finito de trials, GPU-horas, paciência e melhoria mínima; todas as
-tentativas são registradas em `artifacts/optimization/`.
+1. Baixar e validar as fontes.
+2. Preparar os conjuntos manual, controlado e sintéticos.
+3. Treinar os 42 modelos e registrar tempo, configuração e métricas.
+4. Selecionar os checkpoints pela validação de origem.
+5. Preparar o teste externo e avaliar todos os modelos.
+6. Gerar o relatório consolidado.
 
-O modo padrão `strict-synthetic` não consulta rótulos reais para selecionar
-candidatos sintéticos. O modo `real-assisted` só pode ser ativado explicitamente
-e muda a interpretação do resultado. Nenhum modo pode consultar o teste externo
-antes do congelamento e da autorização para a avaliação final.
+A execução pode ser retomada. Dados já preparados, treinamentos concluídos e
+checkpoints intermediários são reutilizados.
 
-## Grade piloto
+## Outros conjuntos de teste
 
-As condições disponíveis para validar a infraestrutura são:
-
-- `real_baseline`: somente as 100 imagens reais de treino;
-- `synthetic_depth`: somente as imagens sintéticas.
-
-As duas condições usam a mesma validação real apenas para exercitar o fluxo. A
-grade piloto compara YOLOv8n/YOLOv8s e não deve produzir os resultados do
-estudo. Cada treino roda em um processo isolado e reutiliza resultados
-completos; `last.pt` permite retomar uma execução interrompida.
-
-Essa grade é um piloto operacional, não o desenho confirmatório do artigo. O
-desenho confirmatório tem uma referência manual, uma condição controlada e
-cinco condições somente sintéticas (`1x`, `2x`, `3x`, `5x` e `10x`). Não há
-mistura de imagens reais e sintéticas no experimento principal.
-
-O fluxo obrigatório é `train` → `select` → `test --unlock-test`.
-
-## Execução em servidor
-
-Para uma máquina única, execute dentro de `tmux` ou `screen`:
+Novos testes podem ser registrados em `external_datasets`, dentro de
+[`configs/pipeline.yaml`](configs/pipeline.yaml), e avaliados sem retreinar os
+modelos:
 
 ```bash
-tmux new -s poncan
-./run_pipeline.sh train --device 0 2>&1 | tee runs/server.log
+./run_pipeline.sh prepare-test \
+  --external-name oranges_mendeley \
+  --external-source /datasets/oranges-in-the-field.zip
+
+./run_pipeline.sh test --device 0 --unlock-test \
+  --external-name oranges_mendeley
+
+./run_pipeline.sh report --external-name oranges_mendeley
 ```
 
-Em Slurm, ajuste recursos/partição e envie
-[`server/train.slurm`](server/train.slurm):
+## Principais arquivos
+
+| Arquivo | Finalidade |
+|---|---|
+| `configs/pipeline.yaml` | fontes, caminhos e validações dos dados |
+| `configs/confirmatory.yaml` | condições, modelos e parâmetros de treino |
+| `configs/synthesis/confirmatory_pool.yaml` | configuração do gerador sintético |
+| `scripts/reproduce.py` | orquestração das etapas |
+
+Os resultados são salvos em `artifacts/confirmatory/`. O relatório final fica
+em `artifacts/confirmatory/RESULTS_citdet.md`.
+
+## Verificação local
 
 ```bash
-sbatch server/train.slurm
+.venv/bin/python -m pytest -q
+uvx ruff check .
 ```
-
-Use `PIPELINE_VENV=/caminho/.venv` para manter o ambiente fora do repositório e
-`PYTHON_COMMAND=python3.11` para escolher o interpretador.
-
-## Estrutura gerada
-
-```text
-data/
-  raw/                  # fotos brutas de frutas e fundos
-  assets/prepared/      # pacote público preparado
-  assets/regenerated/   # DIS + ZoeDepth reconstruídos
-  real_source/          # 130 originais normalizados apenas na orientação EXIF
-  real_yolo/            # split materializado 100/15/15
-  generated/            # datasets sintéticos e manifestos
-artifacts/
-  real_split.json
-  model_selection.json
-  test_results.json
-runs/
-  training/ validation/ test/
-```
-
-Dados, checkpoints e resultados locais são ignorados pelo Git. Não publique a
-base real antes de confirmar a licença e o consentimento aplicáveis às imagens.
-
-## Testes
-
-```bash
-./run_pipeline.sh help
-.venv/bin/python -m pytest
-```
-
-`python setimages.py` funciona como um atalho para `depth_robust.yaml`, mas
-grades experimentais devem usar os scripts acima.

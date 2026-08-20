@@ -5,7 +5,7 @@ import argparse
 import json
 from pathlib import Path
 
-from fruit_pipeline.common import load_yaml, project_path
+from fruit_pipeline.common import automatic_workers, load_yaml, project_path
 from fruit_pipeline.synthesis import generate_dataset
 
 
@@ -17,7 +17,7 @@ def main() -> None:
     parser.add_argument("--pipeline-config", default="configs/pipeline.yaml")
     parser.add_argument("--asset-root", type=Path)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--workers", type=int)
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     pipeline = load_yaml(project_path(args.pipeline_config))
@@ -39,7 +39,9 @@ def main() -> None:
         synthesis,
         train_ratio=float(split["train_ratio"]),
         split_seed=int(split["seed"]),
-        workers=max(1, args.workers),
+        workers=max(1, args.workers)
+        if args.workers is not None
+        else automatic_workers(),
         force=args.force,
     )
     print(json.dumps(summary, indent=2, ensure_ascii=False))

@@ -19,11 +19,14 @@ from PIL import Image, ImageOps
 
 from .common import (
     atomic_write_json,
+    deterministic_split,
     image_files,
+    link_or_copy,
     project_path,
     sha256_file,
     stable_hash,
 )
+from .preprocess import FRUIT_BBOX_MANIFEST
 
 
 def normalize_device(value: str | None) -> str:
@@ -456,18 +459,15 @@ def proportional_allocation(group_sizes: dict[str, int], target: int) -> dict[st
     return result
 
 
-def _link_or_copy(source: Path, target: Path) -> None:
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        target.hardlink_to(source)
-    except OSError:
-        shutil.copy2(source, target)
+_link_or_copy = link_or_copy
 
 
 def split_real_dataset(config: dict, force: bool = False) -> dict:
+    """Materializa o split real de treino e validação."""
     source = project_path(config["paths"]["real_source"])
-    output = project_path(config["paths"]["real_yolo"])
-    artifact = project_path(config["paths"]["artifacts"]) / "real_split.json"
+    real_config = config["real_dataset"]
+    output = project_path(real_config["output"])
+    artifact = project_path(config["paths"]["artifacts"]) / real_config["artifact"]
     manifest_path = source / "manifest.json"
     if not manifest_path.exists():
         raise FileNotFoundError(
@@ -475,7 +475,6 @@ def split_real_dataset(config: dict, force: bool = False) -> dict:
         )
     imported = json.loads(manifest_path.read_text(encoding="utf-8"))
     records = imported["records"]
-    real_config = config["real_dataset"]
     seed = int(config["project"]["seed"])
     fingerprint = imported["summary"]["records_hash"]
     if artifact.exists() and output.exists() and not force:
@@ -489,20 +488,18 @@ def split_real_dataset(config: dict, force: bool = False) -> dict:
         by_device[item["device"]].append(item)
     group_sizes = {name: len(items) for name, items in by_device.items()}
     val_alloc = proportional_allocation(group_sizes, int(real_config["val_images"]))
-    test_alloc = proportional_allocation(group_sizes, int(real_config["test_images"]))
-    splits: dict[str, list[dict]] = {"train": [], "val": [], "test": []}
+    splits: dict[str, list[dict]] = {"train": [], "val": []}
     for device, items in sorted(by_device.items()):
         shuffled = sorted(items, key=lambda item: item["id"])
-        random.Random(seed + int(stable_hash(device, 8), 16)).shuffle(shuffled)
+        random.Random(seed + int(stable_hash(f"confirmatory:{device}", 8), 16)).shuffle(
+            shuffled
+        )
         val_count = val_alloc[device]
-        test_count = test_alloc[device]
         splits["val"].extend(shuffled[:val_count])
-        splits["test"].extend(shuffled[val_count : val_count + test_count])
-        splits["train"].extend(shuffled[val_count + test_count :])
+        splits["train"].extend(shuffled[val_count:])
     expected = {
         "train": int(real_config["train_images"]),
         "val": int(real_config["val_images"]),
-        "test": int(real_config["test_images"]),
     }
     counts = {name: len(items) for name, items in splits.items()}
     if counts != expected:
@@ -527,7 +524,6 @@ def split_real_dataset(config: dict, force: bool = False) -> dict:
             "path": str(temporary.resolve()),
             "train": "images/train",
             "val": "images/val",
-            "test": "images/test",
             "names": {0: config["project"]["class_names"][0]},
         }
         (temporary / "data.yaml").write_text(
@@ -568,4 +564,112 @@ def split_real_dataset(config: dict, force: bool = False) -> dict:
         "splits": split_ids,
     }
     atomic_write_json(artifact, frozen)
+    return summary
+
+
+def materialize_controlled_dataset(config: dict, force: bool = False) -> dict:
+    """Materializa a condição `controlled`: fotos de fruta em ambiente
+    controlado como positivos (bbox da máscara de segmentação) e fundos reais
+    sem fruta como negativos, sem passar pelo compositor sintético."""
+    raw_fruits = project_path(config["paths"]["raw"]) / "fruits"
+    regenerated = project_path(config["paths"]["regenerated_assets"])
+    output = project_path(config["paths"]["real_controlled"])
+    artifact = project_path(config["paths"]["artifacts"]) / "controlled_split.json"
+
+    bbox_path = regenerated / FRUIT_BBOX_MANIFEST
+    if not bbox_path.exists():
+        raise FileNotFoundError(
+            f"bboxes de frutas controladas ausentes: {bbox_path}; "
+            "execute o pré-processamento (etapa segment) primeiro"
+        )
+    bboxes = json.loads(bbox_path.read_text(encoding="utf-8"))
+    fruit_paths = image_files(raw_fruits)
+    missing = [path.name for path in fruit_paths if path.stem.lower() not in bboxes]
+    if missing:
+        raise ValueError(
+            f"bbox ausente para {len(missing)} foto(s) de fruta: {missing}"
+        )
+    background_paths = image_files(regenerated / "backgrounds")
+    if not fruit_paths or not background_paths:
+        raise FileNotFoundError(
+            "fotos de fruta ou fundos negativos ausentes para a condição controlled"
+        )
+
+    split_config = config["asset_split"]
+    ratio = float(split_config["train_ratio"])
+    seed = int(split_config["seed"])
+    fruit_split = deterministic_split(fruit_paths, ratio, seed, "controlled_fruits")
+    background_split = deterministic_split(
+        background_paths, ratio, seed, "controlled_backgrounds"
+    )
+
+    fingerprint = stable_hash(
+        [(path.name, path.stat().st_size) for path in sorted(fruit_paths)]
+        + [(path.name, path.stat().st_size) for path in sorted(background_paths)]
+        + [(FRUIT_BBOX_MANIFEST, bbox_path.stat().st_size)],
+        24,
+    )
+    if artifact.exists() and output.exists() and not force:
+        frozen = json.loads(artifact.read_text(encoding="utf-8"))
+        if frozen.get("source_fingerprint") == fingerprint:
+            return frozen["summary"]
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = Path(
+        tempfile.mkdtemp(prefix=f".{output.name}.controlled-", dir=output.parent)
+    )
+    try:
+        for split_name in ("train", "val"):
+            for path in fruit_split[split_name]:
+                stem = path.stem.lower()
+                x0, y0, x1, y1 = bboxes[stem]["bbox"]
+                width, height = bboxes[stem]["image_size"]
+                with Image.open(path) as opened:
+                    image = ImageOps.exif_transpose(opened).convert("RGB")
+                image_output = temporary / "images" / split_name / f"fruit-{stem}.jpg"
+                image_output.parent.mkdir(parents=True, exist_ok=True)
+                image.save(image_output, format="JPEG", quality=95, subsampling=0)
+                label_output = temporary / "labels" / split_name / f"fruit-{stem}.txt"
+                label_output.parent.mkdir(parents=True, exist_ok=True)
+                label_output.write_text(
+                    f"0 {(x0 + x1) / 2 / width:.6f} {(y0 + y1) / 2 / height:.6f} {(x1 - x0) / width:.6f} {(y1 - y0) / height:.6f}\n",
+                    encoding="utf-8",
+                )
+            for path in background_split[split_name]:
+                image_output = temporary / "images" / split_name / f"bg-{path.stem}.jpg"
+                _link_or_copy(path, image_output)
+                label_output = temporary / "labels" / split_name / f"bg-{path.stem}.txt"
+                label_output.parent.mkdir(parents=True, exist_ok=True)
+                label_output.write_text("", encoding="utf-8")
+        data_yaml = {
+            "path": str(temporary.resolve()),
+            "train": "images/train",
+            "val": "images/val",
+            "names": {0: config["project"]["class_names"][0]},
+        }
+        (temporary / "data.yaml").write_text(
+            yaml.safe_dump(data_yaml, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+        if output.exists():
+            shutil.rmtree(output)
+        temporary.replace(output)
+        data_yaml["path"] = str(output.resolve())
+        (output / "data.yaml").write_text(
+            yaml.safe_dump(data_yaml, sort_keys=False, allow_unicode=True),
+            encoding="utf-8",
+        )
+    except BaseException:
+        shutil.rmtree(temporary, ignore_errors=True)
+        raise
+
+    summary = {
+        "fruits": {name: len(items) for name, items in fruit_split.items()},
+        "backgrounds": {name: len(items) for name, items in background_split.items()},
+        "total": {
+            name: len(fruit_split[name]) + len(background_split[name])
+            for name in ("train", "val")
+        },
+    }
+    atomic_write_json(artifact, {"source_fingerprint": fingerprint, "summary": summary})
     return summary

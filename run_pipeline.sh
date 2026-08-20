@@ -27,7 +27,7 @@ if ! "${venv_dir}/bin/python" -m pip --version >/dev/null 2>&1; then
 fi
 
 case "${stage}" in
-  preprocess)
+  preprocess|materialize-controlled|prepare|all)
     requirements="requirements-preprocess.txt"
     ;;
   train|select|test|all)

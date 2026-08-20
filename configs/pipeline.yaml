@@ -8,40 +8,38 @@ paths:
   assets: data/assets/prepared
   regenerated_assets: data/assets/regenerated
   real_source: data/real_source
-  real_yolo: data/real_yolo
+  real_controlled: data/real_controlled
   generated: data/generated
+  external_tests: data/external_tests
   artifacts: artifacts
   runs: runs
 
 real_dataset:
   expected_images: 130
   expected_boxes: 2093
-  train_images: 100
-  val_images: 15
-  test_images: 15
-  devices: [iphone, pixel]
+  train_images: 104
+  val_images: 26
+  output: data/real_yolo_confirmatory
+  artifact: real_split_confirmatory.json
+  source:
+    download_url: https://drive.usercontent.google.com/download?id=1wonaftsf0E_KzMJ3O1-a-79ik-PcsICy&export=download&authuser=0
+    archive_name: datanotation.zip
+    expected_bytes: 526759500
+    sha256: 28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3
 
 asset_split:
   train_ratio: 0.8
   seed: 42
 
+controlled_dataset:
+  train_images: 284
+  val_images: 71
+
 depth:
-  # DepthPro (Apple, 2024) traça bordas finas de vegetação com muito mais
-  # detalhe que o ZoeDepth (checkpoint anterior, mantido no histórico do
-  # git). Confirmado por inspeção visual direta: o mapa antigo classificava
-  # névoa/chão próximos da câmera como mais "perto" que o tronco da árvore
-  # e não capturava galhos/folhas individuais; o DepthPro resolve os dois
-  # problemas na mesma foto de teste (IMG_3509.jpg). Requer
-  # transformers>=5 (model_type "depth_pro" não existe em 4.x).
   model: apple/DepthPro-hf
   revision: de816c8ce7168afcb231f96d501d72b869d0beda
   prediction_is_distance: true
   lower_percentile: 2.0
-  # DepthPro prevê distância métrica real e tem cauda longa (pixels de céu
-  # às vezes leem 800+ metros); 98 deixava o percentil superior tão alto
-  # que toda a vegetação relevante (2-10m) ficava espremida perto de 255.
-  # 85 preserva gradiente de cinza na folhagem/tronco próximos, que é o que
-  # importa para colocação e oclusão. Testado em IMG_3509.jpg.
   upper_percentile: 85.0
   closest_is_white: true
 
@@ -49,3 +47,25 @@ segmentation:
   model: isnet-general-use
   alpha_threshold: 8
   output_size: 1024
+
+external_datasets:
+  citdet:
+    landing_page: https://mavmatrix.uta.edu/cse_datasets/1/
+    download_url: https://mavmatrix.uta.edu/context/cse_datasets/article/1000/type/native/viewcontent
+    archive_name: UTA_CSE_Dataset.zip
+    expected_bytes: 1103158596
+    sha256: 15610a71de5540baf23f70b6c66123c30859ce42e0846dc843c21d277bfe71b1
+    nested_archive: CitDet-test.zip
+    annotation_format: coco
+    expected_images: 119
+    expected_boxes: 10082
+    collapse_to_single_class: true
+    license: CC BY-NC-SA 4.0
+  oranges_mendeley:
+    landing_page: https://data.mendeley.com/datasets/93f32zgkxz/1
+    download_url: null
+    archive_name: oranges-in-the-field.zip
+    expected_images: 5025
+    annotation_format: auto
+    collapse_to_single_class: true
+    license: CC BY-NC 3.0

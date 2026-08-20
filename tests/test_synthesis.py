@@ -13,6 +13,7 @@ from fruit_pipeline.synthesis import (
     _finish_placement,
     create_asset_split,
     generate_dataset,
+    materialize_nested_subsets,
     validate_synthesis_config,
 )
 
@@ -141,6 +142,35 @@ def test_generation_is_deterministic_and_labels_are_valid(tmp_path: Path) -> Non
     assert split["version"] == 2
     for label in (output / "labels").rglob("*.txt"):
         assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
+def test_materialize_nested_subsets_are_complete_and_nested(tmp_path: Path) -> None:
+    assets = tmp_path / "assets"
+    pool = tmp_path / "pool"
+    generated = tmp_path / "generated"
+    build_assets(assets)
+    config = tiny_config()
+    config["images"] = {"train": 4, "val": 1}
+    generate_dataset(assets, pool, config, train_ratio=0.5, split_seed=42, workers=1)
+
+    summary = materialize_nested_subsets(pool, generated, [1, 2], base_size=2)
+
+    assert summary["synthetic-1x"]["train_images"] == 2
+    assert summary["synthetic-2x"]["train_images"] == 4
+    one = {
+        path.name
+        for path in (generated / "synthetic-1x" / "images" / "train").glob("*")
+    }
+    two = {
+        path.name
+        for path in (generated / "synthetic-2x" / "images" / "train").glob("*")
+    }
+    assert one < two
+    for multiplier in (1, 2):
+        root = generated / f"synthetic-{multiplier}x"
+        assert len(list((root / "images" / "val").glob("*"))) == 1
+        assert (root / "manifest.jsonl").exists()
+        assert (root / "data.yaml").exists()
 
 
 def test_hsv_cast_config_validates_power_bounds() -> None:

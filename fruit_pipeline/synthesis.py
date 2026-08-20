@@ -5,6 +5,7 @@ import json
 import math
 import random
 import shutil
+import tempfile
 from collections import Counter
 from functools import lru_cache
 from pathlib import Path
@@ -25,7 +26,9 @@ from .common import (
     IMAGE_SUFFIXES,
     atomic_write_json,
     atomic_write_text,
+    deterministic_split,
     image_files,
+    link_or_copy,
     relative_or_absolute,
     sha256_file,
     stable_hash,
@@ -45,18 +48,7 @@ def find_depth_map(background: Path, depth_directory: Path) -> Path | None:
     return None
 
 
-def _split_paths(
-    paths: list[Path], ratio: float, seed: int, namespace: str
-) -> dict[str, list[Path]]:
-    shuffled = sorted(paths)
-    random.Random(seed + int(stable_hash(namespace, 8), 16)).shuffle(shuffled)
-    train_count = round(len(shuffled) * ratio)
-    if len(shuffled) > 1:
-        train_count = min(max(train_count, 1), len(shuffled) - 1)
-    return {
-        "train": sorted(shuffled[:train_count]),
-        "val": sorted(shuffled[train_count:]),
-    }
+_split_paths = deterministic_split
 
 
 def create_asset_split(
@@ -1281,4 +1273,130 @@ def generate_dataset(
         "manifest_sha256": sha256_file(output_root / "manifest.jsonl"),
     }
     atomic_write_json(output_root / "summary.json", summary)
+    return summary
+
+
+def materialize_nested_subsets(
+    pool_root: Path,
+    target_root: Path,
+    multipliers: list[int],
+    *,
+    base_size: int = 104,
+    prefix: str = "synthetic-",
+    force: bool = False,
+) -> dict:
+    """Recorta prefixos aninhados (1x, 2x, ...) do pool de treino sintético.
+
+    As imagens do pool são nomeadas `train_000000.jpg`, `train_000001.jpg`,
+    ..., em ordem determinística de geração; os primeiros N arquivos de um
+    subconjunto maior sempre incluem os do menor, então `2x` contém `1x` sem
+    reamostrar frutas, fundos ou parâmetros."""
+    images_dir = pool_root / "images" / "train"
+    images = image_files(images_dir)
+    if not images:
+        raise FileNotFoundError(f"pool sem imagens de treino: {images_dir}")
+    sizes = {int(multiplier): base_size * int(multiplier) for multiplier in multipliers}
+    if any(multiplier <= 0 for multiplier in sizes):
+        raise ValueError("multiplicadores devem ser inteiros positivos")
+    if sizes and max(sizes.values()) > len(images):
+        raise ValueError(
+            f"tamanho pedido {max(sizes.values())} excede o pool ({len(images)})"
+        )
+    manifest_path = pool_root / "manifest.jsonl"
+    if not manifest_path.exists():
+        raise FileNotFoundError(f"manifesto do pool ausente: {manifest_path}")
+    pool_records = [
+        json.loads(line)
+        for line in manifest_path.read_text(encoding="utf-8").splitlines()
+        if line
+    ]
+    by_image = {Path(item["image"]).name: item for item in pool_records}
+    val_images = image_files(pool_root / "images" / "val")
+    pool_manifest_sha256 = sha256_file(manifest_path)
+    target_root.mkdir(parents=True, exist_ok=True)
+    summary = {}
+    for multiplier, size in sorted(sizes.items()):
+        name = f"{prefix}{multiplier}x"
+        target = target_root / name
+        summary_path = target / "summary.json"
+        if target.exists() and not force:
+            if not summary_path.exists():
+                raise FileExistsError(f"subconjunto incompleto: {target}; use --force")
+            existing = json.loads(summary_path.read_text(encoding="utf-8"))
+            if (
+                existing.get("pool_manifest_sha256") != pool_manifest_sha256
+                or int(existing.get("train_images", -1)) != size
+            ):
+                raise RuntimeError(
+                    f"subconjunto congelado não corresponde ao pool: {target}"
+                )
+            summary[name] = existing
+            continue
+        temporary = Path(tempfile.mkdtemp(prefix=f".{name}.", dir=target_root))
+        try:
+            selected = {"train": images[:size], "val": val_images}
+            selected_records = []
+            for split_name, split_images in selected.items():
+                for image_path in split_images:
+                    label_path = (
+                        pool_root / "labels" / split_name / f"{image_path.stem}.txt"
+                    )
+                    if not label_path.exists():
+                        raise FileNotFoundError(f"rótulo do pool ausente: {label_path}")
+                    link_or_copy(
+                        image_path,
+                        temporary / "images" / split_name / image_path.name,
+                    )
+                    link_or_copy(
+                        label_path,
+                        temporary / "labels" / split_name / label_path.name,
+                    )
+                    try:
+                        selected_records.append(by_image[image_path.name])
+                    except KeyError as error:
+                        raise ValueError(
+                            f"imagem sem registro no manifesto do pool: {image_path.name}"
+                        ) from error
+            selected_records.sort(key=lambda item: (item["split"], item["image"]))
+            atomic_write_text(
+                temporary / "manifest.jsonl",
+                "".join(
+                    json.dumps(item, sort_keys=True, ensure_ascii=False) + "\n"
+                    for item in selected_records
+                ),
+            )
+            data_yaml = {
+                "path": str(temporary.resolve()),
+                "train": "images/train",
+                "val": "images/val",
+                "names": {0: "poncan"},
+            }
+            atomic_write_text(
+                temporary / "data.yaml",
+                yaml.safe_dump(data_yaml, sort_keys=False, allow_unicode=True),
+            )
+            subset_summary = {
+                "name": name,
+                "multiplier": multiplier,
+                "base_size": base_size,
+                "train_images": size,
+                "val_images": len(val_images),
+                "pool": relative_or_absolute(pool_root),
+                "pool_manifest_sha256": pool_manifest_sha256,
+                "manifest_sha256": sha256_file(temporary / "manifest.jsonl"),
+                "nested_train_prefix": size,
+            }
+            atomic_write_json(temporary / "summary.json", subset_summary)
+            if target.exists():
+                shutil.rmtree(target)
+            temporary.replace(target)
+            data_yaml["path"] = str(target.resolve())
+            atomic_write_text(
+                target / "data.yaml",
+                yaml.safe_dump(data_yaml, sort_keys=False, allow_unicode=True),
+            )
+            summary[name] = subset_summary
+        except BaseException:
+            shutil.rmtree(temporary, ignore_errors=True)
+            raise
     return summary

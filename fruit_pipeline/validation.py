@@ -42,8 +42,9 @@ def validate_yolo_tree(
 def validate_real(config: dict) -> tuple[dict, list[str]]:
     errors = []
     source = project_path(config["paths"]["real_source"])
-    output = project_path(config["paths"]["real_yolo"])
-    artifact = project_path(config["paths"]["artifacts"]) / "real_split.json"
+    expected = config["real_dataset"]
+    output = project_path(expected["output"])
+    artifact = project_path(config["paths"]["artifacts"]) / expected["artifact"]
     required = (source / "manifest.json", artifact, output / "data.yaml")
     for path in required:
         if not path.exists():
@@ -52,7 +53,6 @@ def validate_real(config: dict) -> tuple[dict, list[str]]:
         return {"ready": False}, errors
     imported = json.loads((source / "manifest.json").read_text(encoding="utf-8"))
     frozen = json.loads(artifact.read_text(encoding="utf-8"))
-    expected = config["real_dataset"]
     summary = imported["summary"]
     if summary["images"] != int(expected["expected_images"]):
         errors.append("contagem de imagens reais diferente do protocolo")
@@ -62,23 +62,22 @@ def validate_real(config: dict) -> tuple[dict, list[str]]:
         errors.append("a fonte real apresenta sinais de resize/augmentation")
     ids = frozen["splits"]
     split_sets = {name: set(values) for name, values in ids.items()}
-    if any(
-        split_sets[left] & split_sets[right]
-        for left, right in (("train", "val"), ("train", "test"), ("val", "test"))
-    ):
+    if split_sets["train"] & split_sets["val"]:
         errors.append("vazamento entre splits reais")
     all_ids = {item["id"] for item in imported["records"]}
     if set().union(*split_sets.values()) != all_ids:
         errors.append("split real não cobre exatamente a base importada")
-    tree, tree_errors = validate_yolo_tree(output, ("train", "val", "test"))
+    tree, tree_errors = validate_yolo_tree(output, ("train", "val"))
     errors.extend(tree_errors)
     expected_counts = {
         "train": int(expected["train_images"]),
         "val": int(expected["val_images"]),
-        "test": int(expected["test_images"]),
     }
-    if {name: tree[name]["images"] for name in expected_counts} != expected_counts:
-        errors.append("contagens materializadas 100/15/15 incorretas")
+    materialized_counts = {
+        name: tree.get(name, {}).get("images", 0) for name in expected_counts
+    }
+    if materialized_counts != expected_counts:
+        errors.append("contagens materializadas do split real incorretas")
     return {
         "ready": not errors,
         "source_sha256": summary.get("source", {}).get("sha256"),
@@ -166,6 +165,25 @@ def validate_assets(config: dict, asset_root: Path) -> tuple[dict, list[str]]:
     }, errors
 
 
+def validate_controlled(config: dict) -> tuple[dict, list[str]]:
+    root = project_path(config["paths"]["real_controlled"])
+    artifact = project_path(config["paths"]["artifacts"]) / "controlled_split.json"
+    errors = []
+    if not artifact.exists():
+        errors.append(f"manifesto controlled ausente: {artifact}")
+    tree, tree_errors = validate_yolo_tree(root, ("train", "val"))
+    errors.extend(tree_errors)
+    expected = config["controlled_dataset"]
+    for split in ("train", "val"):
+        expected_images = int(expected[f"{split}_images"])
+        if tree[split]["images"] != expected_images:
+            errors.append(
+                f"controlled/{split}: {tree[split]['images']} imagens, "
+                f"esperado {expected_images}"
+            )
+    return {"ready": not errors, "splits": tree}, errors
+
+
 def validate_generated(config: dict) -> tuple[dict, list[str]]:
     generated_root = project_path(config["paths"]["generated"])
     errors = []
@@ -205,7 +223,9 @@ def validate_generated(config: dict) -> tuple[dict, list[str]]:
 
 
 def validate_project(
-    config: dict, stage: str = "all", asset_root: Path | None = None
+    config: dict,
+    stage: str = "all",
+    asset_root: Path | None = None,
 ) -> dict:
     report: dict[str, Any] = {"stage": stage, "errors": []}
     if stage in {"all", "real"}:
@@ -214,6 +234,9 @@ def validate_project(
     if stage in {"all", "assets"}:
         chosen_root = asset_root or project_path(config["paths"]["assets"])
         report["assets"], errors = validate_assets(config, chosen_root)
+        report["errors"].extend(errors)
+    if stage == "all":
+        report["controlled"], errors = validate_controlled(config)
         report["errors"].extend(errors)
     if stage in {"all", "generated"}:
         report["generated"], errors = validate_generated(config)

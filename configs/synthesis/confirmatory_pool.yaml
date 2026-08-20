@@ -1,33 +1,69 @@
 name: confirmatory_pool
 seed: 42
 images:
-  # Pool mestre: dez blocos aninhados de 104 cenas.
   train: 1040
-  # Validação fixa, independente do tamanho 1x–10x usado no treino.
   val: 260
-# A fonte tem aspecto 3:4. O maior lado já corresponde ao imgsz=960 congelado;
-# renderizar acima disso só acrescentaria resize e I/O à base sintética.
 canvas: [720, 960]
 objects:
   min: 1
-  max: 35
-  min_scale: 0.035
-  max_scale: 0.12
+  max: 30
+  min_scale: 0.02
+  max_scale: 0.065
   scale_mode: canvas
   rotation_degrees: 180
+  depth_scale:
+    enabled: true
+    near_scale: 1.3
+    far_scale: 0.6
 placement:
   min_depth: 20
   min_visibility: 0.25
   max_attempts_per_object: 100
-  z_method: quantile
-  z_quantile: 0.65
+  z_method: center_patch
+  z_patch_fraction: 0.2
+  z_offset: -5
+  z_offset_jitter: 30
+  exclude_bottom_fraction: 0.15
 appearance:
   hardlight_power: 0.65
+  hsv_cast:
+    enabled: true
+    use_hardlight_target: true
+    hue_power: 0.12
+    saturation_power: 0.18
+    value_power: 0.45
+    value_power_jitter: 0.3
+    min_value_ratio: 0.6
+    bright_flatten_strength: 0.7
 occlusion:
   edge_blur: 1.5
+  depth_smooth_radius: 1.2
+  mask_threshold: 0.5
+  edge_feather_radius: 0.8
+  contact_shadow:
+    enabled: true
+    strength: 0.45
+    radius_fraction: 0.04
+  cast_shadow:
+    enabled: true
+    probability: 0.4
+    strength: 0.4
+    min_coverage: 0.3
+    max_coverage: 0.6
+    offset_fraction: 0.35
+    light_angle_degrees: 315.0
+    light_angle_jitter_degrees: 20.0
+    blur_radius: 3.0
 annotation:
   mode: visible
-  # Equivale aproximadamente a 4 px no canvas piloto 1500x2000 depois do resize.
   min_box_pixels: 2
 output:
   jpeg_quality: 95
+  scene_grading:
+    enabled: true
+    contrast: 1.2
+    saturation: 1.0
+    brightness: 0.82
+    sharpen_radius: 2.0
+    sharpen_percent: 25
+    sharpen_threshold: 2
