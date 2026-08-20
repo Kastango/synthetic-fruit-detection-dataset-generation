@@ -103,15 +103,20 @@ occlusion:
     strength: 0.45
     radius_fraction: 0.04
   # Ideia do usuário: mesmo uma fruta sem oclusão geométrica pode ter uma
-  # sombra de dossel caindo sobre ela. Sorteia um limiar de profundidade
-  # independente do usado pra oclusão real (mesma estrutura local, formato
-  # plausível), em 40% das inserções, e só escurece — não remove pixels.
+  # sombra de dossel caindo sobre ela. Usar profundidade deslocada não deu
+  # contraste real (fruta pequena demais pra depth ter resolução — o
+  # usuário não conseguiu ver a sombra); uma elipse suave procedural cobre
+  # sempre 38-61% da fruta (verificado geometricamente para 14-47px),
+  # deslocada na direção da luz, e só escurece — não remove pixels.
   cast_shadow:
     enabled: true
     probability: 0.4
-    strength: 0.3
-    min_quantile: 0.25
-    max_quantile: 0.6
+    strength: 0.4
+    min_coverage: 0.3
+    max_coverage: 0.6
+    offset_fraction: 0.35
+    light_angle_degrees: 315.0
+    light_angle_jitter_degrees: 20.0
     blur_radius: 3.0
 annotation:
   mode: visible

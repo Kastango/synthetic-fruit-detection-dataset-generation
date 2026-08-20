@@ -292,12 +292,12 @@ def test_bright_flatten_strength_pulls_more_in_bright_regions() -> None:
     assert boosted_v.mean() > unboosted_v.mean()
 
 
-def test_cast_shadow_config_validates_quantile_order() -> None:
+def test_cast_shadow_config_validates_coverage_order() -> None:
     config = tiny_config()
     config["occlusion"]["cast_shadow"] = {
         "enabled": True,
-        "min_quantile": 0.7,
-        "max_quantile": 0.5,
+        "min_coverage": 0.7,
+        "max_coverage": 0.5,
     }
     with pytest.raises(ValueError, match="cast_shadow"):
         validate_synthesis_config(config)

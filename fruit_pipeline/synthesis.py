@@ -248,22 +248,22 @@ def validate_synthesis_config(config: dict) -> None:
     if cast_shadow and cast_shadow.get("enabled", False):
         probability = float(cast_shadow.get("probability", 0.4))
         strength = float(cast_shadow.get("strength", 0.25))
-        min_quantile = float(cast_shadow.get("min_quantile", 0.25))
-        max_quantile = float(cast_shadow.get("max_quantile", 0.6))
+        min_coverage = float(cast_shadow.get("min_coverage", 0.3))
+        max_coverage = float(cast_shadow.get("max_coverage", 0.6))
         blur_radius = float(cast_shadow.get("blur_radius", 3.0))
         if not 0 <= probability <= 1:
             raise ValueError("occlusion.cast_shadow.probability deve estar entre 0 e 1")
         if not 0 <= strength <= 1:
             raise ValueError("occlusion.cast_shadow.strength deve estar entre 0 e 1")
-        if not 0 <= min_quantile < max_quantile <= 1:
+        if not 0 < min_coverage < max_coverage <= 1:
             raise ValueError(
-                "occlusion.cast_shadow requer 0 <= min_quantile < max_quantile <= 1"
+                "occlusion.cast_shadow requer 0 < min_coverage < max_coverage <= 1"
             )
         if blur_radius < 0:
             raise ValueError("occlusion.cast_shadow.blur_radius não pode ser negativo")
-        if float(cast_shadow.get("distance_fraction", 0.35)) < 0:
+        if float(cast_shadow.get("offset_fraction", 0.35)) < 0:
             raise ValueError(
-                "occlusion.cast_shadow.distance_fraction não pode ser negativo"
+                "occlusion.cast_shadow.offset_fraction não pode ser negativo"
             )
         if float(cast_shadow.get("light_angle_jitter_degrees", 20.0)) < 0:
             raise ValueError(
@@ -508,9 +508,6 @@ def _apply_occlusion_contact_shadow(
 
 def _apply_cast_shadow(
     fruit: Image.Image,
-    x: int,
-    y: int,
-    depth: np.ndarray,
     opaque: np.ndarray,
     occlusion: dict,
     rng: random.Random,
@@ -522,35 +519,29 @@ def _apply_cast_shadow(
     if rng.random() > probability:
         return fruit
     height, width = opaque.shape
-    canvas_height, canvas_width = depth.shape
-    # Uma sombra real vem de um objeto a uma certa distância, numa direção
-    # ditada pela luz — não fica alinhada com a própria fruta. Desloca a
-    # amostragem de profundidade nessa direção antes de derivar o formato,
-    # em vez de reusar a região exatamente sob a fruta.
+    # Amostrar profundidade deslocada não funcionou: numa fruta de poucas
+    # dezenas de pixels o mapa não tem resolução pra desenhar uma silhueta
+    # com contraste real, e a "sombra" saía quase uniforme (escurecia tudo
+    # por igual, sem parte clara/parte escura) — visualmente imperceptível.
+    # Uma elipse suave procedural garante contraste real dentro da fruta;
+    # o deslocamento do centro na direção da luz ainda dá uma noção de
+    # ângulo (a sombra cai do lado oposto à luz, como autossombra).
     base_angle = float(cast_shadow.get("light_angle_degrees", 315.0))
     angle_jitter = float(cast_shadow.get("light_angle_jitter_degrees", 20.0))
     angle = math.radians(base_angle + rng.uniform(-angle_jitter, angle_jitter))
-    distance = max(width, height) * float(cast_shadow.get("distance_fraction", 0.35))
-    offset_x = min(max(x + round(math.cos(angle) * distance), 0), canvas_width - width)
-    offset_y = min(
-        max(y + round(math.sin(angle) * distance), 0), canvas_height - height
+    coverage = rng.uniform(
+        float(cast_shadow.get("min_coverage", 0.3)),
+        float(cast_shadow.get("max_coverage", 0.6)),
     )
-    region_depth = depth[offset_y : offset_y + height, offset_x : offset_x + width]
-    local_values = region_depth[opaque]
-    if not len(local_values):
-        return fruit
-    # Sorteia um limiar independente da oclusão real (que decide o que é
-    # removido) dentro da faixa de profundidade observada na região
-    # deslocada — luz de dossel real projeta manchas de sombra sobre frutas
-    # que não estão geometricamente ocluídas por nada. Usar a estrutura de
-    # profundidade local (em vez de uma mancha genérica) mantém a sombra
-    # com formato plausível para aquela cena específica.
-    quantile = rng.uniform(
-        float(cast_shadow.get("min_quantile", 0.25)),
-        float(cast_shadow.get("max_quantile", 0.6)),
-    )
-    shadow_z = float(np.quantile(local_values, quantile))
-    shadow_mask = (region_depth > shadow_z).astype(np.uint8) * 255
+    offset_fraction = float(cast_shadow.get("offset_fraction", 0.35))
+    center_x = width / 2.0 + math.cos(angle) * width * offset_fraction
+    center_y = height / 2.0 + math.sin(angle) * height * offset_fraction
+    scale = math.sqrt(coverage) * 0.75
+    radius_x = max(width * scale, 1.0)
+    radius_y = max(height * scale, 1.0)
+    ys, xs = np.mgrid[0:height, 0:width]
+    ellipse = ((xs - center_x) / radius_x) ** 2 + ((ys - center_y) / radius_y) ** 2
+    shadow_mask = (ellipse <= 1.0).astype(np.uint8) * 255
     blur_radius = float(cast_shadow.get("blur_radius", 3.0))
     if blur_radius > 0:
         shadow_mask = np.asarray(
@@ -683,7 +674,7 @@ def _finish_placement(
         fruit, visibility, opaque, config["occlusion"]
     )
     if rng is not None:
-        fruit = _apply_cast_shadow(fruit, x, y, depth, opaque, config["occlusion"], rng)
+        fruit = _apply_cast_shadow(fruit, opaque, config["occlusion"], rng)
     fruit.putalpha(Image.fromarray(new_alpha))
     return {
         "x": x,
