@@ -277,14 +277,7 @@ def _open_background_pair_cached(
     with Image.open(background_path) as opened:
         background = ImageOps.exif_transpose(opened).convert("RGB")
     with Image.open(depth_path) as opened:
-        oriented_depth = ImageOps.exif_transpose(opened)
-        # O pacote preparado contém mapas ZoeDepth coloridos e usa o canal R.
-        # Os mapas regenerados já são L; esta seleção mantém ambos compatíveis.
-        depth = (
-            oriented_depth.convert("RGB").getchannel("R")
-            if len(oriented_depth.getbands()) > 1
-            else oriented_depth.convert("L")
-        )
+        depth = ImageOps.exif_transpose(opened).convert("L")
     if background.size != depth.size and background.size == depth.size[::-1]:
         background = background.rotate(-90, expand=True)
     background = background.resize(size, Image.Resampling.LANCZOS)

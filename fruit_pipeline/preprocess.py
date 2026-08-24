@@ -18,6 +18,14 @@ from .common import (
 FRUIT_BBOX_MANIFEST = "fruit_bboxes.json"
 
 
+def resolve_torch_device(
+    device: str | None, *, cuda_available: bool, mps_available: bool
+) -> str:
+    if device is None or device == "auto":
+        return "cuda" if cuda_available else ("mps" if mps_available else "cpu")
+    return f"cuda:{device}" if device.isdigit() else device
+
+
 def _save_image_atomic(image: Image.Image, path: Path, **save_options: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.stem}.tmp{path.suffix}")
@@ -141,13 +149,11 @@ class DepthEstimator:
                 "mapas de profundidade requerem requirements-preprocess.txt"
             ) from error
         self.torch = torch
-        if device is None or device == "auto":
-            device = (
-                "cuda"
-                if torch.cuda.is_available()
-                else ("mps" if torch.backends.mps.is_available() else "cpu")
-            )
-        self.device = device
+        self.device = resolve_torch_device(
+            device,
+            cuda_available=torch.cuda.is_available(),
+            mps_available=torch.backends.mps.is_available(),
+        )
         self.config = depth_config
         model_name = str(depth_config["model"])
         revision = str(depth_config["revision"])
@@ -156,7 +162,7 @@ class DepthEstimator:
         )
         self.model = AutoModelForDepthEstimation.from_pretrained(
             model_name, revision=revision
-        ).to(device)
+        ).to(self.device)
         self.model.eval()
 
     def infer(self, image: Image.Image) -> Image.Image:
@@ -243,7 +249,7 @@ def preprocess_assets(
     force: bool = False,
 ) -> dict:
     raw = project_path(config["paths"]["raw"])
-    target = project_path(config["paths"]["regenerated_assets"])
+    target = project_path(config["paths"]["assets"])
     target.mkdir(parents=True, exist_ok=True)
     report: dict[str, Any] = {
         "stage": stage,

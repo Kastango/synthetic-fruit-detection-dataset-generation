@@ -15,7 +15,9 @@ def main() -> None:
         "--stage", choices=("all", "normalize", "segment", "depth"), default="all"
     )
     parser.add_argument("--config", default="configs/pipeline.yaml")
-    parser.add_argument("--device", default="auto", help="auto, cuda, mps ou cpu")
+    parser.add_argument(
+        "--device", default="auto", help="auto, 0, cuda:0, mps ou cpu"
+    )
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     preprocess_assets(

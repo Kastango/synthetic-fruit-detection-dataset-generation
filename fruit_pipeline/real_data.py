@@ -572,7 +572,7 @@ def materialize_controlled_dataset(config: dict, force: bool = False) -> dict:
     controlado como positivos (bbox da máscara de segmentação) e fundos reais
     sem fruta como negativos, sem passar pelo compositor sintético."""
     raw_fruits = project_path(config["paths"]["raw"]) / "fruits"
-    regenerated = project_path(config["paths"]["regenerated_assets"])
+    regenerated = project_path(config["paths"]["assets"])
     output = project_path(config["paths"]["real_controlled"])
     artifact = project_path(config["paths"]["artifacts"]) / "controlled_split.json"
 

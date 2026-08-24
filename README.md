@@ -102,7 +102,7 @@ disponíveis.
 ## Etapas da pipeline
 
 1. Baixar e validar as fontes.
-2. Preparar os conjuntos manual, controlado e sintéticos.
+2. Gerar os recortes e mapas DepthPro e preparar os conjuntos.
 3. Treinar os 42 modelos e registrar tempo, configuração e métricas.
 4. Selecionar os checkpoints pela validação de origem.
 5. Preparar o teste externo e avaliar todos os modelos.

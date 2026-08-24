@@ -22,25 +22,15 @@ class DataSource:
     drive_id: str
     archive_name: str
     expected_bytes: int
-    target_key: str | None = None
     minimum_images: int = 0
 
 
 SOURCES = {
-    "prepared": DataSource(
-        key="prepared",
-        drive_id="1YIBQHP9dPglBPG68jbxD7MYx0SlHK3z_",
-        archive_name="prepared-assets.zip",
-        expected_bytes=1_544_768_252,
-        target_key="assets",
-        minimum_images=583,
-    ),
     "fruits": DataSource(
         key="fruits",
         drive_id="1EWSv230GBdlouaRArZxv0WFjKhsPNQqT",
         archive_name="fruits-closeup.zip",
         expected_bytes=236_417_183,
-        target_key="raw/fruits",
         minimum_images=127,
     ),
     "backgrounds": DataSource(
@@ -48,7 +38,6 @@ SOURCES = {
         drive_id="13c1s7xFXj08VocUZBS6BhvTcGXjohDZs",
         archive_name="backgrounds2.zip",
         expected_bytes=1_431_673_341,
-        target_key="raw/backgrounds",
         minimum_images=228,
     ),
 }
@@ -160,13 +149,7 @@ def download_google_drive(source: DataSource, destination: Path) -> None:
 
 
 def target_for(source: DataSource, pipeline_config: dict) -> Path:
-    paths = pipeline_config["paths"]
-    if source.key == "prepared":
-        return project_path(paths["assets"])
-    if source.target_key is None:
-        raise ValueError(f"fonte sem destino de extração: {source.key}")
-    _, child = source.target_key.split("/", 1)
-    return project_path(paths["raw"]) / child
+    return project_path(pipeline_config["paths"]["raw"]) / source.key
 
 
 def verify_extracted(source: DataSource, target: Path) -> dict:
@@ -176,22 +159,7 @@ def verify_extracted(source: DataSource, target: Path) -> dict:
             f"{source.key}: somente {len(files)} imagens em {target}; "
             f"mínimo esperado {source.minimum_images}"
         )
-    if source.key == "prepared":
-        required = ("backgrounds", "backgrounds_map", "pictures_trimmed")
-        missing = [name for name in required if not (target / name).is_dir()]
-        if missing:
-            raise RuntimeError(f"pacote preparado sem diretórios: {missing}")
     return {"source": source.key, "target": str(target), "images": len(files)}
-
-
-def _remove_ignored_prepared_assets(source: DataSource, target: Path) -> None:
-    if source.key != "prepared":
-        return
-    ignored = target / "lights"
-    if ignored.is_symlink() or ignored.is_file():
-        ignored.unlink()
-    elif ignored.is_dir():
-        shutil.rmtree(ignored)
 
 
 def obtain_source(
@@ -207,7 +175,6 @@ def obtain_source(
         return verify_extracted(source, target)
     if target.exists() and not force:
         try:
-            _remove_ignored_prepared_assets(source, target)
             report = verify_extracted(source, target)
             print(f"reutilizando dados extraídos: {target}")
             return report
@@ -219,15 +186,7 @@ def obtain_source(
     download_google_drive(source, archive)
     if not zipfile.is_zipfile(archive):
         raise RuntimeError(f"arquivo baixado não é um ZIP válido: {archive}")
-    extract_zip_atomic(
-        archive,
-        target,
-        force=force,
-        excluded_roots=frozenset({"lights"})
-        if source.key == "prepared"
-        else frozenset(),
-    )
-    _remove_ignored_prepared_assets(source, target)
+    extract_zip_atomic(archive, target, force=force)
     report = verify_extracted(source, target)
     if not keep_archive:
         archive.unlink()
@@ -375,10 +334,6 @@ def obtain_external_archive(
 
 
 def selected_sources(mode: str) -> list[DataSource]:
-    if mode == "prepared":
-        return [SOURCES["prepared"]]
-    if mode == "raw":
+    if mode in {"raw", "all"}:
         return [SOURCES[name] for name in ("fruits", "backgrounds")]
-    if mode == "all":
-        return [SOURCES[name] for name in ("prepared", "fruits", "backgrounds")]
     return [SOURCES[mode]]

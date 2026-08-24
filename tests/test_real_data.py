@@ -107,7 +107,7 @@ def test_materialize_controlled_dataset_derives_boxes_and_negatives(
     config = {
         "paths": {
             "raw": str(tmp_path / "raw"),
-            "regenerated_assets": str(regenerated),
+            "assets": str(regenerated),
             "real_controlled": str(tmp_path / "real_controlled"),
             "artifacts": str(tmp_path / "artifacts"),
         },

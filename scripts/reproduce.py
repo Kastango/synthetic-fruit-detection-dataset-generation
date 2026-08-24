@@ -97,15 +97,6 @@ class Workflow:
             command.append("--force")
         self.run("Regenerar recortes e profundidade", command)
 
-    def preprocess_controlled(self) -> None:
-        for stage in ("normalize", "segment"):
-            command = self.command(
-                "preprocess_assets.py", "--stage", stage, "--device", self.args.device
-            )
-            if self.args.force:
-                command.append("--force")
-            self.run(f"Pré-processar condição controlled ({stage})", command)
-
     def split_assets(self) -> None:
         command = self.command("split_assets.py", "--asset-root", str(self.asset_root))
         if self.args.force:
@@ -241,11 +232,10 @@ class Workflow:
         )
 
     def prepare(self) -> None:
-        self.download("prepared")
         self.download("raw")
         self.import_real()
         self.split_real()
-        self.preprocess_controlled()
+        self.preprocess()
         self.materialize_controlled()
         self.split_assets()
         self.synthesize()
@@ -276,7 +266,6 @@ def main() -> None:
         "stage",
         choices=(
             "help",
-            "download-prepared",
             "download-raw",
             "download-real",
             "preprocess",
@@ -316,7 +305,6 @@ def main() -> None:
     args = parser.parse_args()
     workflow = Workflow(args)
     actions = {
-        "download-prepared": lambda: workflow.download("prepared"),
         "download-raw": lambda: workflow.download("raw"),
         "download-real": workflow.import_real,
         "preprocess": workflow.preprocess,

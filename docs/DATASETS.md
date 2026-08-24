@@ -63,18 +63,9 @@ adjudicação antes da execução confirmatória.
 
 ## Ativos sintéticos públicos
 
-O Google Drive referenciado pelo repositório contém um pacote preparado de
-1.544.768.252 bytes. A pipeline extrai e utiliza somente:
-
-- 228 imagens de fundo;
-- mapas de profundidade preparados;
-- 127 recortes de poncã.
-
-Arquivos auxiliares presentes no pacote de origem não são extraídos nem entram
-no inventário de ativos. Os arquivos brutos necessários permanecem públicos em
-dois ZIPs separados: 127 fotos de frutas e 228 fundos. O notebook Colab
-associado aos ativos usa DIS/IS-Net e ZoeDepth. Nenhum desses arquivos inclui
-as 130 imagens reais com anotações.
+A pipeline baixa dois ZIPs com 127 fotos de frutas e 228 fundos. A partir deles,
+gera os recortes com IS-Net e os mapas de profundidade em resolução original
+com DepthPro. Nenhum desses arquivos inclui as 130 imagens reais anotadas.
 
 A licença do projeto cobre o código, mas o repositório de origem não declara de
 forma inequívoca a licença dos arquivos de campo. Por isso o download exige

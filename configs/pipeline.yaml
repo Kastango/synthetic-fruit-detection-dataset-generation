@@ -5,8 +5,7 @@ project:
 paths:
   archives: data/archives
   raw: data/raw
-  assets: data/assets/prepared
-  regenerated_assets: data/assets/regenerated
+  assets: data/assets/regenerated
   real_source: data/real_source
   real_controlled: data/real_controlled
   generated: data/generated

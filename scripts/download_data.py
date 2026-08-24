@@ -14,8 +14,8 @@ def main() -> None:
     )
     parser.add_argument(
         "source",
-        choices=("prepared", "raw", "all", "fruits", "backgrounds"),
-        help="prepared é o pacote pronto; raw permite reconstruir recortes/profundidade",
+        choices=("raw", "all", "fruits", "backgrounds"),
+        help="raw e all baixam as fotos de frutas e os fundos",
     )
     parser.add_argument("--config", default="configs/pipeline.yaml")
     parser.add_argument("--force", action="store_true")
