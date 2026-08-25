@@ -29,7 +29,7 @@ O fluxograma resume a preparação dos ativos, a composição das cenas, os arqu
 salvos em JPG, TXT e JSON, o split do pool gerado e a materialização de
 `synthetic-1x` a `synthetic-10x`.
 
-![Fluxograma da geração dos conjuntos synthetic-1x a synthetic-10x](docs/figures/fluxograma-sintese-v3.svg)
+![Fluxograma da geração dos conjuntos synthetic-1x a synthetic-10x](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)
 
 *Figura 1 — Preparação das imagens, composição das cenas e formação dos conjuntos sintéticos.*
 
