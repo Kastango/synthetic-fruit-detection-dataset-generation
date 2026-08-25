@@ -22,8 +22,8 @@
 <path d="M 760 340 L 760 476" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)"/>
 <path d="M 228 555 L 196 555" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
 <path d="M 924 555 L 956 555" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
-<path d="M 126 376 L 126 382 A 6 6 0 0 0 132 388 L 368 388 A 8 8 0 0 1 376 396 L 376 476" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
-<path d="M 1026 376 L 1026 382 A 6 6 0 0 1 1020 388 L 784 388 A 8 8 0 0 0 776 396 L 776 476" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
+<path d="M 126 376 L 126 384 A 8 8 0 0 0 134 392 L 368 392 A 8 8 0 0 1 376 400 L 376 476" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
+<path d="M 1026 376 L 1026 384 A 8 8 0 0 1 1018 392 L 784 392 A 8 8 0 0 0 776 400 L 776 476" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
 <path d="M 392 634 L 392 660 A 8 8 0 0 0 400 668 L 576 668" fill="none" stroke="#6d5a92" stroke-width="1.6"/>
 <path d="M 760 634 L 760 660 A 8 8 0 0 1 752 668 L 576 668" fill="none" stroke="#6d5a92" stroke-width="1.6"/>
 <rect x="512" y="38" width="128" height="60" rx="30" fill="#efe7fa"/>
@@ -77,6 +77,7 @@
 <path d="M 432 640 L 400 640" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)"/>
 <path d="M 112 640 L 88 640 A 8 8 0 0 1 80 632 L 80 472 A 8 8 0 0 1 88 464 L 112 464" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)"/>
 <path d="M 576 744 L 576 784 A 8 8 0 0 1 568 792 L 412 792 A 8 8 0 0 0 404 800 L 404 812" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)"/>
+<path d="M 404 924 L 404 988 A 8 8 0 0 0 412 996 L 536 996 A 8 8 0 0 1 544 1004 L 544 1056" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)"/>
 <path d="M 632 868 L 648 868 A 8 8 0 0 0 656 860 L 656 792 A 8 8 0 0 1 664 784 L 970 784" fill="none" stroke="#6d5a92" stroke-width="1.6" stroke-dasharray="6,5"/>
 <path d="M 730 784 L 730 800" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
 <path d="M 850 784 L 850 800" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#arrow)" stroke-dasharray="6,5"/>
