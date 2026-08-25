@@ -31,6 +31,8 @@ salvos em JPG, TXT e JSON, o split do pool gerado e a materialização de
 
 ![Fluxograma da geração dos conjuntos synthetic-1x a synthetic-10x](docs/figures/fluxograma-sintese-v3.svg)
 
+*Figura 1 — Preparação das imagens, composição das cenas e formação dos conjuntos sintéticos.*
+
 ## Experimento
 
 O experimento compara sete condições de treinamento:
