@@ -32,7 +32,7 @@ def main() -> None:
         if args.output
         else project_path(pipeline["paths"]["generated"]) / synthesis["name"]
     )
-    split = pipeline["asset_split"]
+    split = pipeline["synthetic_split"]
     summary = generate_dataset(
         asset_root,
         output,

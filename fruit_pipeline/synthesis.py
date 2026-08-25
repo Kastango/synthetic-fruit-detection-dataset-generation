@@ -26,7 +26,6 @@ from .common import (
     IMAGE_SUFFIXES,
     atomic_write_json,
     atomic_write_text,
-    deterministic_split,
     image_files,
     link_or_copy,
     relative_or_absolute,
@@ -34,8 +33,9 @@ from .common import (
     stable_hash,
 )
 
-GENERATOR_SCHEMA_VERSION = 5
-ASSET_SPLIT_SCHEMA_VERSION = 2
+GENERATOR_SCHEMA_VERSION = 6
+ASSET_CATALOG_SCHEMA_VERSION = 1
+SCENE_SPLIT_SCHEMA_VERSION = 1
 
 
 def find_depth_map(background: Path, depth_directory: Path) -> Path | None:
@@ -48,17 +48,9 @@ def find_depth_map(background: Path, depth_directory: Path) -> Path | None:
     return None
 
 
-_split_paths = deterministic_split
-
-
-def create_asset_split(
-    asset_root: Path,
-    *,
-    train_ratio: float,
-    seed: int,
-    force: bool = False,
-) -> dict:
-    target = asset_root / "asset_split.json"
+def create_asset_catalog(asset_root: Path, *, force: bool = False) -> dict:
+    """Indexa todos os ativos elegíveis sem separá-los por train/val."""
+    target = asset_root / "asset_catalog.json"
     backgrounds_dir = asset_root / "backgrounds"
     depth_dir = asset_root / "backgrounds_map"
     cutouts_dir = asset_root / "pictures_trimmed"
@@ -94,22 +86,22 @@ def create_asset_split(
     if target.exists() and not force:
         previous = json.loads(target.read_text(encoding="utf-8"))
         if (
-            previous.get("version") == ASSET_SPLIT_SCHEMA_VERSION
-            and previous.get("seed") == seed
-            and previous.get("train_ratio") == train_ratio
+            previous.get("version") == ASSET_CATALOG_SCHEMA_VERSION
             and previous.get("source_fingerprint") == source_fingerprint
         ):
             return previous
 
-    background_split = _split_paths(list(pair_lookup), train_ratio, seed, "backgrounds")
-    cutout_split = _split_paths(cutouts, train_ratio, seed, "cutouts")
     result = {
-        "version": ASSET_SPLIT_SCHEMA_VERSION,
-        "seed": seed,
-        "train_ratio": train_ratio,
+        "version": ASSET_CATALOG_SCHEMA_VERSION,
         "asset_root": relative_or_absolute(asset_root),
         "source_fingerprint": source_fingerprint,
-        "splits": {},
+        "assets": {
+            "backgrounds": [
+                {"image": rel(path), "depth": rel(pair_lookup[path])}
+                for path in sorted(pair_lookup)
+            ],
+            "cutouts": [rel(path) for path in sorted(cutouts)],
+        },
         "orphans": {
             "depth_maps": sorted(
                 rel(path)
@@ -118,16 +110,33 @@ def create_asset_split(
             )
         },
     }
-    for split_name in ("train", "val"):
-        result["splits"][split_name] = {
-            "backgrounds": [
-                {"image": rel(path), "depth": rel(pair_lookup[path])}
-                for path in background_split[split_name]
-            ],
-            "cutouts": [rel(path) for path in cutout_split[split_name]],
-        }
     atomic_write_json(target, result)
     return result
+
+
+def create_scene_split(total: int, train_ratio: float, seed: int) -> dict:
+    """Particiona IDs de cenas já definidos, sem afetar sua composição."""
+    if total <= 0:
+        raise ValueError("o total de cenas sintéticas deve ser positivo")
+    if not 0.0 <= train_ratio <= 1.0:
+        raise ValueError("train_ratio deve estar entre 0 e 1")
+    scene_indices = list(range(total))
+    random.Random(seed + int(stable_hash("synthetic_scene_split", 8), 16)).shuffle(
+        scene_indices
+    )
+    train_count = round(total * train_ratio)
+    if total > 1 and 0.0 < train_ratio < 1.0:
+        train_count = min(max(train_count, 1), total - 1)
+    return {
+        "version": SCENE_SPLIT_SCHEMA_VERSION,
+        "seed": seed,
+        "train_ratio": train_ratio,
+        "total": total,
+        "splits": {
+            "train": sorted(scene_indices[:train_count]),
+            "val": sorted(scene_indices[train_count:]),
+        },
+    }
 
 
 def validate_synthesis_config(config: dict) -> None:
@@ -146,6 +155,11 @@ def validate_synthesis_config(config: dict) -> None:
     missing = required - set(config)
     if missing:
         raise ValueError(f"configuração sintética sem chaves: {sorted(missing)}")
+    images = config["images"]
+    if set(images) != {"total"} or int(images["total"]) <= 0:
+        raise ValueError(
+            "images deve declarar somente total; train/val são definidos depois da geração"
+        )
     width, height = map(int, config["canvas"])
     if width <= 0 or height <= 0:
         raise ValueError("canvas deve ser positivo")
@@ -967,6 +981,7 @@ def _build_debug_panel(
 def _render_one(task: dict) -> dict:
     split_name = task["split"]
     index = task["index"]
+    generation_index = task["generation_index"]
     output = Path(task["output"])
     name = f"{split_name}_{index:06d}"
     image_path = output / "images" / split_name / f"{name}.jpg"
@@ -1076,6 +1091,8 @@ def _render_one(task: dict) -> dict:
     record = {
         "id": name,
         "split": split_name,
+        "generation_index": generation_index,
+        "generation_id": f"scene_{generation_index:06d}",
         "seed": task["sample_seed"],
         "background": Path(pair["image"]).name,
         "depth": Path(pair["depth"]).name,
@@ -1102,18 +1119,19 @@ def _initialize_worker(context: dict) -> None:
     _clear_image_caches()
 
 
-def _render_compact(task: tuple[str, int, int]) -> dict:
+def _render_compact(task: tuple[str, int, int, int]) -> dict:
     if _WORKER_CONTEXT is None:
         raise RuntimeError("worker de síntese sem contexto")
-    split_name, index, sample_seed = task
+    split_name, index, generation_index, sample_seed = task
     return _render_one(
         {
             "split": split_name,
             "index": index,
+            "generation_index": generation_index,
             "sample_seed": sample_seed,
             "output": _WORKER_CONTEXT["output"],
             "config": _WORKER_CONTEXT["config"],
-            "assets": _WORKER_CONTEXT["assets"][split_name],
+            "assets": _WORKER_CONTEXT["assets"],
             "force": _WORKER_CONTEXT["force"],
             "debug": _WORKER_CONTEXT["debug"],
         }
@@ -1121,12 +1139,12 @@ def _render_compact(task: tuple[str, int, int]) -> dict:
 
 
 def _background_sort_key(
-    task: tuple[str, int, int], assets: dict[str, dict]
+    task: tuple[str, int, int, int], assets: dict
 ) -> tuple[str, str, int]:
-    split_name, index, sample_seed = task
+    split_name, _index, generation_index, sample_seed = task
     rng = random.Random(sample_seed)
-    pair = rng.choice(assets[split_name]["backgrounds"])
-    return split_name, pair["image"], index
+    pair = rng.choice(assets["backgrounds"])
+    return pair["image"], split_name, generation_index
 
 
 def generate_dataset(
@@ -1141,8 +1159,9 @@ def generate_dataset(
     debug: bool = False,
 ) -> dict:
     validate_synthesis_config(config)
-    asset_split = create_asset_split(
-        asset_root, train_ratio=train_ratio, seed=split_seed, force=False
+    asset_catalog = create_asset_catalog(asset_root, force=False)
+    scene_split = create_scene_split(
+        int(config["images"]["total"]), train_ratio, split_seed
     )
     config_hash = stable_hash(config, 24)
     config_marker = output_root / "generation_config.json"
@@ -1150,7 +1169,12 @@ def generate_dataset(
         previous = json.loads(config_marker.read_text(encoding="utf-8"))
         expected_marker = {
             "config_hash": config_hash,
-            "asset_split_fingerprint": asset_split["source_fingerprint"],
+            "asset_catalog_fingerprint": asset_catalog["source_fingerprint"],
+            "scene_split": {
+                "version": scene_split["version"],
+                "seed": scene_split["seed"],
+                "train_ratio": scene_split["train_ratio"],
+            },
             "generator_schema_version": GENERATOR_SCHEMA_VERSION,
         }
         mismatched = [
@@ -1170,50 +1194,54 @@ def generate_dataset(
             "generator_schema_version": GENERATOR_SCHEMA_VERSION,
             "config_hash": config_hash,
             "config": config,
-            "asset_split_fingerprint": asset_split["source_fingerprint"],
+            "asset_catalog_fingerprint": asset_catalog["source_fingerprint"],
+            "scene_split": {
+                "version": scene_split["version"],
+                "seed": scene_split["seed"],
+                "train_ratio": scene_split["train_ratio"],
+            },
         },
     )
+    atomic_write_json(output_root / "scene_split.json", scene_split)
 
-    tasks: list[tuple[str, int, int]] = []
-    assets_by_split = {}
+    source_assets = asset_catalog["assets"]
+    assets = {
+        "backgrounds": [
+            {
+                "image": str(asset_root / item["image"]),
+                "depth": str(asset_root / item["depth"]),
+            }
+            for item in source_assets["backgrounds"]
+        ],
+        "cutouts": [str(asset_root / path) for path in source_assets["cutouts"]],
+    }
+    if not assets["backgrounds"] or not assets["cutouts"]:
+        raise RuntimeError("catálogo de ativos sintéticos vazio")
+
+    tasks: list[tuple[str, int, int, int]] = []
     for split_name in ("train", "val"):
-        source_assets = asset_split["splits"][split_name]
-        assets = {
-            "backgrounds": [
-                {
-                    "image": str(asset_root / item["image"]),
-                    "depth": str(asset_root / item["depth"]),
-                }
-                for item in source_assets["backgrounds"]
-            ],
-            "cutouts": [str(asset_root / path) for path in source_assets["cutouts"]],
-        }
-        if not assets["backgrounds"] or not assets["cutouts"]:
-            raise RuntimeError(f"split de ativos vazio: {split_name}")
-        assets_by_split[split_name] = assets
-        count = int(config["images"][split_name])
-        for index in range(count):
+        for index, generation_index in enumerate(scene_split["splits"][split_name]):
             sample_seed = int(
                 stable_hash(
                     [
                         int(config["seed"]),
                         config_hash,
-                        asset_split["source_fingerprint"],
-                        split_name,
-                        index,
+                        asset_catalog["source_fingerprint"],
+                        "scene",
+                        generation_index,
                     ],
                     16,
                 ),
                 16,
             )
-            tasks.append((split_name, index, sample_seed))
+            tasks.append((split_name, index, generation_index, sample_seed))
     # Agrupar fundos aumenta o reaproveitamento do cache sem alterar a semente ou
     # a composição de nenhuma cena. O manifesto é ordenado novamente ao final.
-    tasks.sort(key=lambda task: _background_sort_key(task, assets_by_split))
+    tasks.sort(key=lambda task: _background_sort_key(task, assets))
     context = {
         "output": str(output_root),
         "config": config,
-        "assets": assets_by_split,
+        "assets": assets,
         "force": force,
         "debug": debug,
     }
@@ -1247,7 +1275,16 @@ def generate_dataset(
         "name": config["name"],
         "generator_schema_version": GENERATOR_SCHEMA_VERSION,
         "config_hash": config_hash,
-        "asset_split_fingerprint": asset_split["source_fingerprint"],
+        "asset_catalog_fingerprint": asset_catalog["source_fingerprint"],
+        "scene_split": {
+            "seed": scene_split["seed"],
+            "train_ratio": scene_split["train_ratio"],
+            "sha256": sha256_file(output_root / "scene_split.json"),
+        },
+        "asset_counts": {
+            "backgrounds": len(assets["backgrounds"]),
+            "cutouts": len(assets["cutouts"]),
+        },
         "images": dict(Counter(item["split"] for item in records)),
         "annotations": {
             split_name: sum(
@@ -1275,25 +1312,41 @@ def materialize_nested_subsets(
     multipliers: list[int],
     *,
     base_size: int = 104,
+    base_val_size: int = 26,
     prefix: str = "synthetic-",
     force: bool = False,
 ) -> dict:
-    """Recorta prefixos aninhados (1x, 2x, ...) do pool de treino sintético.
+    """Recorta prefixos aninhados de treino e validação do pool sintético.
 
-    As imagens do pool são nomeadas `train_000000.jpg`, `train_000001.jpg`,
-    ..., em ordem determinística de geração; os primeiros N arquivos de um
-    subconjunto maior sempre incluem os do menor, então `2x` contém `1x` sem
-    reamostrar frutas, fundos ou parâmetros."""
+    Depois do split determinístico, cada subconjunto usa prefixos crescentes das
+    duas partições. Assim, `2x` contém todo o treino e toda a validação de `1x`,
+    sem gerar amostras independentes ou reamostrar frutas, fundos e parâmetros."""
     images_dir = pool_root / "images" / "train"
     images = image_files(images_dir)
     if not images:
         raise FileNotFoundError(f"pool sem imagens de treino: {images_dir}")
-    sizes = {int(multiplier): base_size * int(multiplier) for multiplier in multipliers}
-    if any(multiplier <= 0 for multiplier in sizes):
+    val_images = image_files(pool_root / "images" / "val")
+    if not val_images:
+        raise FileNotFoundError(
+            f"pool sem imagens de validação: {pool_root / 'images' / 'val'}"
+        )
+    train_sizes = {
+        int(multiplier): base_size * int(multiplier) for multiplier in multipliers
+    }
+    val_sizes = {
+        int(multiplier): base_val_size * int(multiplier) for multiplier in multipliers
+    }
+    if any(multiplier <= 0 for multiplier in train_sizes):
         raise ValueError("multiplicadores devem ser inteiros positivos")
-    if sizes and max(sizes.values()) > len(images):
+    if base_size <= 0 or base_val_size <= 0:
+        raise ValueError("os tamanhos-base de treino e validação devem ser positivos")
+    if train_sizes and max(train_sizes.values()) > len(images):
         raise ValueError(
-            f"tamanho pedido {max(sizes.values())} excede o pool ({len(images)})"
+            f"treino pedido {max(train_sizes.values())} excede o pool ({len(images)})"
+        )
+    if val_sizes and max(val_sizes.values()) > len(val_images):
+        raise ValueError(
+            f"validação pedida {max(val_sizes.values())} excede o pool ({len(val_images)})"
         )
     manifest_path = pool_root / "manifest.jsonl"
     if not manifest_path.exists():
@@ -1304,11 +1357,11 @@ def materialize_nested_subsets(
         if line
     ]
     by_image = {Path(item["image"]).name: item for item in pool_records}
-    val_images = image_files(pool_root / "images" / "val")
     pool_manifest_sha256 = sha256_file(manifest_path)
     target_root.mkdir(parents=True, exist_ok=True)
     summary = {}
-    for multiplier, size in sorted(sizes.items()):
+    for multiplier, train_size in sorted(train_sizes.items()):
+        val_size = val_sizes[multiplier]
         name = f"{prefix}{multiplier}x"
         target = target_root / name
         summary_path = target / "summary.json"
@@ -1318,7 +1371,10 @@ def materialize_nested_subsets(
             existing = json.loads(summary_path.read_text(encoding="utf-8"))
             if (
                 existing.get("pool_manifest_sha256") != pool_manifest_sha256
-                or int(existing.get("train_images", -1)) != size
+                or int(existing.get("train_images", -1)) != train_size
+                or int(existing.get("val_images", -1)) != val_size
+                or int(existing.get("base_val_size", -1)) != base_val_size
+                or int(existing.get("nested_val_prefix", -1)) != val_size
             ):
                 raise RuntimeError(
                     f"subconjunto congelado não corresponde ao pool: {target}"
@@ -1327,7 +1383,10 @@ def materialize_nested_subsets(
             continue
         temporary = Path(tempfile.mkdtemp(prefix=f".{name}.", dir=target_root))
         try:
-            selected = {"train": images[:size], "val": val_images}
+            selected = {
+                "train": images[:train_size],
+                "val": val_images[:val_size],
+            }
             selected_records = []
             for split_name, split_images in selected.items():
                 for image_path in split_images:
@@ -1372,12 +1431,14 @@ def materialize_nested_subsets(
                 "name": name,
                 "multiplier": multiplier,
                 "base_size": base_size,
-                "train_images": size,
-                "val_images": len(val_images),
+                "base_val_size": base_val_size,
+                "train_images": train_size,
+                "val_images": val_size,
                 "pool": relative_or_absolute(pool_root),
                 "pool_manifest_sha256": pool_manifest_sha256,
                 "manifest_sha256": sha256_file(temporary / "manifest.jsonl"),
-                "nested_train_prefix": size,
+                "nested_train_prefix": train_size,
+                "nested_val_prefix": val_size,
             }
             atomic_write_json(temporary / "summary.json", subset_summary)
             if target.exists():

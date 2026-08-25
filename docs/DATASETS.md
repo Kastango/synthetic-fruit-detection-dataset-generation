@@ -67,6 +67,18 @@ A pipeline baixa dois ZIPs com 127 fotos de frutas e 228 fundos. A partir deles,
 gera os recortes com IS-Net e os mapas de profundidade em resolução original
 com DepthPro. Nenhum desses arquivos inclui as 130 imagens reais anotadas.
 
+Todos os fundos, mapas e recortes regenerados integram um único catálogo de
+ativos da síntese. O compositor gera primeiro 1.300 identidades de cena com esse
+catálogo completo. Só então a pipeline aplica, com semente 42, o split 80/20 das
+cenas sintéticas: 1.040 para treino e 260 para validação. A composição de uma
+cena depende do seu índice de geração, não do split ao qual ela será destinada.
+Assim, alterar a proporção do split não altera seus pixels nem seus rótulos.
+
+Os conjuntos `synthetic-1x` a `synthetic-10x` usam prefixos aninhados das duas
+partições. As contagens de treino/validação são, respectivamente, 104/26,
+208/52, 312/78, 520/130 e 1.040/260. Portanto, os conjuntos menores não copiam
+as 260 cenas de validação do `10x`; recebem apenas o prefixo correspondente.
+
 A licença do projeto cobre o código, mas o repositório de origem não declara de
 forma inequívoca a licença dos arquivos de campo. Por isso o download exige
 `--accept-data-terms` e os dados ficam fora do Git.

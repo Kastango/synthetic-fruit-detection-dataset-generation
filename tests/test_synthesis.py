@@ -11,7 +11,8 @@ from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
     _apply_appearance_hsv_cast,
     _finish_placement,
-    create_asset_split,
+    create_asset_catalog,
+    create_scene_split,
     generate_dataset,
     materialize_nested_subsets,
     validate_synthesis_config,
@@ -39,7 +40,7 @@ def tiny_config() -> dict:
     return {
         "name": "tiny",
         "seed": 42,
-        "images": {"train": 2, "val": 1},
+        "images": {"total": 3},
         "canvas": [64, 64],
         "objects": {
             "min": 1,
@@ -77,7 +78,7 @@ def test_exclude_bottom_fraction_keeps_instances_out_of_bottom_band(
     output = tmp_path / "generated"
     build_assets(assets)
     config = tiny_config()
-    config["images"] = {"train": 20, "val": 0}
+    config["images"] = {"total": 20}
     config["placement"]["exclude_bottom_fraction"] = 0.3
     generate_dataset(assets, output, config, train_ratio=0.5, split_seed=42, workers=1)
     canvas_height = config["canvas"][1]
@@ -94,21 +95,26 @@ def test_light_texture_options_are_rejected() -> None:
         validate_synthesis_config(config)
 
 
-def test_legacy_asset_split_is_regenerated_without_light_assets(tmp_path: Path) -> None:
+def test_asset_catalog_contains_every_pair_and_cutout(tmp_path: Path) -> None:
     assets = tmp_path / "assets"
     build_assets(assets)
-    split = create_asset_split(assets, train_ratio=0.5, seed=42)
-    split["version"] = 1
-    for partition in split["splits"].values():
-        partition["lights"] = ["lights/legacy.png"]
-    (assets / "asset_split.json").write_text(json.dumps(split))
+    catalog = create_asset_catalog(assets)
 
-    regenerated = create_asset_split(assets, train_ratio=0.5, seed=42)
+    assert catalog["version"] == 1
+    assert len(catalog["assets"]["backgrounds"]) == 4
+    assert len(catalog["assets"]["cutouts"]) == 4
+    assert "splits" not in catalog
 
-    assert regenerated["version"] == 2
-    assert all(
-        "lights" not in partition for partition in regenerated["splits"].values()
-    )
+
+def test_scene_split_is_deterministic_complete_and_disjoint() -> None:
+    first = create_scene_split(10, 0.8, 42)
+    second = create_scene_split(10, 0.8, 42)
+
+    assert first == second
+    assert len(first["splits"]["train"]) == 8
+    assert len(first["splits"]["val"]) == 2
+    assert not set(first["splits"]["train"]) & set(first["splits"]["val"])
+    assert set(first["splits"]["train"]) | set(first["splits"]["val"]) == set(range(10))
 
 
 def test_generation_is_deterministic_and_labels_are_valid(tmp_path: Path) -> None:
@@ -137,11 +143,86 @@ def test_generation_is_deterministic_and_labels_are_valid(tmp_path: Path) -> Non
     records = [json.loads(line) for line in manifest_before.splitlines()]
     assert len(records) == 3
     assert all(record["annotations"] == 1 for record in records)
-    split = json.loads((assets / "asset_split.json").read_text())
-    assert set(split["splits"]["train"]) == {"backgrounds", "cutouts"}
-    assert split["version"] == 2
+    catalog = json.loads((assets / "asset_catalog.json").read_text())
+    assert set(catalog["assets"]) == {"backgrounds", "cutouts"}
+    assert catalog["version"] == 1
+    scene_split = json.loads((output / "scene_split.json").read_text())
+    assert len(scene_split["splits"]["train"]) == 2
+    assert len(scene_split["splits"]["val"]) == 1
     for label in (output / "labels").rglob("*.txt"):
         assert validate_yolo_text(label.read_text(), str(label)) == 1
+
+
+def test_train_and_val_are_generated_from_the_same_complete_asset_catalog(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    output = tmp_path / "generated"
+    for name in ("backgrounds", "backgrounds_map", "pictures_trimmed"):
+        (assets / name).mkdir(parents=True)
+    Image.new("RGB", (64, 64), (30, 90, 40)).save(
+        assets / "backgrounds" / "only-background.jpg"
+    )
+    Image.new("L", (64, 64), 100).save(
+        assets / "backgrounds_map" / "only-background_depth.png"
+    )
+    cutout = Image.new("RGBA", (16, 16), (230, 120, 20, 255))
+    cutout.save(assets / "pictures_trimmed" / "only-fruit.png")
+    config = tiny_config()
+    config["images"] = {"total": 2}
+
+    generate_dataset(assets, output, config, train_ratio=0.5, split_seed=42, workers=1)
+
+    records = [
+        json.loads(line)
+        for line in (output / "manifest.jsonl").read_text().splitlines()
+    ]
+    assert {record["split"] for record in records} == {"train", "val"}
+    assert {record["background"] for record in records} == {"only-background.jpg"}
+    assert {tuple(record["cutouts"]) for record in records} == {("only-fruit.png",)}
+
+
+def test_scene_composition_is_independent_of_the_final_split_ratio(
+    tmp_path: Path,
+) -> None:
+    assets = tmp_path / "assets"
+    first_output = tmp_path / "first"
+    second_output = tmp_path / "second"
+    build_assets(assets)
+    config = tiny_config()
+    config["images"] = {"total": 4}
+
+    generate_dataset(
+        assets, first_output, config, train_ratio=0.5, split_seed=42, workers=1
+    )
+    generate_dataset(
+        assets, second_output, config, train_ratio=0.75, split_seed=42, workers=1
+    )
+
+    def records_by_generation_index(root: Path) -> dict[int, dict]:
+        return {
+            int(record["generation_index"]): record
+            for record in (
+                json.loads(line)
+                for line in (root / "manifest.jsonl").read_text().splitlines()
+            )
+        }
+
+    first = records_by_generation_index(first_output)
+    second = records_by_generation_index(second_output)
+    assert set(first) == set(second) == set(range(4))
+    for generation_index in first:
+        first_record = first[generation_index]
+        second_record = second[generation_index]
+        assert first_record["seed"] == second_record["seed"]
+        assert first_record["background"] == second_record["background"]
+        assert first_record["cutouts"] == second_record["cutouts"]
+        assert (first_output / first_record["image"]).read_bytes() == (
+            second_output / second_record["image"]
+        ).read_bytes()
+        assert (first_output / first_record["label"]).read_bytes() == (
+            second_output / second_record["label"]
+        ).read_bytes()
 
 
 def test_materialize_nested_subsets_are_complete_and_nested(tmp_path: Path) -> None:
@@ -150,25 +231,41 @@ def test_materialize_nested_subsets_are_complete_and_nested(tmp_path: Path) -> N
     generated = tmp_path / "generated"
     build_assets(assets)
     config = tiny_config()
-    config["images"] = {"train": 4, "val": 1}
-    generate_dataset(assets, pool, config, train_ratio=0.5, split_seed=42, workers=1)
+    config["images"] = {"total": 10}
+    generate_dataset(assets, pool, config, train_ratio=0.8, split_seed=42, workers=1)
 
-    summary = materialize_nested_subsets(pool, generated, [1, 2], base_size=2)
+    summary = materialize_nested_subsets(
+        pool,
+        generated,
+        [1, 2],
+        base_size=4,
+        base_val_size=1,
+    )
 
-    assert summary["synthetic-1x"]["train_images"] == 2
-    assert summary["synthetic-2x"]["train_images"] == 4
-    one = {
+    assert summary["synthetic-1x"]["train_images"] == 4
+    assert summary["synthetic-1x"]["val_images"] == 1
+    assert summary["synthetic-2x"]["train_images"] == 8
+    assert summary["synthetic-2x"]["val_images"] == 2
+    one_train = {
         path.name
         for path in (generated / "synthetic-1x" / "images" / "train").glob("*")
     }
-    two = {
+    two_train = {
         path.name
         for path in (generated / "synthetic-2x" / "images" / "train").glob("*")
     }
-    assert one < two
-    for multiplier in (1, 2):
+    one_val = {
+        path.name for path in (generated / "synthetic-1x" / "images" / "val").glob("*")
+    }
+    two_val = {
+        path.name for path in (generated / "synthetic-2x" / "images" / "val").glob("*")
+    }
+    assert one_train < two_train
+    assert one_val < two_val
+    for multiplier, train_count, val_count in ((1, 4, 1), (2, 8, 2)):
         root = generated / f"synthetic-{multiplier}x"
-        assert len(list((root / "images" / "val").glob("*"))) == 1
+        assert len(list((root / "images" / "train").glob("*"))) == train_count
+        assert len(list((root / "images" / "val").glob("*"))) == val_count
         assert (root / "manifest.jsonl").exists()
         assert (root / "data.yaml").exists()
 

@@ -1,25 +1,56 @@
 # Detecção de poncãs com dados sintéticos
 
-Pipeline reprodutível para investigar se imagens sintéticas podem substituir
-imagens manualmente anotadas no treinamento de detectores de poncãs.
+Pipeline reprodutível para gerar conjuntos sintéticos e compará-los com dados
+anotados manualmente na detecção de poncãs.
+
+## Problema e pergunta de pesquisa
+
+Treinar um detector de frutas exige imagens da época de frutificação e caixas
+desenhadas à mão. A base real usada aqui tem 130 imagens e 2.093 caixas. Cobrir
+diferentes condições de iluminação e oclusão exige novas coletas e mais
+rotulagem.
+
+> Imagens sintéticas anotadas automaticamente podem reduzir o esforço de
+> rotulagem e manter desempenho próximo ao obtido com imagens reais?
+
+A pipeline combina fotos de árvores sem frutas, feitas fora do período
+produtivo, com frutas fotografadas sobre fundo uniforme. O DepthPro estima a
+profundidade, e o compositor usa o mapa para posicionar as frutas, simular
+oclusões, ajustar sua aparência e gerar as caixas. O processo usa imagens RGB
+comuns, sem sensores de profundidade ou modelagem 3D, e gera os rótulos junto
+com cada cena.
+
+Os dados reais são a referência. Os conjuntos sintéticos variam de `1x` a
+`10x` para medir como o desempenho muda com o volume de dados.
+
+## Fluxo de geração
+
+O fluxograma resume a preparação dos ativos, a composição das cenas, os arquivos
+salvos em JPG, TXT e JSON, o split do pool gerado e a materialização de
+`synthetic-1x` a `synthetic-10x`.
+
+![Fluxograma da geração dos conjuntos synthetic-1x a synthetic-10x](docs/figures/fluxograma-sintese-v3.svg)
 
 ## Experimento
 
 O experimento compara sete condições de treinamento:
 
-| Condição | Imagens de treino | Conteúdo |
-|---|---:|---|
-| `manual-full` | 104 | fotografias de campo anotadas manualmente |
-| `controlled` | 284 | frutas fotografadas em ambiente controlado e fundos negativos |
-| `synthetic-1x` | 104 | cenas sintéticas |
-| `synthetic-2x` | 208 | cenas sintéticas |
-| `synthetic-3x` | 312 | cenas sintéticas |
-| `synthetic-5x` | 520 | condição sintética principal |
-| `synthetic-10x` | 1.040 | análise de saturação |
+| Condição | Treino | Validação | Conteúdo |
+|---|---:|---:|---|
+| `manual-full` | 104 | 26 | fotografias de campo anotadas manualmente |
+| `controlled` | 284 | 71 | frutas fotografadas em ambiente controlado e fundos negativos |
+| `synthetic-1x` | 104 | 26 | cenas sintéticas |
+| `synthetic-2x` | 208 | 52 | cenas sintéticas |
+| `synthetic-3x` | 312 | 78 | cenas sintéticas |
+| `synthetic-5x` | 520 | 130 | condição sintética principal |
+| `synthetic-10x` | 1.040 | 260 | análise de saturação |
 
-Os conjuntos sintéticos são aninhados: `2x` contém `1x`, `3x` contém `2x` e
-assim por diante. O pool completo possui 1.040 imagens de treino e 260 de
-validação.
+Todos os fundos, mapas de profundidade e recortes ficam disponíveis durante a
+composição. O gerador cria um pool único de 1.300 cenas e só depois aplica o
+split determinístico 80/20: 1.040 imagens de treino e 260 de validação. Os
+conjuntos são aninhados nas duas partições: `2x` contém o treino e a validação
+de `1x`, `3x` contém os de `2x` e assim por diante. Cada multiplicador usa apenas
+o prefixo de validação correspondente ao seu tamanho.
 
 Cada condição é treinada com três detectores:
 

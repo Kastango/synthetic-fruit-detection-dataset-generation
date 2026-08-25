@@ -111,7 +111,7 @@ def test_materialize_controlled_dataset_derives_boxes_and_negatives(
             "real_controlled": str(tmp_path / "real_controlled"),
             "artifacts": str(tmp_path / "artifacts"),
         },
-        "asset_split": {"train_ratio": 0.8, "seed": 42},
+        "controlled_split": {"train_ratio": 0.8, "seed": 42},
         "project": {"class_names": ["poncan"]},
     }
     summary = materialize_controlled_dataset(config)

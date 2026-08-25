@@ -26,9 +26,18 @@ real_dataset:
     expected_bytes: 526759500
     sha256: 28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3
 
-asset_split:
+controlled_split:
   train_ratio: 0.8
   seed: 42
+
+synthetic_split:
+  train_ratio: 0.8
+  seed: 42
+
+synthetic_subsets:
+  multipliers: [1, 2, 3, 5, 10]
+  base_train_images: 104
+  base_val_images: 26
 
 controlled_dataset:
   train_images: 284

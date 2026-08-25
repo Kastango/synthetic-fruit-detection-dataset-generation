@@ -595,7 +595,7 @@ def materialize_controlled_dataset(config: dict, force: bool = False) -> dict:
             "fotos de fruta ou fundos negativos ausentes para a condição controlled"
         )
 
-    split_config = config["asset_split"]
+    split_config = config["controlled_split"]
     ratio = float(split_config["train_ratio"])
     seed = int(split_config["seed"])
     fruit_split = deterministic_split(fruit_paths, ratio, seed, "controlled_fruits")

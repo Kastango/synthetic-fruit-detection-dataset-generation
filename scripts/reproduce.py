@@ -97,11 +97,13 @@ class Workflow:
             command.append("--force")
         self.run("Regenerar recortes e profundidade", command)
 
-    def split_assets(self) -> None:
-        command = self.command("split_assets.py", "--asset-root", str(self.asset_root))
+    def catalog_assets(self) -> None:
+        command = self.command(
+            "catalog_assets.py", "--asset-root", str(self.asset_root)
+        )
         if self.args.force:
             command.append("--force")
-        self.run("Congelar ativos sintéticos de treino/validação", command)
+        self.run("Catalogar todos os ativos da síntese", command)
 
     def synthesis_configs(self) -> list[Path]:
         return self.args.synthesis_config or [
@@ -237,7 +239,7 @@ class Workflow:
         self.split_real()
         self.preprocess()
         self.materialize_controlled()
-        self.split_assets()
+        self.catalog_assets()
         self.synthesize()
         self.materialize_subsets()
         self.validate("all")
@@ -272,6 +274,7 @@ def main() -> None:
             "import-real",
             "split-real",
             "materialize-controlled",
+            "catalog-assets",
             "split-assets",
             "synthesize",
             "materialize-subsets",
@@ -311,7 +314,8 @@ def main() -> None:
         "import-real": lambda: (workflow.import_real(), workflow.split_real()),
         "split-real": workflow.split_real,
         "materialize-controlled": workflow.materialize_controlled,
-        "split-assets": workflow.split_assets,
+        "catalog-assets": workflow.catalog_assets,
+        "split-assets": workflow.catalog_assets,
         "synthesize": workflow.synthesize,
         "materialize-subsets": workflow.materialize_subsets,
         "validate": workflow.validate,

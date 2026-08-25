@@ -9,7 +9,11 @@ from PIL import Image
 
 from .common import atomic_write_json, image_files, project_path, sha256_file
 from .real_data import validate_yolo_text
-from .synthesis import find_depth_map
+from .synthesis import (
+    ASSET_CATALOG_SCHEMA_VERSION,
+    GENERATOR_SCHEMA_VERSION,
+    find_depth_map,
+)
 
 
 def validate_yolo_tree(
@@ -96,6 +100,7 @@ def validate_assets(config: dict, asset_root: Path) -> tuple[dict, list[str]]:
     depth_maps = image_files(asset_root / "backgrounds_map")
     cutouts = image_files(asset_root / "pictures_trimmed")
     paired = []
+    pair_lookup = {}
     mismatched_sizes = []
     for background in backgrounds:
         depth = find_depth_map(background, asset_root / "backgrounds_map")
@@ -103,6 +108,7 @@ def validate_assets(config: dict, asset_root: Path) -> tuple[dict, list[str]]:
             errors.append(f"mapa ausente para {background.name}")
             continue
         paired.append(depth)
+        pair_lookup[background] = depth
         try:
             with Image.open(background) as image, Image.open(depth) as depth_image:
                 if (
@@ -133,27 +139,37 @@ def validate_assets(config: dict, asset_root: Path) -> tuple[dict, list[str]]:
         errors.append(f"recortes sem alpha válido: {invalid_cutouts[:10]}")
     if mismatched_sizes:
         errors.append(f"fundo/mapa com dimensões incompatíveis: {mismatched_sizes[:5]}")
-    split_path = asset_root / "asset_split.json"
-    split_report = None
-    if split_path.exists():
-        split = json.loads(split_path.read_text(encoding="utf-8"))
-        train_backgrounds = {
-            item["image"] for item in split["splits"]["train"]["backgrounds"]
+    catalog_path = asset_root / "asset_catalog.json"
+    catalog_report = None
+    if catalog_path.exists():
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+        if catalog.get("version") != ASSET_CATALOG_SCHEMA_VERSION:
+            errors.append(f"versão inválida do catálogo de ativos: {catalog_path}")
+        catalog_backgrounds = {
+            item["image"]: item["depth"]
+            for item in catalog.get("assets", {}).get("backgrounds", [])
         }
-        val_backgrounds = {
-            item["image"] for item in split["splits"]["val"]["backgrounds"]
+        catalog_cutouts = set(catalog.get("assets", {}).get("cutouts", []))
+        expected_backgrounds = {
+            path.relative_to(asset_root).as_posix(): depth.relative_to(
+                asset_root
+            ).as_posix()
+            for path, depth in pair_lookup.items()
         }
-        train_cutouts = set(split["splits"]["train"]["cutouts"])
-        val_cutouts = set(split["splits"]["val"]["cutouts"])
-        if train_backgrounds & val_backgrounds or train_cutouts & val_cutouts:
-            errors.append("vazamento de ativos entre treino e validação sintéticos")
-        split_report = {
-            "fingerprint": split["source_fingerprint"],
-            "backgrounds": [len(train_backgrounds), len(val_backgrounds)],
-            "cutouts": [len(train_cutouts), len(val_cutouts)],
+        expected_cutouts = {path.relative_to(asset_root).as_posix() for path in cutouts}
+        if catalog_backgrounds != expected_backgrounds:
+            errors.append(
+                "catálogo não cobre exatamente todos os pares fundo/profundidade"
+            )
+        if catalog_cutouts != expected_cutouts:
+            errors.append("catálogo não cobre exatamente todos os recortes")
+        catalog_report = {
+            "fingerprint": catalog.get("source_fingerprint"),
+            "backgrounds": len(catalog_backgrounds),
+            "cutouts": len(catalog_cutouts),
         }
     else:
-        errors.append(f"split de ativos ausente: {split_path}")
+        errors.append(f"catálogo de ativos ausente: {catalog_path}")
     return {
         "ready": not errors,
         "root": str(asset_root),
@@ -161,7 +177,7 @@ def validate_assets(config: dict, asset_root: Path) -> tuple[dict, list[str]]:
         "paired_depth_maps": len(paired),
         "depth_maps": len(depth_maps),
         "cutouts": len(cutouts),
-        "split": split_report,
+        "catalog": catalog_report,
     }, errors
 
 
@@ -207,11 +223,40 @@ def validate_generated(config: dict) -> tuple[dict, list[str]]:
             for line in (directory / "manifest.jsonl").read_text().splitlines()
             if line
         ]
+        summary = json.loads((directory / "summary.json").read_text())
         record_counts = Counter(item["split"] for item in records)
         if any(
             tree[name]["images"] != record_counts[name] for name in ("train", "val")
         ):
             errors.append(f"{directory.name}: manifesto não corresponde às imagens")
+        schema_version = summary.get("generator_schema_version")
+        if schema_version is not None and schema_version != GENERATOR_SCHEMA_VERSION:
+            errors.append(
+                f"{directory.name}: gerador v{schema_version}; "
+                f"regenere com v{GENERATOR_SCHEMA_VERSION}"
+            )
+        elif schema_version == GENERATOR_SCHEMA_VERSION:
+            split_path = directory / "scene_split.json"
+            if not split_path.exists():
+                errors.append(f"{directory.name}: scene_split.json ausente")
+            else:
+                scene_split = json.loads(split_path.read_text())
+                expected_split = {
+                    int(generation_index): split_name
+                    for split_name, generation_indices in scene_split["splits"].items()
+                    for generation_index in generation_indices
+                }
+                record_split = {
+                    int(item["generation_index"]): item["split"] for item in records
+                }
+                if len(record_split) != len(records):
+                    errors.append(
+                        f"{directory.name}: índices de geração duplicados no manifesto"
+                    )
+                if record_split != expected_split:
+                    errors.append(
+                        f"{directory.name}: split de cenas não corresponde ao manifesto"
+                    )
         datasets[directory.name] = {
             "splits": tree,
             "manifest_records": len(records),
