@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
@@ -164,13 +165,80 @@ class DepthEstimator:
             model_name, revision=revision
         ).to(self.device)
         self.model.eval()
+        # DepthPro-hf is stored in FP16. On Turing GPUs (for example, a GTX
+        # 1660) cuDNN can return NaNs in the first 256-channel convolution of
+        # the depth head even though the fused features are finite. Loading the
+        # whole model as FP32 exceeds 6 GB of VRAM, so only that convolution is
+        # evaluated in tiled FP32 below.
+        self.tiled_fp32_head = (
+            self.device.startswith("cuda")
+            and self.model.dtype == torch.float16
+            and torch.cuda.get_device_capability(self.device)[0] < 8
+        )
+
+    def _forward_tiled_fp32_head(self, pixel_values):
+        torch = self.torch
+        functional = torch.nn.functional
+        model = self.model
+        depth_pro_outputs = model.depth_pro(
+            pixel_values=pixel_values,
+            return_dict=True,
+        )
+        fused_hidden_states = model.fusion_stage(depth_pro_outputs.features)
+        fov = (
+            model.fov_model(
+                pixel_values=pixel_values,
+                global_features=depth_pro_outputs.features[0].detach(),
+            )
+            if model.use_fov_model
+            else None
+        )
+
+        hidden_states = fused_hidden_states[-1]
+        first_layer = model.head.layers[0]
+        padded = functional.pad(hidden_states, (1, 1, 1, 1))
+        first_output = torch.empty(
+            (
+                hidden_states.shape[0],
+                first_layer.out_channels,
+                hidden_states.shape[2],
+                hidden_states.shape[3],
+            ),
+            device=hidden_states.device,
+            dtype=hidden_states.dtype,
+        )
+        weight = first_layer.weight.float()
+        bias = first_layer.bias.float() if first_layer.bias is not None else None
+        tile_size = 192
+        for top in range(0, hidden_states.shape[2], tile_size):
+            bottom = min(top + tile_size, hidden_states.shape[2])
+            for left in range(0, hidden_states.shape[3], tile_size):
+                right = min(left + tile_size, hidden_states.shape[3])
+                patch = padded[:, :, top : bottom + 2, left : right + 2].float()
+                first_output[:, :, top:bottom, left:right] = functional.conv2d(
+                    patch,
+                    weight,
+                    bias=bias,
+                ).to(hidden_states.dtype)
+
+        hidden_states = first_output
+        for layer in model.head.layers[1:]:
+            hidden_states = layer(hidden_states)
+        return SimpleNamespace(
+            predicted_depth=hidden_states.squeeze(dim=1),
+            field_of_view=fov,
+        )
 
     def infer(self, image: Image.Image) -> Image.Image:
         torch = self.torch
         inputs = self.processor(images=image, return_tensors="pt")
         inputs = {key: value.to(self.device) for key, value in inputs.items()}
         with torch.inference_mode():
-            outputs = self.model(**inputs)
+            outputs = (
+                self._forward_tiled_fp32_head(inputs["pixel_values"])
+                if self.tiled_fp32_head
+                else self.model(**inputs)
+            )
         # post_process_depth_estimation aplica a semântica oficial de cada
         # modelo (remoção de padding, calibração de escala a partir do campo
         # de visão previsto pelo DepthPro, etc.); interpolar diretamente o
