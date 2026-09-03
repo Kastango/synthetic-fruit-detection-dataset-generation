@@ -39,13 +39,13 @@ O experimento compara sete condições de treinamento:
 
 | Condição | Conjuntos | Conteúdo |
 |---|---|---|
-| `manual-full` | <img src="docs/figures/condicoes/condicao-manual-full.svg" width="612" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"> | fotografias de campo anotadas manualmente |
-| `controlled` | <img src="docs/figures/condicoes/condicao-controlled.svg" width="612" alt="284 imagens de treino, 71 de validação e 119 do teste externo CitDet"> | frutas fotografadas em ambiente controlado e fundos negativos |
-| `synthetic-1x` | <img src="docs/figures/condicoes/condicao-synthetic-1x.svg" width="612" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
-| `synthetic-2x` | <img src="docs/figures/condicoes/condicao-synthetic-2x.svg" width="612" alt="208 imagens de treino, 52 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
-| `synthetic-3x` | <img src="docs/figures/condicoes/condicao-synthetic-3x.svg" width="612" alt="312 imagens de treino, 78 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
-| `synthetic-5x` | <img src="docs/figures/condicoes/condicao-synthetic-5x.svg" width="612" alt="520 imagens de treino, 130 de validação e 119 do teste externo CitDet"> | condição sintética principal |
-| `synthetic-10x` | <img src="docs/figures/condicoes/condicao-synthetic-10x.svg" width="612" alt="1.040 imagens de treino, 260 de validação e 119 do teste externo CitDet"> | análise de saturação |
+| `manual-full` | <img src="docs/figures/condicoes/condicao-manual-full.svg" width="676" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"> | fotografias de campo |
+| `controlled` | <img src="docs/figures/condicoes/condicao-controlled.svg" width="676" alt="284 imagens de treino, 71 de validação e 119 do teste externo CitDet"> | frutas isoladas + negativos |
+| `synthetic-1x` | <img src="docs/figures/condicoes/condicao-synthetic-1x.svg" width="676" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
+| `synthetic-2x` | <img src="docs/figures/condicoes/condicao-synthetic-2x.svg" width="676" alt="208 imagens de treino, 52 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
+| `synthetic-3x` | <img src="docs/figures/condicoes/condicao-synthetic-3x.svg" width="676" alt="312 imagens de treino, 78 de validação e 119 do teste externo CitDet"> | cenas sintéticas |
+| `synthetic-5x` | <img src="docs/figures/condicoes/condicao-synthetic-5x.svg" width="676" alt="520 imagens de treino, 130 de validação e 119 do teste externo CitDet"> | condição principal |
+| `synthetic-10x` | <img src="docs/figures/condicoes/condicao-synthetic-10x.svg" width="676" alt="1.040 imagens de treino, 260 de validação e 119 do teste externo CitDet"> | análise de saturação |
 
 Todos os fundos, mapas de profundidade e recortes ficam disponíveis durante a
 composição. O gerador cria um pool único de 1.300 cenas e só depois aplica o
