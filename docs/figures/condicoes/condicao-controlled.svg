@@ -53,10 +53,10 @@
 <use href="#c-test-1" x="572" y="8"/>
 <rect x="532" y="6" width="64" height="64" rx="3" fill="#ffffff" stroke="rgba(43,27,70,0.35)" stroke-width="1"/>
 <use href="#c-test-0" x="534" y="8"/>
-<path d="M 203 28 L 262 28" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#a)"/>
-<path d="M 262 48 L 203 48" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#a)"/>
-<path d="M 467 38 L 526 38" fill="none" stroke="#6d5a92" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#a)"/>
-<text x="99.5" y="88" fill="#6d5a92" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">284 treino</text>
-<text x="363.5" y="88" fill="#6d5a92" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">71 validação</text>
+<path d="M 202 28 L 262 28" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M 262 48 L 202 48" fill="none" stroke="#6d5a92" stroke-width="1.6" marker-end="url(#a)"/>
+<path d="M 466 38 L 526 38" fill="none" stroke="#6d5a92" stroke-width="1.6" stroke-dasharray="5,4" marker-end="url(#a)"/>
+<text x="99" y="88" fill="#6d5a92" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">284 treino</text>
+<text x="363" y="88" fill="#6d5a92" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">71 validação</text>
 <text x="602" y="88" fill="#6d5a92" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">119 teste</text>
 </svg>
