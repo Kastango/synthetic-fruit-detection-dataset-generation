@@ -47,6 +47,14 @@ O experimento compara sete condições de treinamento:
 | `synthetic-5x` | 520 | 130 | condição sintética principal |
 | `synthetic-10x` | 1.040 | 260 | análise de saturação |
 
+A figura abaixo mostra imagens reais de cada conjunto. Treino e validação mudam
+a cada condição; o teste externo é o mesmo para as sete e nenhuma delas o vê
+durante o treinamento.
+
+![As sete condições de treinamento, com imagens reais de cada conjunto](docs/figures/condicoes-treinamento.svg)
+
+*Figura 2 — O que é treino, validação e teste em cada uma das sete condições.*
+
 Todos os fundos, mapas de profundidade e recortes ficam disponíveis durante a
 composição. O gerador cria um pool único de 1.300 cenas e só depois aplica o
 split determinístico 80/20: 1.040 imagens de treino e 260 de validação. Os
