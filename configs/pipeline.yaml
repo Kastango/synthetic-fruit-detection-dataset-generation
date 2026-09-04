@@ -77,3 +77,12 @@ external_datasets:
     annotation_format: auto
     collapse_to_single_class: true
     license: CC BY-NC 3.0
+  manual_full_val:
+    landing_page: null
+    license: interno (coleta própria do projeto)
+    download_url: null
+    archive_name: null
+    annotation_format: yolo
+    expected_images: 26
+    expected_boxes: 451
+    collapse_to_single_class: true

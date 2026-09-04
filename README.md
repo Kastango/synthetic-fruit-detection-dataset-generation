@@ -90,8 +90,9 @@ destacados no relatório final.
 ## Estado atual
 
 - Pipeline confirmatória implementada e validada por testes automatizados.
-- Dry-run confirmado com 42 treinamentos.
-- Treinamento confirmatório e avaliação final ainda não executados.
+- Os 42 treinamentos confirmatórios foram executados e avaliados contra dois
+  testes externos (CitDet e o split de validação de `manual-full`). Resultados,
+  gráficos e mapas de calor em [`docs/RESULTS.md`](docs/RESULTS.md).
 
 ## Dados
 
