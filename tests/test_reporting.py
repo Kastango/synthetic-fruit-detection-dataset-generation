@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from fruit_pipeline.reporting import generate_markdown_report
+from fruit_pipeline.reporting import _HEATMAP_OUTPUT_SIZE, generate_markdown_report
 
 
 def _write_labels(image_directory: Path, *contents: str) -> None:
@@ -189,5 +189,5 @@ def test_report_highlights_only_positive_synthetic_delta(tmp_path: Path) -> None
         )
     for name in ("manual-full", "synthetic-1x", "fixture"):
         with Image.open(artifacts / "annotation_heatmaps" / f"{name}.png") as image:
-            assert image.size == (512, 512)
+            assert image.size == (_HEATMAP_OUTPUT_SIZE, _HEATMAP_OUTPUT_SIZE)
             assert image.getbbox() is not None

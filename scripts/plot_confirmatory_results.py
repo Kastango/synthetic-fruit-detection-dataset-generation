@@ -75,17 +75,26 @@ def markdown_table(name: str, summary: dict) -> str:
         "|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for detector in DETECTOR_ORDER:
+        best_condition = max(
+            (c for c in CONDITION_ORDER if c in summary.get(detector, {})),
+            key=lambda c: summary[detector][c]["map50_95_mean"],
+        )
         for condition in CONDITION_ORDER:
             row = summary.get(detector, {}).get(condition)
             if not row:
                 continue
             flag = " ⚠️" if (name == "manual_full_val" and condition == "manual-full") else ""
+            best = condition == best_condition
+            label = f"🏆 **{condition}**{flag}" if best else f"{condition}{flag}"
+            map_value = f"**{row['map50_95_mean']:.3f}**" if best else f"{row['map50_95_mean']:.3f}"
             lines.append(
-                f"| {detector} | {condition}{flag} | {row['precision_mean']:.3f} | "
+                f"| {detector} | {label} | {row['precision_mean']:.3f} | "
                 f"{row['recall_mean']:.3f} | {row['f1_mean']:.3f} | {row['map50_mean']:.3f} | "
-                f"{row['map75_mean']:.3f} | **{row['map50_95_mean']:.3f}** | "
+                f"{row['map75_mean']:.3f} | {map_value} | "
                 f"{row['count_mae_mean']:.1f} |"
             )
+    lines.append("")
+    lines.append("🏆 = maior mAP@.50:.95 para aquele detector, nesse teste.")
     lines.append("")
     return "\n".join(lines)
 
@@ -175,14 +184,21 @@ def copy_heatmaps() -> list[str]:
     return copied
 
 
+def copy_detection_examples() -> list[str]:
+    src_dir = ROOT / "docs" / "figures" / "results" / "examples"
+    return sorted(p.name for p in src_dir.glob("*.jpg")) if src_dir.exists() else []
+
+
 def main() -> None:
     results = {name: load_results(name) for name in TESTS}
     tables = "\n".join(markdown_table(name, summary) for name, summary in results.items())
     chart_path = build_trend_chart(results)
     heatmaps = copy_heatmaps()
+    examples = copy_detection_examples()
     print(f"tabelas geradas para: {list(results)}")
     print(f"gráfico salvo em: {chart_path.relative_to(ROOT)}")
     print(f"heatmaps copiados: {heatmaps}")
+    print(f"exemplos de detecção presentes: {examples or '(rode scripts/render_detection_examples.py antes)'}")
     (ARTIFACTS / "results_tables.md").write_text(tables, encoding="utf-8")
     print(f"tabelas markdown intermediárias em: {(ARTIFACTS / 'results_tables.md').relative_to(ROOT)}")
 

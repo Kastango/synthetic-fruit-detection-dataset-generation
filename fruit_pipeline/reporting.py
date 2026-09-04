@@ -18,8 +18,8 @@ from .common import atomic_write_text, project_path
 from .real_data import validate_yolo_text
 from .training import scoped_experiment_root
 
-_HEATMAP_GRID_SIZE = 256
-_HEATMAP_OUTPUT_SIZE = 512
+_HEATMAP_GRID_SIZE = 512
+_HEATMAP_OUTPUT_SIZE = 1536
 
 
 def _number(value: float | None, digits: int = 4) -> str:
