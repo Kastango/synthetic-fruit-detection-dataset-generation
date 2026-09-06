@@ -6,7 +6,11 @@ canvas: [720, 960]
 objects:
   min: 1
   max: 30
-  min_scale: 0.02
+  # Fração linear (sqrt(w*h)) do tamanho aparente da fruta. Calibrado contra
+  # a distribuição real de caixas dos testes externos: cobre tanto o
+  # tamanho típico do manual-full (câmera mais próxima) quanto o do CitDet
+  # (câmera mais distante, frutos bem menores na imagem).
+  min_scale: 0.01
   max_scale: 0.065
   scale_mode: canvas
   rotation_degrees: 180
@@ -14,6 +18,18 @@ objects:
     enabled: true
     near_scale: 1.3
     far_scale: 0.6
+  # Pomares fotografados de longe (ex.: CitDet) mostram muito mais fruto por
+  # imagem do que uma foto de perto (manual-full). Uma fração das cenas
+  # sorteia desse range de densidade alta à parte, para o gerador cobrir os
+  # dois regimes em vez de só o mais esparso. Teto limitado a 100 (não ao
+  # máximo real de ~233): acima disso o RT-DETR estoura a VRAM da GPU
+  # (atenção/denoising escalam com nº de instâncias por imagem, diferente
+  # do YOLO), então o teto aqui é o maior valor estável para os três
+  # detectores, não o maior valor realista.
+  dense:
+    probability: 0.25
+    min: 60
+    max: 100
 placement:
   min_depth: 20
   min_visibility: 0.15
@@ -25,6 +41,21 @@ placement:
   exclude_bottom_fraction: 0.15
 appearance:
   hardlight_power: 0.65
+  # Os recortes-fonte são fotos de fruta madura; sem isso, o pool sintético
+  # nunca teria fruta verde/em maturação, embora pomares reais tenham. Gira
+  # o matiz de uma fração dos objetos em direção a um verde-amarelado (mais
+  # "de vez" que folha), com força e saturação moderadas para não colidir
+  # cromaticamente com a folhagem real ao redor, e acha o brilho especular
+  # (fruta madura é mais cerosa que a "de vez"). Aplicado antes do hsv_cast
+  # ambiental, que continua respondendo à luz da cena por cima.
+  # Ver fruit_pipeline/synthesis.py:_apply_ripeness_shift.
+  ripeness:
+    enabled: true
+    fraction_affected: 0.18
+    green_hue_degrees: 85
+    strength_range: [0.25, 0.75]
+    saturation_scale: 0.8
+    gloss_reduction: 0.4
   hsv_cast:
     enabled: true
     use_hardlight_target: true

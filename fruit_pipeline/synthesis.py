@@ -166,6 +166,12 @@ def validate_synthesis_config(config: dict) -> None:
     objects = config["objects"]
     if not 0 <= int(objects["min"]) <= int(objects["max"]):
         raise ValueError("intervalo de objetos inválido")
+    dense = objects.get("dense")
+    if dense:
+        if not 0 <= float(dense.get("probability", 0.0)) <= 1:
+            raise ValueError("objects.dense.probability deve estar entre 0 e 1")
+        if not 0 <= int(dense["min"]) <= int(dense["max"]):
+            raise ValueError("objects.dense: intervalo inválido")
     if not 0 < float(objects["min_scale"]) <= float(objects["max_scale"]):
         raise ValueError("intervalo de escala inválido")
     if objects["scale_mode"] not in {"cutout", "canvas"}:
@@ -225,6 +231,22 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "appearance.hsv_cast.bright_flatten_strength deve estar entre 0 e 1"
             )
+    ripeness = appearance.get("ripeness")
+    if ripeness and ripeness.get("enabled", False):
+        if not 0 <= float(ripeness.get("fraction_affected", 0.0)) <= 1:
+            raise ValueError("appearance.ripeness.fraction_affected deve estar entre 0 e 1")
+        strength_range = ripeness.get("strength_range", [0.3, 1.0])
+        lo, hi = float(strength_range[0]), float(strength_range[1])
+        if not 0 <= lo <= hi <= 1:
+            raise ValueError(
+                "appearance.ripeness.strength_range deve ser crescente dentro de 0 e 1"
+            )
+        if not 0 <= float(ripeness.get("green_hue_degrees", 105.0)) <= 360:
+            raise ValueError("appearance.ripeness.green_hue_degrees deve estar entre 0 e 360")
+        if not 0 <= float(ripeness.get("saturation_scale", 1.0)) <= 2:
+            raise ValueError("appearance.ripeness.saturation_scale deve estar entre 0 e 2")
+        if not 0 <= float(ripeness.get("gloss_reduction", 0.0)) <= 1:
+            raise ValueError("appearance.ripeness.gloss_reduction deve estar entre 0 e 1")
     grading = config["output"].get("scene_grading")
     if grading and grading.get("enabled", False):
         for key in ("contrast", "saturation", "brightness"):
@@ -462,12 +484,71 @@ def _apply_appearance_hsv_cast(
     return result
 
 
+def _apply_ripeness_shift(
+    fruit: Image.Image,
+    ripeness: dict,
+    rng: random.Random,
+) -> Image.Image:
+    # Os 127 recortes-fonte foram fotografados só em ponto de colheita
+    # (maduros): sem essa etapa, nenhuma fruta sintética fica verde, mesmo
+    # que o pomar real tenha frutos em vários estágios de maturação. Gira o
+    # matiz de uma fração dos objetos em direção ao verde ANTES do hsv_cast
+    # ambiental (que continua sendo aplicado por cima, como iluminação de
+    # cena), então o resultado é "fruta verde sob a luz daquele fundo", não
+    # um filtro plano sobre a fruta madura final.
+    if rng.random() > float(ripeness.get("fraction_affected", 0.0)):
+        return fruit
+    alpha = fruit.getchannel("A")
+    rgb = fruit.convert("RGB")
+    h, s, v = rgb.convert("HSV").split()
+    h_array = np.asarray(h, dtype=np.float32)
+    strength_lo, strength_hi = ripeness.get("strength_range", [0.3, 1.0])
+    strength = rng.uniform(float(strength_lo), float(strength_hi))
+    target_hue = float(ripeness.get("green_hue_degrees", 105.0)) / 360.0 * 255.0
+    hue_diff = ((target_hue - h_array + 128) % 256) - 128
+    h_new = (h_array + hue_diff * strength) % 256
+    # A folhagem já ocupa a mesma faixa de matiz alvo; sem diferenciar
+    # saturação, um fruto verde fica cromaticamente equivalente a um
+    # aglomerado de folhas. Reduzir a saturação da fruta abaixo da folha
+    # real preserva a distinção entre as duas.
+    saturation_scale = float(ripeness.get("saturation_scale", 1.0))
+    s_array = np.asarray(s, dtype=np.float32) * saturation_scale
+    # Fruta "de vez" real tem casca mais fosca que a madura (menos cera
+    # visível) — o brilho especular concentrado é justamente o que soma com
+    # o matiz/saturação pra ler como "plástico" em vez de fruta. Achata só
+    # os pixels acima do percentil 75 de V do próprio recorte (o highlight),
+    # não a fruta inteira, senão ela escurece de forma plana e artificial.
+    gloss_reduction = float(ripeness.get("gloss_reduction", 0.0))
+    v_array = np.asarray(v, dtype=np.float32)
+    if gloss_reduction > 0:
+        alpha_array = np.asarray(alpha, dtype=np.float32)
+        opaque = alpha_array > 8
+        if opaque.any():
+            highlight_threshold = float(np.percentile(v_array[opaque], 75))
+            excess = np.clip(v_array - highlight_threshold, 0, None)
+            v_array = v_array - excess * gloss_reduction
+    blended = Image.merge(
+        "HSV",
+        [
+            Image.fromarray(np.clip(h_new, 0, 255).astype(np.uint8)),
+            Image.fromarray(np.clip(s_array, 0, 255).astype(np.uint8)),
+            Image.fromarray(np.clip(v_array, 0, 255).astype(np.uint8)),
+        ],
+    ).convert("RGB")
+    result = blended.convert("RGBA")
+    result.putalpha(alpha)
+    return result
+
+
 def _apply_appearance(
     fruit: Image.Image,
     background_region: Image.Image,
     appearance: dict,
     rng: random.Random | None = None,
 ) -> Image.Image:
+    ripeness = appearance.get("ripeness")
+    if ripeness and ripeness.get("enabled", False) and rng is not None:
+        fruit = _apply_ripeness_shift(fruit, ripeness, rng)
     hsv_cast = appearance.get("hsv_cast")
     if hsv_cast and hsv_cast.get("enabled", False):
         return _apply_appearance_hsv_cast(fruit, background_region, hsv_cast, rng)
@@ -1026,9 +1107,18 @@ def _render_one(task: dict) -> dict:
         # cena composta.
         depth_image = depth_image.filter(ImageFilter.GaussianBlur(depth_smooth_radius))
     depth = np.asarray(depth_image, dtype=np.uint8)
-    requested = rng.randint(
-        int(config["objects"]["min"]), int(config["objects"]["max"])
-    )
+    dense = config["objects"].get("dense")
+    if dense and rng.random() < float(dense.get("probability", 0.0)):
+        # O CitDet real chega a ~85 frutos/imagem em mediana (até 233); o
+        # range padrão (min/max) sozinho nunca cobre isso, então a maioria
+        # das cenas sintéticas fica bem mais esparsa que esse domínio. Uma
+        # fração das cenas sorteia desse range denso à parte, preservando a
+        # distribuição original (mais parecida com manual-full) no resto.
+        requested = rng.randint(int(dense["min"]), int(dense["max"]))
+    else:
+        requested = rng.randint(
+            int(config["objects"]["min"]), int(config["objects"]["max"])
+        )
     if requested <= len(cutouts):
         chosen = rng.sample(cutouts, requested)
     else:

@@ -21,6 +21,7 @@ def main() -> None:
     parser.add_argument("--multipliers", type=int, nargs="+")
     parser.add_argument("--base-size", type=int)
     parser.add_argument("--base-val-size", type=int)
+    parser.add_argument("--prefix", default="synthetic-")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     pipeline = load_yaml(project_path(args.pipeline_config))
@@ -39,6 +40,7 @@ def main() -> None:
             if args.base_val_size is not None
             else int(subset_config["base_val_images"])
         ),
+        prefix=args.prefix,
         force=args.force,
     )
     print(json.dumps(summary, indent=2, ensure_ascii=False))

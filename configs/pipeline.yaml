@@ -92,8 +92,8 @@ external_datasets:
 # GitHub. Baixe com `scripts/download_weights.py` para rodar mais testes ou
 # gráficos sem retreinar. Ver docs/RESULTS.md.
 confirmatory_checkpoints:
-  download_url: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/download/confirmatory-checkpoints-v1/confirmatory_checkpoints.zip
-  expected_bytes: 1529127220
-  sha256: 60b5583fad0b8f05ec534c95a4b99bab8ec8990a6dde474d61e6eb1c29937262
+  download_url: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/download/confirmatory-checkpoints-v2/confirmatory_checkpoints.zip
+  expected_bytes: 1529129264
+  sha256: ad7a7e1a009a709e0b9f33c676322416e2a9e41f20eae310f189cb99cdb80ce8
   checkpoints: 42
   license: interno (coleta própria do projeto)
