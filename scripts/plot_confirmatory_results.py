@@ -105,7 +105,6 @@ def build_trend_chart(results_by_test: dict[str, dict]) -> Path:
 
     for ax, (test_name, summary) in zip(axes, results_by_test.items()):
         ax.set_facecolor(SURFACE)
-        ax.set_xscale("log")
         ax.set_xticks([104, 208, 312, 520, 1040])
         ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{int(v)}"))
         ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0)
@@ -144,7 +143,7 @@ def build_trend_chart(results_by_test: dict[str, dict]) -> Path:
             )
 
         ax.set_title(TESTS[test_name], fontsize=10.5, color=INK_PRIMARY, loc="left", pad=10)
-        ax.set_xlabel("imagens de treino (escala log; rótulo = synthetic-Nx)", fontsize=8.5, color=INK_SECONDARY)
+        ax.set_xlabel("imagens de treino (rótulo = synthetic-Nx)", fontsize=8.5, color=INK_SECONDARY)
         ax.set_ylabel("mAP@0.50:0.95", fontsize=8.5, color=INK_SECONDARY)
         ax.set_xticklabels(["1x\n104", "2x\n208", "3x\n312", "5x\n520", "10x\n1040"], fontsize=8)
 
