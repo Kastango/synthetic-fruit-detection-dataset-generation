@@ -19,17 +19,15 @@ objects:
     near_scale: 1.3
     far_scale: 0.6
   # Pomares fotografados de longe (ex.: CitDet) mostram muito mais fruto por
-  # imagem do que uma foto de perto (manual-full). Uma fração das cenas
-  # sorteia desse range de densidade alta à parte, para o gerador cobrir os
-  # dois regimes em vez de só o mais esparso. Teto limitado a 100 (não ao
-  # máximo real de ~233): acima disso o RT-DETR estoura a VRAM da GPU
-  # (atenção/denoising escalam com nº de instâncias por imagem, diferente
-  # do YOLO), então o teto aqui é o maior valor estável para os três
-  # detectores, não o maior valor realista.
+  # imagem do que uma foto de perto (manual-full): a mediana real vai de 18
+  # caixas por imagem num caso a 78 no outro, com cauda até 233. Metade das
+  # cenas sorteia desta faixa densa à parte, para o gerador cobrir os dois
+  # regimes em vez de só o esparso — cobrir a faixa inteira rende mais que
+  # acertar a densidade de um dos testes.
   dense:
-    probability: 0.25
+    probability: 0.50
     min: 60
-    max: 100
+    max: 200
 placement:
   min_depth: 20
   min_visibility: 0.15
@@ -56,6 +54,19 @@ appearance:
     strength_range: [0.25, 0.75]
     saturation_scale: 0.8
     gloss_reduction: 0.4
+  # O hsv_cast abaixo puxa a fruta na direção da cor do fundo local, então por
+  # construção ele só reduz o contraste entre fruta e cena. Nas fotos reais o
+  # contraste se espalha muito mais para os dois lados: fruta em sombra profunda
+  # quase some na folhagem, fruta em sol direto estoura contra a copa escura.
+  # Este fator de exposição por instância, aplicado depois do cast e
+  # independente do fundo, é o que reproduz esse espalhamento — calibrado
+  # contra os percentis de contraste medidos nas fotos reais.
+  # Ver fruit_pipeline/synthesis.py:_apply_exposure_jitter.
+  exposure_jitter:
+    enabled: true
+    probability: 0.8
+    range: [0.40, 1.90]
+    saturation_pull: 0.35
   hsv_cast:
     enabled: true
     use_hardlight_target: true
@@ -63,7 +74,7 @@ appearance:
     saturation_power: 0.18
     value_power: 0.45
     value_power_jitter: 0.3
-    min_value_ratio: 0.6
+    min_value_ratio: 0.15
     bright_flatten_strength: 0.7
 occlusion:
   edge_blur: 1.5

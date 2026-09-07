@@ -56,8 +56,11 @@ models:
   - name: rtdetr-l
     checkpoint: rtdetr-l.pt
     parameters:
-      batch: 4
-      nbs: 4
+      # Metade do batch dos YOLOs: a atenção deformável e os grupos de
+      # denoising do RT-DETR escalam com o nº de instâncias por imagem, e nas
+      # cenas densas do pool o batch 4 não cabe nos 8 GB da GPU.
+      batch: 2
+      nbs: 2
       optimizer: AdamW
       lr0: 0.0001
       deterministic: false

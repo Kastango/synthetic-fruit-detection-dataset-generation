@@ -247,6 +247,21 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("appearance.ripeness.saturation_scale deve estar entre 0 e 2")
         if not 0 <= float(ripeness.get("gloss_reduction", 0.0)) <= 1:
             raise ValueError("appearance.ripeness.gloss_reduction deve estar entre 0 e 1")
+    exposure = appearance.get("exposure_jitter")
+    if exposure and exposure.get("enabled", False):
+        if not 0 <= float(exposure.get("probability", 0.0)) <= 1:
+            raise ValueError(
+                "appearance.exposure_jitter.probability deve estar entre 0 e 1"
+            )
+        low, high = exposure.get("range", [1.0, 1.0])
+        if not 0 < float(low) <= float(high):
+            raise ValueError(
+                "appearance.exposure_jitter.range deve ser crescente e positivo"
+            )
+        if not 0 <= float(exposure.get("saturation_pull", 0.0)) <= 1:
+            raise ValueError(
+                "appearance.exposure_jitter.saturation_pull deve estar entre 0 e 1"
+            )
     grading = config["output"].get("scene_grading")
     if grading and grading.get("enabled", False):
         for key in ("contrast", "saturation", "brightness"):
@@ -540,6 +555,42 @@ def _apply_ripeness_shift(
     return result
 
 
+def _apply_exposure_jitter(
+    fruit: Image.Image, exposure: dict, rng: random.Random
+) -> Image.Image:
+    # O hsv_cast puxa a fruta na direcao da cor do fundo local, entao ele so
+    # sabe REDUZIR o contraste entre fruta e cena. Nas fotos reais o contraste
+    # se espalha muito mais para os dois lados: fruta em sombra profunda quase
+    # some no meio da folhagem, e fruta em sol direto estoura contra a copa
+    # escura. Um fator de exposicao por instancia, aplicado depois do cast e
+    # independente do fundo, e o unico ponto do modelo de aparencia capaz de
+    # abrir as duas caudas.
+    if rng.random() > float(exposure.get("probability", 0.0)):
+        return fruit
+    low, high = exposure.get("range", [1.0, 1.0])
+    factor = rng.uniform(float(low), float(high))
+    alpha = fruit.getchannel("A")
+    h, s, v = fruit.convert("RGB").convert("HSV").split()
+    v_array = np.asarray(v, dtype=np.float32) * factor
+    # Sombra profunda dessatura junto; sol direto tambem lava a cor. Nos dois
+    # extremos a saturacao cai, so que por motivos opostos.
+    saturation_pull = float(exposure.get("saturation_pull", 0.0))
+    s_array = np.asarray(s, dtype=np.float32)
+    if saturation_pull > 0:
+        s_array = s_array * (1.0 - saturation_pull * min(abs(factor - 1.0), 1.0))
+    blended = Image.merge(
+        "HSV",
+        [
+            h,
+            Image.fromarray(np.clip(s_array, 0, 255).astype(np.uint8)),
+            Image.fromarray(np.clip(v_array, 0, 255).astype(np.uint8)),
+        ],
+    ).convert("RGB")
+    result = blended.convert("RGBA")
+    result.putalpha(alpha)
+    return result
+
+
 def _apply_appearance(
     fruit: Image.Image,
     background_region: Image.Image,
@@ -551,8 +602,13 @@ def _apply_appearance(
         fruit = _apply_ripeness_shift(fruit, ripeness, rng)
     hsv_cast = appearance.get("hsv_cast")
     if hsv_cast and hsv_cast.get("enabled", False):
-        return _apply_appearance_hsv_cast(fruit, background_region, hsv_cast, rng)
-    return _apply_appearance_hardlight(fruit, background_region, appearance)
+        fruit = _apply_appearance_hsv_cast(fruit, background_region, hsv_cast, rng)
+    else:
+        fruit = _apply_appearance_hardlight(fruit, background_region, appearance)
+    exposure = appearance.get("exposure_jitter")
+    if exposure and exposure.get("enabled", False) and rng is not None:
+        fruit = _apply_exposure_jitter(fruit, exposure, rng)
+    return fruit
 
 
 def _apply_occlusion_contact_shadow(
@@ -890,6 +946,32 @@ def _resolve_depth_scale(proximity: float, depth_scale: dict) -> float:
     return far + (near - far) * proximity
 
 
+def _sample_clustered_center(
+    instances: list, clustering: dict, rng: random.Random, size: tuple[int, int]
+) -> tuple[int, int] | None:
+    # Fruta real nasce em cacho, presa ao mesmo ramo: nos dois conjuntos reais
+    # cerca de metade das frutas tem vizinha a menos de 1,5 diametro, contra
+    # bem menos no sorteio uniforme. Ancorar parte das insercoes num vizinho ja
+    # colocado reproduz esse agrupamento sem mudar quantas frutas entram na
+    # cena.
+    if not instances:
+        return None
+    if rng.random() > float(clustering.get("probability", 0.0)):
+        return None
+    anchor = rng.choice(instances)
+    _, _, anchor_width, anchor_height = anchor["rect"]
+    diameter = max(1.0, (anchor_width * anchor_height) ** 0.5)
+    low, high = clustering.get("radius_range_diameters", [0.6, 2.0])
+    distance = rng.uniform(float(low), float(high)) * diameter
+    angle = rng.uniform(0.0, 2.0 * math.pi)
+    cx = anchor["x"] + anchor_width / 2 + distance * math.cos(angle)
+    cy = anchor["y"] + anchor_height / 2 + distance * math.sin(angle)
+    width, height = size
+    if not (0 <= cx < width and 0 <= cy < height):
+        return None
+    return int(cx), int(cy)
+
+
 def _placement_with_depth_scale(
     canvas: Image.Image,
     depth: np.ndarray,
@@ -897,6 +979,7 @@ def _placement_with_depth_scale(
     config: dict,
     rng: random.Random,
     depth_scale: dict,
+    instances: list | None = None,
 ) -> dict | None:
     # A escala de referência (`_scale_cutout`) já fixou uma fração
     # aleatória; aqui essa fração é modulada pela profundidade local do
@@ -906,9 +989,18 @@ def _placement_with_depth_scale(
     width, height = canvas.size
     placement = config["placement"]
     exclude_bottom = float(placement.get("exclude_bottom_fraction", 0.0))
+    clustering = placement.get("clustering")
     for _ in range(int(placement["max_attempts_per_object"])):
-        cx = rng.randint(0, width - 1)
-        cy = rng.randint(0, height - 1)
+        clustered = (
+            _sample_clustered_center(instances or [], clustering, rng, (width, height))
+            if clustering and clustering.get("enabled", False)
+            else None
+        )
+        if clustered is not None:
+            cx, cy = clustered
+        else:
+            cx = rng.randint(0, width - 1)
+            cy = rng.randint(0, height - 1)
         if exclude_bottom > 0 and cy > height * (1 - exclude_bottom):
             continue
         proximity = float(depth[cy, cx]) / 255.0
@@ -1144,7 +1236,7 @@ def _render_one(task: dict) -> dict:
         depth_scale = config["objects"].get("depth_scale")
         if depth_scale and depth_scale.get("enabled", False):
             instance = _placement_with_depth_scale(
-                canvas, depth, fruit, config, rng, depth_scale
+                canvas, depth, fruit, config, rng, depth_scale, instances
             )
         else:
             instance = _placement(canvas, depth, fruit, config, rng)
@@ -1305,6 +1397,16 @@ def generate_dataset(
         ],
         "cutouts": [str(asset_root / path) for path in source_assets["cutouts"]],
     }
+    # EXPLORATORIO: limita quantas identidades distintas de fruta o pool pode
+    # usar, mantendo tudo o mais igual. Serve para medir se o desempenho ainda
+    # depende do numero de recortes distintos ou se ja saturou.
+    pool_size = config["objects"].get("cutout_pool_size")
+    if pool_size:
+        # Aninhado: embaralha uma vez com semente fixa e corta o prefixo, entao
+        # o conjunto de 32 esta contido no de 64, que esta contido no de 127.
+        ordered = sorted(assets["cutouts"])
+        random.Random(int(config["seed"])).shuffle(ordered)
+        assets["cutouts"] = sorted(ordered[: int(pool_size)])
     if not assets["backgrounds"] or not assets["cutouts"]:
         raise RuntimeError("catálogo de ativos sintéticos vazio")
 

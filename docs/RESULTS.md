@@ -61,7 +61,7 @@ teste externo novo, sem rodar `train`/`select`:
 ./run_pipeline.sh report --external-name <nome>
 ```
 
-Release: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/tag/confirmatory-checkpoints-v2
+Release: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/tag/confirmatory-checkpoints-v3
 
 ## Como mais dados sintéticos afetam o mAP
 
@@ -70,19 +70,16 @@ Release: https://github.com/Kastango/synthetic-fruit-detection-dataset-generatio
 - **`controlled` fica fora de escala nos dois gráficos** (mAP ≈ 0.00–0.01 nos
   dois testes) — um detector treinado com frutas isoladas sobre fundo uniforme
   não generaliza para árvore real, em nenhum domínio de teste. Ver tabela completa abaixo.
-- **A relação entre volume sintético e mAP depende do detector.** Nos dois
-  YOLO, o ganho satura por volta de `synthetic-3x` nos dois testes (mais
-  volume não ajuda ou recua ligeiramente depois disso). O RT-DETR foge do
-  padrão: melhora de forma monotônica até `synthetic-10x` no CitDet, sem sinal
-  de saturação no intervalo testado.
-- **No CitDet, a distância para `manual-full` é pequena — ou inexistente.**
-  Os dois YOLO ficam a 0,004–0,011 de mAP@.50:.95 do dado real; o RT-DETR com
-  `synthetic-10x` (0,194) **supera** `manual-full` (0,143). Já no
-  `manual-full · val` — que compartilha câmera e pomar com o próprio treino de
-  `manual-full` — a distância continua grande nos três detectores (0,11–0,19),
-  o que sugere que parte da vantagem de `manual-full` nesse teste é vantagem
-  de domínio (mesma coleta), não superioridade geral do dado anotado
-  manualmente.
+- **A relação entre volume sintético e mAP depende do detector.** Os dois YOLO
+  atingem o melhor resultado já em `synthetic-2x` no CitDet e ficam num platô
+  depois disso. O RT-DETR foge do padrão: melhora de forma monotônica até
+  `synthetic-10x`, sem sinal de saturação no intervalo testado.
+- **No CitDet o sintético supera o dado real nos três detectores.** yolov8s
+  0,240 contra 0,214; yolo26s 0,243 contra 0,236; RT-DETR 0,212 contra 0,161.
+  Já no `manual-full · val` — que compartilha câmera e pomar com o próprio
+  treino de `manual-full` — o dado real continua à frente nos três (0,469–0,552
+  contra 0,330–0,413), o que sugere que essa vantagem é vantagem de coleta, não
+  superioridade geral do dado anotado manualmente.
 
 ## Tabela completa
 
@@ -95,27 +92,27 @@ condição viu qualquer imagem de `manual-full` durante treino ou seleção.
 
 | Detector | Condição | P | R | F1 | mAP@.50 | mAP@.75 | mAP@.50:.95 | Count MAE |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| yolov8s | 🏆 **manual-full** | 0.710 | 0.488 | 0.578 | 0.529 | 0.123 | **0.214** | 45.1 |
+| yolov8s | manual-full | 0.710 | 0.488 | 0.578 | 0.529 | 0.123 | 0.214 | 45.1 |
 | yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 84.7 |
-| yolov8s | synthetic-1x | 0.713 | 0.458 | 0.558 | 0.510 | 0.113 | 0.204 | 49.3 |
-| yolov8s | synthetic-2x | 0.724 | 0.467 | 0.567 | 0.518 | 0.114 | 0.207 | 43.8 |
-| yolov8s | synthetic-3x | 0.705 | 0.476 | 0.568 | 0.518 | 0.120 | 0.210 | 37.8 |
-| yolov8s | synthetic-5x | 0.730 | 0.460 | 0.565 | 0.510 | 0.117 | 0.205 | 43.3 |
-| yolov8s | synthetic-10x | 0.730 | 0.456 | 0.561 | 0.504 | 0.120 | 0.206 | 42.9 |
-| rtdetr-l | manual-full | 0.520 | 0.473 | 0.495 | 0.368 | 0.075 | 0.143 | 29.6 |
-| rtdetr-l | controlled | 0.005 | 0.018 | 0.008 | 0.003 | 0.003 | 0.002 | 84.7 |
-| rtdetr-l | synthetic-1x | 0.606 | 0.418 | 0.494 | 0.413 | 0.071 | 0.151 | 36.9 |
-| rtdetr-l | synthetic-2x | 0.604 | 0.396 | 0.478 | 0.412 | 0.074 | 0.154 | 46.4 |
-| rtdetr-l | synthetic-3x | 0.616 | 0.470 | 0.533 | 0.469 | 0.085 | 0.174 | 31.6 |
-| rtdetr-l | synthetic-5x | 0.667 | 0.462 | 0.546 | 0.485 | 0.094 | 0.182 | 34.0 |
-| rtdetr-l | 🏆 **synthetic-10x** | 0.691 | 0.486 | 0.571 | 0.512 | 0.101 | **0.194** | 30.4 |
-| yolo26s | 🏆 **manual-full** | 0.718 | 0.523 | 0.606 | 0.576 | 0.130 | **0.236** | 42.3 |
+| yolov8s | synthetic-1x | 0.732 | 0.514 | 0.603 | 0.572 | 0.144 | 0.236 | 35.2 |
+| yolov8s | 🏆 **synthetic-2x** | 0.730 | 0.523 | 0.609 | 0.576 | 0.150 | **0.240** | 33.8 |
+| yolov8s | synthetic-3x | 0.722 | 0.507 | 0.596 | 0.556 | 0.123 | 0.221 | 32.4 |
+| yolov8s | synthetic-5x | 0.745 | 0.504 | 0.601 | 0.568 | 0.142 | 0.235 | 36.7 |
+| yolov8s | synthetic-10x | 0.743 | 0.502 | 0.599 | 0.564 | 0.141 | 0.233 | 35.0 |
+| rtdetr-l | manual-full | 0.578 | 0.414 | 0.479 | 0.423 | 0.078 | 0.161 | 54.8 |
+| rtdetr-l | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 84.7 |
+| rtdetr-l | synthetic-1x | 0.613 | 0.419 | 0.498 | 0.429 | 0.099 | 0.172 | 45.3 |
+| rtdetr-l | synthetic-2x | 0.634 | 0.480 | 0.547 | 0.494 | 0.091 | 0.184 | 27.2 |
+| rtdetr-l | synthetic-3x | 0.628 | 0.468 | 0.536 | 0.476 | 0.093 | 0.181 | 42.0 |
+| rtdetr-l | synthetic-5x | 0.677 | 0.499 | 0.574 | 0.524 | 0.118 | 0.207 | 33.6 |
+| rtdetr-l | 🏆 **synthetic-10x** | 0.706 | 0.515 | 0.595 | 0.544 | 0.116 | **0.212** | 26.9 |
+| yolo26s | manual-full | 0.718 | 0.523 | 0.606 | 0.576 | 0.130 | 0.236 | 42.3 |
 | yolo26s | controlled | 0.279 | 0.035 | 0.062 | 0.030 | 0.002 | 0.009 | 84.7 |
-| yolo26s | synthetic-1x | 0.716 | 0.485 | 0.579 | 0.541 | 0.130 | 0.220 | 43.9 |
-| yolo26s | synthetic-2x | 0.723 | 0.493 | 0.586 | 0.547 | 0.133 | 0.222 | 41.5 |
-| yolo26s | synthetic-3x | 0.728 | 0.501 | 0.593 | 0.552 | 0.133 | 0.225 | 32.8 |
-| yolo26s | synthetic-5x | 0.723 | 0.483 | 0.579 | 0.534 | 0.133 | 0.218 | 35.1 |
-| yolo26s | synthetic-10x | 0.717 | 0.472 | 0.569 | 0.521 | 0.129 | 0.213 | 42.9 |
+| yolo26s | synthetic-1x | 0.720 | 0.511 | 0.598 | 0.570 | 0.136 | 0.232 | 40.6 |
+| yolo26s | 🏆 **synthetic-2x** | 0.739 | 0.525 | 0.614 | 0.588 | 0.151 | **0.243** | 30.5 |
+| yolo26s | synthetic-3x | 0.727 | 0.520 | 0.606 | 0.573 | 0.145 | 0.236 | 33.6 |
+| yolo26s | synthetic-5x | 0.737 | 0.503 | 0.598 | 0.559 | 0.139 | 0.230 | 32.3 |
+| yolo26s | synthetic-10x | 0.717 | 0.507 | 0.594 | 0.557 | 0.142 | 0.232 | 34.4 |
 
 🏆 = maior mAP@.50:.95 para aquele detector, nesse teste.
 
@@ -125,25 +122,25 @@ condição viu qualquer imagem de `manual-full` durante treino ou seleção.
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | yolov8s | 🏆 **manual-full** ⚠️ | 0.925 | 0.814 | 0.866 | 0.896 | 0.602 | **0.549** | 2.3 |
 | yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 17.3 |
-| yolov8s | synthetic-1x | 0.755 | 0.476 | 0.583 | 0.541 | 0.347 | 0.316 | 8.9 |
-| yolov8s | synthetic-2x | 0.761 | 0.536 | 0.629 | 0.602 | 0.372 | 0.348 | 6.8 |
-| yolov8s | synthetic-3x | 0.771 | 0.496 | 0.604 | 0.574 | 0.352 | 0.332 | 8.3 |
-| yolov8s | synthetic-5x | 0.796 | 0.522 | 0.629 | 0.607 | 0.369 | 0.352 | 7.5 |
-| yolov8s | synthetic-10x | 0.820 | 0.538 | 0.650 | 0.620 | 0.380 | 0.359 | 6.3 |
-| rtdetr-l | 🏆 **manual-full** ⚠️ | 0.749 | 0.766 | 0.757 | 0.772 | 0.485 | **0.454** | 4.0 |
-| rtdetr-l | controlled | 0.354 | 0.076 | 0.023 | 0.012 | 0.003 | 0.005 | 17.3 |
-| rtdetr-l | synthetic-1x | 0.789 | 0.521 | 0.627 | 0.572 | 0.327 | 0.318 | 5.9 |
-| rtdetr-l | synthetic-2x | 0.738 | 0.524 | 0.613 | 0.566 | 0.318 | 0.310 | 6.2 |
-| rtdetr-l | synthetic-3x | 0.766 | 0.548 | 0.639 | 0.611 | 0.355 | 0.340 | 6.2 |
-| rtdetr-l | synthetic-5x | 0.746 | 0.544 | 0.629 | 0.599 | 0.348 | 0.332 | 6.0 |
-| rtdetr-l | synthetic-10x | 0.788 | 0.462 | 0.581 | 0.530 | 0.312 | 0.301 | 7.5 |
+| yolov8s | synthetic-1x | 0.782 | 0.595 | 0.674 | 0.681 | 0.433 | 0.400 | 4.6 |
+| yolov8s | synthetic-2x | 0.778 | 0.618 | 0.689 | 0.693 | 0.417 | 0.400 | 4.7 |
+| yolov8s | synthetic-3x | 0.769 | 0.595 | 0.671 | 0.676 | 0.396 | 0.390 | 4.5 |
+| yolov8s | synthetic-5x | 0.810 | 0.594 | 0.685 | 0.693 | 0.391 | 0.394 | 4.2 |
+| yolov8s | synthetic-10x | 0.781 | 0.606 | 0.682 | 0.681 | 0.421 | 0.396 | 4.9 |
+| rtdetr-l | 🏆 **manual-full** ⚠️ | 0.823 | 0.775 | 0.798 | 0.797 | 0.518 | **0.469** | 2.2 |
+| rtdetr-l | controlled | 0.004 | 0.032 | 0.006 | 0.001 | 0.000 | 0.000 | 17.3 |
+| rtdetr-l | synthetic-1x | 0.715 | 0.507 | 0.591 | 0.550 | 0.333 | 0.313 | 5.0 |
+| rtdetr-l | synthetic-2x | 0.695 | 0.476 | 0.560 | 0.533 | 0.299 | 0.287 | 5.6 |
+| rtdetr-l | synthetic-3x | 0.771 | 0.500 | 0.607 | 0.573 | 0.345 | 0.327 | 6.9 |
+| rtdetr-l | synthetic-5x | 0.707 | 0.527 | 0.603 | 0.576 | 0.342 | 0.330 | 6.8 |
+| rtdetr-l | synthetic-10x | 0.784 | 0.499 | 0.610 | 0.570 | 0.347 | 0.330 | 6.5 |
 | yolo26s | 🏆 **manual-full** ⚠️ | 0.911 | 0.815 | 0.860 | 0.894 | 0.618 | **0.552** | 2.4 |
 | yolo26s | controlled | 0.139 | 0.041 | 0.063 | 0.021 | 0.001 | 0.007 | 17.3 |
-| yolo26s | synthetic-1x | 0.784 | 0.596 | 0.677 | 0.666 | 0.397 | 0.380 | 6.2 |
-| yolo26s | synthetic-2x | 0.807 | 0.543 | 0.649 | 0.632 | 0.390 | 0.370 | 7.8 |
-| yolo26s | synthetic-3x | 0.789 | 0.585 | 0.672 | 0.659 | 0.407 | 0.386 | 6.2 |
-| yolo26s | synthetic-5x | 0.797 | 0.570 | 0.664 | 0.657 | 0.398 | 0.383 | 6.1 |
-| yolo26s | synthetic-10x | 0.794 | 0.576 | 0.668 | 0.657 | 0.413 | 0.386 | 5.9 |
+| yolo26s | synthetic-1x | 0.734 | 0.635 | 0.680 | 0.679 | 0.419 | 0.397 | 4.9 |
+| yolo26s | synthetic-2x | 0.807 | 0.640 | 0.714 | 0.706 | 0.434 | 0.412 | 4.8 |
+| yolo26s | synthetic-3x | 0.823 | 0.614 | 0.703 | 0.696 | 0.437 | 0.412 | 4.5 |
+| yolo26s | synthetic-5x | 0.765 | 0.650 | 0.703 | 0.699 | 0.425 | 0.409 | 4.3 |
+| yolo26s | synthetic-10x | 0.783 | 0.642 | 0.705 | 0.701 | 0.443 | 0.413 | 4.0 |
 
 🏆 = maior mAP@.50:.95 para aquele detector, nesse teste.
 
@@ -172,9 +169,9 @@ compartilhada entre todos os conjuntos.
 
 | | | |
 |---|---|---|
-| **manual-full** (130 img / 2.093 caixas)<br><img src="figures/results/heatmaps/manual-full.png" width="240"> | **controlled** (355 img / 127 caixas)<br><img src="figures/results/heatmaps/controlled.png" width="240"> | **synthetic-1x** (130 img / 3.887 caixas)<br><img src="figures/results/heatmaps/synthetic-1x.png" width="240"> |
-| **synthetic-2x** (260 img / 8.002 caixas)<br><img src="figures/results/heatmaps/synthetic-2x.png" width="240"> | **synthetic-3x** (390 img / 12.566 caixas)<br><img src="figures/results/heatmaps/synthetic-3x.png" width="240"> | **synthetic-5x** (650 img / 20.580 caixas)<br><img src="figures/results/heatmaps/synthetic-5x.png" width="240"> |
-| **synthetic-10x** (1.300 img / 41.427 caixas)<br><img src="figures/results/heatmaps/synthetic-10x.png" width="240"> | **CitDet** — teste (119 img / 10.082 caixas)<br><img src="figures/results/heatmaps/citdet.png" width="240"> | **manual-full · val** — teste (26 img / 451 caixas)<br><img src="figures/results/heatmaps/manual_full_val.png" width="240"> |
+| **manual-full** (130 img / 2.093 caixas)<br><img src="figures/results/heatmaps/manual-full.png" width="240"> | **controlled** (355 img / 127 caixas)<br><img src="figures/results/heatmaps/controlled.png" width="240"> | **synthetic-1x** (130 img / 8.302 caixas)<br><img src="figures/results/heatmaps/synthetic-1x.png" width="240"> |
+| **synthetic-2x** (260 img / 18.084 caixas)<br><img src="figures/results/heatmaps/synthetic-2x.png" width="240"> | **synthetic-3x** (390 img / 26.853 caixas)<br><img src="figures/results/heatmaps/synthetic-3x.png" width="240"> | **synthetic-5x** (650 img / 44.284 caixas)<br><img src="figures/results/heatmaps/synthetic-5x.png" width="240"> |
+| **synthetic-10x** (1.300 img / 91.623 caixas)<br><img src="figures/results/heatmaps/synthetic-10x.png" width="240"> | **CitDet** — teste (119 img / 10.082 caixas)<br><img src="figures/results/heatmaps/citdet.png" width="240"> | **manual-full · val** — teste (26 img / 451 caixas)<br><img src="figures/results/heatmaps/manual_full_val.png" width="240"> |
 
 `controlled` concentra as caixas numa faixa muito mais estreita do que os
 demais conjuntos — mais um indício visual de por que a condição não
@@ -190,28 +187,31 @@ quanto a densidade de objetos por cena.
    interna quase perfeita (mAP@.50:.95 ≈ 0.98) e colapso total nos dois testes
    externos (≤ 0.01) — o exemplo mais claro de overfitting de domínio do
    experimento inteiro.
-2. **No domínio verdadeiramente externo (CitDet), o sintético chega perto — ou
-   supera — o dado real.** Os dois YOLO ficam a 0,004–0,011 de mAP@.50:.95 de
-   `manual-full`; o RT-DETR com `synthetic-10x` (0,194) **supera**
-   `manual-full` (0,143). No `manual-full · val` — mesmo pomar/câmeras do
-   treino de `manual-full` — a distância continua grande nos três detectores
-   (0,11–0,19), o que sugere que parte dessa vantagem de `manual-full` é
-   vantagem de domínio (mesma coleta), não superioridade geral do dado
-   anotado manualmente.
-3. **A relação entre volume sintético e desempenho depende do detector.** Nos
-   dois YOLO, o ganho satura por volta de `synthetic-3x` nos dois testes. O
-   RT-DETR foge do padrão: melhora de forma monotônica até `synthetic-10x` no
-   CitDet, sem sinal de saturação no intervalo testado — pode ser diferença de
+2. **No teste verdadeiramente externo (CitDet), o dado sintético supera o dado
+   anotado manualmente nos três detectores.** yolov8s vai de 0,214 (`manual-full`)
+   para 0,240 (`synthetic-2x`); yolo26s, de 0,236 para 0,243 (`synthetic-2x`); e
+   o RT-DETR, de 0,161 para 0,212 (`synthetic-10x`), o maior salto relativo
+   (+32%). O ganho é maior justamente onde o dado real rende menos: o detector
+   com mais capacidade é o que mais sofre com apenas 130 imagens reais e o que
+   mais aproveita o volume sintético. No `manual-full · val` o dado real segue
+   à frente (0,469–0,552 contra 0,330–0,413), mas esse conjunto é o split de
+   validação da mesma sessão de fotos que treinou `manual-full` — mesma câmera,
+   mesmo dia, mesmo pomar.
+3. **A relação entre volume sintético e desempenho depende do detector.** Os
+   dois YOLO já atingem o melhor resultado em `synthetic-2x` (208 imagens de
+   treino) e ficam num platô. O RT-DETR melhora de forma monotônica até
+   `synthetic-10x`, sem saturar no intervalo testado — pode ser diferença de
    arquitetura (atenção global vs. convolução local absorvendo melhor a
    diversidade extra) ou só dessa combinação de hiperparâmetros.
-4. **Em contagem — métrica prática para estimativa de safra — o sintético no
-   CitDet iguala ou supera o dado real.** `synthetic-3x` tem MAE de contagem
-   menor que `manual-full` no yolo26s (32,8 vs. 42,3) e no yolov8s (37,8 vs.
-   45,1): mais recall compensa o viés de contagem melhor que o dado real
-   nesse domínio externo.
+4. **Em contagem — métrica prática para estimativa de safra — o sintético
+   supera o dado real no CitDet nos três detectores.** MAE de contagem:
+   yolo26s 30,5 (`synthetic-2x`) contra 42,3 de `manual-full`; yolov8s 32,4
+   (`synthetic-3x`) contra 45,1; RT-DETR 26,9 (`synthetic-10x`) contra 54,8.
+   Mais recall compensa o viés de contagem melhor que o dado real nesse
+   domínio externo.
 
 ## Rastreabilidade
 
-- SHA-256 da seleção de checkpoints: `8b3e2d3e0d42aea8396a0b7b04e691dc356d0989f31260aed397ef760435a031`
+- SHA-256 da seleção de checkpoints: `99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f`
 - Checkpoints avaliados por teste: 42 (todos os treinamentos confirmatórios)
 - Teste aberto somente após a seleção (`model_selection.json` congelado antes de qualquer avaliação externa), nos dois testes.
