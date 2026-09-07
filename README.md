@@ -78,12 +78,10 @@ não detecta uma alteração no código.
 | Parâmetro | O que faz |
 |---|---|
 | `min` / `max` | Faixa esparsa de frutas solicitadas, sorteada uniformemente entre 1 e 30. Inserções podem ser rejeitadas. |
-| `dense.probability` | Probabilidade de solicitar a faixa densa, atualmente 50%. A distribuição final depende das rejeições e oclusões. |
-| `dense.min` / `dense.max` | Faixa densa de frutas solicitadas, de 60 a 200. A demanda de memória depende também do detector, batch, resolução e implementação. |
+| `dense.probability` | Probabilidade de a cena sortear da faixa densa em vez da esparsa, atualmente 6%. A distribuição final depende das rejeições e oclusões. |
+| `dense.min` / `dense.max` | Faixa densa de frutas solicitadas, de 60 a 110. Junto com a faixa esparsa (`min`/`max`), produz uma mistura de dois modos: a maioria das cenas fica perto das 14,5 caixas por imagem medianas do `manual-full` e uma minoria perto das 78 do CitDet. Em 104 imagens isso dá cerca de 2.100 caixas, próximo das 2.093 do conjunto real. |
 | `min_scale` / `max_scale` | Fração do menor lado do canvas que define o maior lado do recorte antes da rotação e do ajuste por profundidade. Faixa atual 0,01–0,065, calibrada com estatísticas de caixas do CitDet e da base manual. |
-| `scale_mode` | `canvas` escala em relação à imagem; `cutout` escala em relação ao próprio recorte. |
 | `rotation_degrees` | Rotação no plano da imagem, sorteada em `[-x, +x]` por instância. Gira também o brilho registrado na foto; não recalcula a iluminação em 3D. |
-| `depth_scale.enabled` | Liga a modulação do tamanho pela profundidade do ponto de inserção. |
 | `depth_scale.near_scale` / `far_scale` | Multiplicadores do tamanho para fruta no primeiro plano e no fundo. Interpolados linearmente pela proximidade estimada. |
 
 Quando a quantidade solicitada supera os 127 recortes disponíveis, o gerador
@@ -100,7 +98,6 @@ não representam metros.
 
 | Parâmetro | O que faz |
 |---|---|
-| `z_method` | Como derivar o `z` da fruta a partir da profundidade sob sua silhueta. `center_patch` usa a mediana de um retalho ao redor do ponto de ancoragem; `quantile` e `mean_plus_std` são alternativas. |
 | `z_patch_fraction` | Lado do patch central, como fração do menor lado da fruta. Sua mediana define uma referência local de proximidade. |
 | `z_offset` | Deslocamento fixo do `z`. Negativo empurra a fruta para trás, aumentando a oclusão. |
 | `z_offset_jitter` | Amplitude da perturbação uniforme somada ao offset por tentativa, em unidades do mapa de 8 bits. |
@@ -123,7 +120,6 @@ ou da iluminação.
 | `ripeness.strength_range` | Intensidade do deslocamento por instância, de 0 (sem efeito) a 1 (matiz alvo puro). |
 | `ripeness.saturation_scale` | Multiplicador da saturação. Controla a saturação da transformação; não garante separação cromática da folhagem. |
 | `ripeness.gloss_reduction` | Reduz valores altos de luminância do recorte. É uma heurística visual, sem calibração de propriedades físicas da casca. |
-| `hsv_cast.enabled` | Liga a integração da fruta à luz da cena, puxando matiz e saturação para um alvo derivado do fundo local. |
 | `hsv_cast.use_hardlight_target` | Usa o hard-light da fruta contra a cor média do fundo como alvo por pixel, em vez de uma cor única e plana. |
 | `hsv_cast.hue_power` / `saturation_power` / `value_power` | Quanto cada canal HSV adota o alvo ambiental, de 0 a 1. |
 | `hsv_cast.value_power_jitter` | Sorteio do `value_power` por instância, alargando a variação de luz e sombra entre frutas. |
@@ -133,7 +129,6 @@ ou da iluminação.
 | `exposure_jitter.probability` | Fração das instâncias afetadas. |
 | `exposure_jitter.range` | Faixa do multiplicador de intensidade, atualmente 0,40–1,90. Escurece ou clareia a fruta independentemente do fundo; não demonstra, por si só, equivalência à distribuição real de iluminação. |
 | `exposure_jitter.saturation_pull` | Dessaturação proporcional ao afastamento do fator de exposição em relação a 1. |
-| `hardlight_power` | Intensidade do hard-light no modo legado, usado quando `hsv_cast` está desligado. |
 
 ### Oclusão e sombras (`occlusion`)
 
@@ -143,10 +138,8 @@ ou da iluminação.
 | `depth_smooth_radius` | Suaviza o mapa de profundidade antes de compará-lo ao `z`, reduzindo ruído do DepthPro. |
 | `mask_threshold` | Limiar que converte a máscara suavizada em oclusão efetiva. |
 | `edge_feather_radius` | Segundo desfoque, mais curto, no contorno do recorte, para não sobrar franja semitransparente. |
-| `contact_shadow.enabled` | Escurece a vizinhança da região ocluída para aproximar visualmente uma sombra de contato. |
 | `contact_shadow.strength` | Intensidade do escurecimento. |
 | `contact_shadow.radius_fraction` | Alcance da penumbra como fração do menor lado da fruta. |
-| `cast_shadow.enabled` | Liga uma sombra procedural sobre a fruta. Sua geometria não é reconstruída a partir de folhas ou fontes de luz reais. |
 | `cast_shadow.probability` | Fração das instâncias que recebe sombra projetada. |
 | `cast_shadow.strength` | Intensidade do escurecimento. |
 | `cast_shadow.min_coverage` / `max_coverage` | Fração da fruta coberta pela sombra, sorteada na faixa. |
@@ -162,7 +155,6 @@ ou da iluminação.
 | `annotation.mode` | `visible` anota apenas a parte visível da fruta; `amodal`, a extensão completa incluindo o que está oculto; `rect`, o retângulo do recorte. |
 | `annotation.min_box_pixels` | Comprimento mínimo de cada lado da caixa, em pixels. Com valor 2, largura e altura precisam ser pelo menos 2 px. |
 | `output.jpeg_quality` | Qualidade JPEG da cena final. |
-| `output.scene_grading.enabled` | Liga a correção do fundo antes da inserção das frutas, apesar do nome `scene_grading`. |
 | `output.scene_grading.contrast` / `saturation` / `brightness` | Multiplicadores de contraste, saturação e brilho aplicados somente ao fundo. |
 | `output.scene_grading.sharpen_radius` / `sharpen_percent` / `sharpen_threshold` | Máscara de nitidez aplicada ao fundo antes da composição. |
 
