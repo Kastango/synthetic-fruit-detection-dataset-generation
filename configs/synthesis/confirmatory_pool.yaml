@@ -12,33 +12,30 @@ objects:
   # (câmera mais distante, frutos bem menores na imagem).
   min_scale: 0.01
   max_scale: 0.065
-  scale_mode: canvas
   rotation_degrees: 180
   depth_scale:
-    enabled: true
     near_scale: 1.3
     far_scale: 0.6
-  # Pomares fotografados de longe (ex.: CitDet) mostram muito mais fruto por
-  # imagem do que uma foto de perto (manual-full): a mediana real vai de 18
-  # caixas por imagem num caso a 78 no outro, com cauda até 233. Metade das
-  # cenas sorteia desta faixa densa à parte, para o gerador cobrir os dois
-  # regimes em vez de só o esparso — cobrir a faixa inteira rende mais que
-  # acertar a densidade de um dos testes.
+  # As duas coletas reais discordam por um fator de cinco na densidade: o
+  # manual-full tem mediana de 14,5 caixas por imagem (máximo 40) e o CitDet,
+  # 78 (máximo 233). O gerador sorteia dos dois regimes — a maioria das cenas
+  # da faixa esparsa, uma minoria da densa — para que o pool contenha tanto
+  # imagem de pomar visto de perto quanto de longe. A média resultante fica
+  # próxima da densidade do conjunto real anotado à mão, e a variedade entre
+  # cenas fica a cargo da mistura, não de um valor médio único.
   dense:
-    probability: 0.50
+    probability: 0.06
     min: 60
-    max: 200
+    max: 110
 placement:
   min_depth: 20
   min_visibility: 0.15
   max_attempts_per_object: 100
-  z_method: center_patch
   z_patch_fraction: 0.2
   z_offset: -5
   z_offset_jitter: 30
   exclude_bottom_fraction: 0.15
 appearance:
-  hardlight_power: 0.65
   # Os recortes-fonte são fotos de fruta madura; sem isso, o pool sintético
   # nunca teria fruta verde/em maturação, embora pomares reais tenham. Gira
   # o matiz de uma fração dos objetos em direção a um verde-amarelado (mais
@@ -68,7 +65,6 @@ appearance:
     range: [0.40, 1.90]
     saturation_pull: 0.35
   hsv_cast:
-    enabled: true
     use_hardlight_target: true
     hue_power: 0.12
     saturation_power: 0.18
@@ -82,11 +78,9 @@ occlusion:
   mask_threshold: 0.5
   edge_feather_radius: 0.8
   contact_shadow:
-    enabled: true
     strength: 0.45
     radius_fraction: 0.04
   cast_shadow:
-    enabled: true
     probability: 0.4
     strength: 0.4
     min_coverage: 0.3
@@ -101,7 +95,6 @@ annotation:
 output:
   jpeg_quality: 95
   scene_grading:
-    enabled: true
     contrast: 1.2
     saturation: 1.0
     brightness: 0.82

@@ -174,12 +174,9 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("objects.dense: intervalo inválido")
     if not 0 < float(objects["min_scale"]) <= float(objects["max_scale"]):
         raise ValueError("intervalo de escala inválido")
-    if objects["scale_mode"] not in {"cutout", "canvas"}:
-        raise ValueError("scale_mode deve ser cutout ou canvas")
     depth_scale = objects.get("depth_scale")
     if (
         depth_scale
-        and depth_scale.get("enabled", False)
         and not (
             0 < float(depth_scale["far_scale"]) <= float(depth_scale["near_scale"])
         )
@@ -192,18 +189,14 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
-    z_method = config["placement"]["z_method"]
-    if z_method not in {"quantile", "mean_plus_std", "center_patch"}:
-        raise ValueError(f"z_method desconhecido: {z_method}")
-    if z_method == "center_patch":
-        patch_fraction = float(config["placement"].get("z_patch_fraction", 0.2))
-        if not 0 < patch_fraction <= 1:
-            raise ValueError(
-                "placement.z_patch_fraction deve estar entre 0 (exclusivo) e 1"
-            )
-        z_offset_jitter = float(config["placement"].get("z_offset_jitter", 0.0))
-        if z_offset_jitter < 0:
-            raise ValueError("placement.z_offset_jitter não pode ser negativo")
+    patch_fraction = float(config["placement"].get("z_patch_fraction", 0.2))
+    if not 0 < patch_fraction <= 1:
+        raise ValueError(
+            "placement.z_patch_fraction deve estar entre 0 (exclusivo) e 1"
+        )
+    z_offset_jitter = float(config["placement"].get("z_offset_jitter", 0.0))
+    if z_offset_jitter < 0:
+        raise ValueError("placement.z_offset_jitter não pode ser negativo")
     exclude_bottom = config["placement"].get("exclude_bottom_fraction", 0.0)
     if not 0 <= float(exclude_bottom) < 1:
         raise ValueError("placement.exclude_bottom_fraction deve estar entre 0 e 1")
@@ -212,10 +205,8 @@ def validate_synthesis_config(config: dict) -> None:
     if obsolete:
         options = ", ".join(f"appearance.{name}" for name in sorted(obsolete))
         raise ValueError(f"texturas de iluminação não são suportadas; remova {options}")
-    if not 0 <= float(appearance["hardlight_power"]) <= 1:
-        raise ValueError("appearance.hardlight_power deve estar entre 0 e 1")
     hsv_cast = appearance.get("hsv_cast")
-    if hsv_cast and hsv_cast.get("enabled", False):
+    if hsv_cast:
         for key in ("hue_power", "saturation_power", "value_power"):
             if not 0 <= float(hsv_cast[key]) <= 1:
                 raise ValueError(f"appearance.hsv_cast.{key} deve estar entre 0 e 1")
@@ -263,7 +254,7 @@ def validate_synthesis_config(config: dict) -> None:
                 "appearance.exposure_jitter.saturation_pull deve estar entre 0 e 1"
             )
     grading = config["output"].get("scene_grading")
-    if grading and grading.get("enabled", False):
+    if grading:
         for key in ("contrast", "saturation", "brightness"):
             if key in grading and float(grading[key]) <= 0:
                 raise ValueError(f"output.scene_grading.{key} deve ser positivo")
@@ -277,7 +268,7 @@ def validate_synthesis_config(config: dict) -> None:
     if float(edge_feather_radius) < 0:
         raise ValueError("occlusion.edge_feather_radius não pode ser negativo")
     contact_shadow = config["occlusion"].get("contact_shadow")
-    if contact_shadow and contact_shadow.get("enabled", False):
+    if contact_shadow:
         strength = float(contact_shadow.get("strength", 0.0))
         radius_fraction = float(contact_shadow.get("radius_fraction", 0.04))
         if not 0 <= strength <= 1:
@@ -288,7 +279,7 @@ def validate_synthesis_config(config: dict) -> None:
                 "(exclusivo) e 0.5"
             )
     cast_shadow = config["occlusion"].get("cast_shadow")
-    if cast_shadow and cast_shadow.get("enabled", False):
+    if cast_shadow:
         probability = float(cast_shadow.get("probability", 0.4))
         strength = float(cast_shadow.get("strength", 0.25))
         min_coverage = float(cast_shadow.get("min_coverage", 0.3))
@@ -376,32 +367,13 @@ def _trim_alpha(image: Image.Image, threshold: int = 1) -> Image.Image:
 def _scale_cutout(
     image: Image.Image, config: dict, rng: random.Random, canvas: tuple[int, int]
 ) -> Image.Image:
+    # A escala é sempre relativa ao canvas: o tamanho aparente da fruta na
+    # imagem é o que precisa casar com a distribuição real de caixas, e ele não
+    # depende da resolução do recorte-fonte.
     fraction = rng.uniform(float(config["min_scale"]), float(config["max_scale"]))
-    if config["scale_mode"] == "cutout":
-        scale = fraction
-    else:
-        scale = fraction * min(canvas) / max(image.size)
+    scale = fraction * min(canvas) / max(image.size)
     size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
     return image.resize(size, Image.Resampling.LANCZOS)
-
-
-def _apply_appearance_hardlight(
-    fruit: Image.Image,
-    background_region: Image.Image,
-    appearance: dict,
-) -> Image.Image:
-    alpha = fruit.getchannel("A")
-    rgb = fruit.convert("RGB")
-    mean = tuple(
-        round(value) for value in ImageStat.Stat(background_region.convert("RGB")).mean
-    )
-    color = Image.new("RGB", fruit.size, mean)
-    hardlight = ImageChops.hard_light(rgb, color)
-    power = min(max(float(appearance["hardlight_power"]), 0.0), 1.0)
-    rgb = Image.blend(rgb, hardlight, power)
-    result = rgb.convert("RGBA")
-    result.putalpha(alpha)
-    return result
 
 
 def _apply_appearance_hsv_cast(
@@ -600,11 +572,9 @@ def _apply_appearance(
     ripeness = appearance.get("ripeness")
     if ripeness and ripeness.get("enabled", False) and rng is not None:
         fruit = _apply_ripeness_shift(fruit, ripeness, rng)
-    hsv_cast = appearance.get("hsv_cast")
-    if hsv_cast and hsv_cast.get("enabled", False):
-        fruit = _apply_appearance_hsv_cast(fruit, background_region, hsv_cast, rng)
-    else:
-        fruit = _apply_appearance_hardlight(fruit, background_region, appearance)
+    fruit = _apply_appearance_hsv_cast(
+        fruit, background_region, appearance["hsv_cast"], rng
+    )
     exposure = appearance.get("exposure_jitter")
     if exposure and exposure.get("enabled", False) and rng is not None:
         fruit = _apply_exposure_jitter(fruit, exposure, rng)
@@ -618,7 +588,7 @@ def _apply_occlusion_contact_shadow(
     occlusion: dict,
 ) -> Image.Image:
     contact_shadow = occlusion.get("contact_shadow")
-    if not contact_shadow or not contact_shadow.get("enabled", False):
+    if not contact_shadow:
         return fruit
     # Uma folha que passa à frente não produz apenas um recorte geométrico:
     # ela também bloqueia parte da luz na faixa imediatamente vizinha da
@@ -717,7 +687,7 @@ def _apply_cast_shadow(
     rng: random.Random,
 ) -> Image.Image:
     cast_shadow = occlusion.get("cast_shadow")
-    if not cast_shadow or not cast_shadow.get("enabled", False):
+    if not cast_shadow:
         return fruit
     probability = min(max(float(cast_shadow.get("probability", 0.4)), 0.0), 1.0)
     if rng.random() > probability:
@@ -792,56 +762,45 @@ def _finish_placement(
     local_values = region_depth[opaque]
     if not len(local_values):
         return None
-    if placement["z_method"] == "quantile":
+    # O Z da fruta deve vir do ponto onde ela foi ancorada, não de um
+    # quantil calculado sobre toda a sua silhueta. O quantil local força
+    # quase a mesma fração de oclusão em toda inserção (por exemplo, q=.65
+    # oculta aproximadamente 35%), mesmo quando não há uma camada física
+    # coerente à frente. Uma pequena mediana ao redor da âncora é robusta
+    # a ruído de um pixel sem perder a interpretação de eixo Z.
+    anchor_x, anchor_y = anchor or (fruit.width // 2, fruit.height // 2)
+    patch_size = max(
+        1,
+        round(
+            min(fruit.width, fruit.height)
+            * float(placement.get("z_patch_fraction", 0.2))
+        ),
+    )
+    half_before = patch_size // 2
+    half_after = patch_size - half_before
+    left = max(0, anchor_x - half_before)
+    right = min(fruit.width, anchor_x + half_after)
+    top = max(0, anchor_y - half_before)
+    bottom = min(fruit.height, anchor_y + half_after)
+    patch_opaque = opaque[top:bottom, left:right]
+    placement_values = region_depth[top:bottom, left:right][patch_opaque]
+    if not len(placement_values):
         placement_values = local_values
-        z_value = float(np.quantile(local_values, float(placement["z_quantile"])))
-    elif placement["z_method"] == "mean_plus_std":
-        placement_values = local_values
-        z_value = float(local_values.mean()) + float(
-            placement["z_std_multiplier"]
-        ) * float(local_values.std())
-    elif placement["z_method"] == "center_patch":
-        # O Z da fruta deve vir do ponto onde ela foi ancorada, não de um
-        # quantil calculado sobre toda a sua silhueta. O quantil local força
-        # quase a mesma fração de oclusão em toda inserção (por exemplo, q=.65
-        # oculta aproximadamente 35%), mesmo quando não há uma camada física
-        # coerente à frente. Uma pequena mediana ao redor da âncora é robusta
-        # a ruído de um pixel sem perder a interpretação de eixo Z.
-        anchor_x, anchor_y = anchor or (fruit.width // 2, fruit.height // 2)
-        patch_size = max(
-            1,
-            round(
-                min(fruit.width, fruit.height)
-                * float(placement.get("z_patch_fraction", 0.2))
-            ),
+    z_offset = float(placement.get("z_offset", 0.0))
+    z_offset_jitter = float(placement.get("z_offset_jitter", 0.0))
+    if z_offset_jitter > 0:
+        # Um offset fixo desloca o limiar igualmente em toda inserção,
+        # então quase nenhuma fruta sai totalmente visível nem totalmente
+        # oculta: a variação vem só da geometria local, que é estreita.
+        # Sortear o offset por tentativa (mesmo rng da posição, then
+        # determinístico pela seed) alarga essa distribuição para incluir
+        # os dois extremos.
+        sampler = rng or random.Random()
+        z_offset = sampler.uniform(
+            z_offset - z_offset_jitter, z_offset + z_offset_jitter
         )
-        half_before = patch_size // 2
-        half_after = patch_size - half_before
-        left = max(0, anchor_x - half_before)
-        right = min(fruit.width, anchor_x + half_after)
-        top = max(0, anchor_y - half_before)
-        bottom = min(fruit.height, anchor_y + half_after)
-        patch_opaque = opaque[top:bottom, left:right]
-        placement_values = region_depth[top:bottom, left:right][patch_opaque]
-        if not len(placement_values):
-            placement_values = local_values
-        z_offset = float(placement.get("z_offset", 0.0))
-        z_offset_jitter = float(placement.get("z_offset_jitter", 0.0))
-        if z_offset_jitter > 0:
-            # Um offset fixo desloca o limiar igualmente em toda inserção,
-            # então quase nenhuma fruta sai totalmente visível nem totalmente
-            # oculta: a variação vem só da geometria local, que é estreita.
-            # Sortear o offset por tentativa (mesmo rng da posição, then
-            # determinístico pela seed) alarga essa distribuição para incluir
-            # os dois extremos.
-            sampler = rng or random.Random()
-            z_offset = sampler.uniform(
-                z_offset - z_offset_jitter, z_offset + z_offset_jitter
-            )
-        z_value = float(np.median(placement_values)) + z_offset
-        z_value = float(np.clip(z_value, 0.0, 255.0))
-    else:
-        raise ValueError(f"z_method desconhecido: {placement['z_method']}")
+    z_value = float(np.median(placement_values)) + z_offset
+    z_value = float(np.clip(z_value, 0.0, 255.0))
     if float(np.median(placement_values)) < float(placement["min_depth"]):
         return None
     visibility = (region_depth <= z_value).astype(np.uint8) * 255
@@ -946,32 +905,6 @@ def _resolve_depth_scale(proximity: float, depth_scale: dict) -> float:
     return far + (near - far) * proximity
 
 
-def _sample_clustered_center(
-    instances: list, clustering: dict, rng: random.Random, size: tuple[int, int]
-) -> tuple[int, int] | None:
-    # Fruta real nasce em cacho, presa ao mesmo ramo: nos dois conjuntos reais
-    # cerca de metade das frutas tem vizinha a menos de 1,5 diametro, contra
-    # bem menos no sorteio uniforme. Ancorar parte das insercoes num vizinho ja
-    # colocado reproduz esse agrupamento sem mudar quantas frutas entram na
-    # cena.
-    if not instances:
-        return None
-    if rng.random() > float(clustering.get("probability", 0.0)):
-        return None
-    anchor = rng.choice(instances)
-    _, _, anchor_width, anchor_height = anchor["rect"]
-    diameter = max(1.0, (anchor_width * anchor_height) ** 0.5)
-    low, high = clustering.get("radius_range_diameters", [0.6, 2.0])
-    distance = rng.uniform(float(low), float(high)) * diameter
-    angle = rng.uniform(0.0, 2.0 * math.pi)
-    cx = anchor["x"] + anchor_width / 2 + distance * math.cos(angle)
-    cy = anchor["y"] + anchor_height / 2 + distance * math.sin(angle)
-    width, height = size
-    if not (0 <= cx < width and 0 <= cy < height):
-        return None
-    return int(cx), int(cy)
-
-
 def _placement_with_depth_scale(
     canvas: Image.Image,
     depth: np.ndarray,
@@ -979,7 +912,6 @@ def _placement_with_depth_scale(
     config: dict,
     rng: random.Random,
     depth_scale: dict,
-    instances: list | None = None,
 ) -> dict | None:
     # A escala de referência (`_scale_cutout`) já fixou uma fração
     # aleatória; aqui essa fração é modulada pela profundidade local do
@@ -989,18 +921,9 @@ def _placement_with_depth_scale(
     width, height = canvas.size
     placement = config["placement"]
     exclude_bottom = float(placement.get("exclude_bottom_fraction", 0.0))
-    clustering = placement.get("clustering")
     for _ in range(int(placement["max_attempts_per_object"])):
-        clustered = (
-            _sample_clustered_center(instances or [], clustering, rng, (width, height))
-            if clustering and clustering.get("enabled", False)
-            else None
-        )
-        if clustered is not None:
-            cx, cy = clustered
-        else:
-            cx = rng.randint(0, width - 1)
-            cy = rng.randint(0, height - 1)
+        cx = rng.randint(0, width - 1)
+        cy = rng.randint(0, height - 1)
         if exclude_bottom > 0 and cy > height * (1 - exclude_bottom):
             continue
         proximity = float(depth[cy, cx]) / 255.0
@@ -1181,7 +1104,7 @@ def _render_one(task: dict) -> dict:
         Path(pair["image"]), Path(pair["depth"]), canvas_size
     )
     grading = config["output"].get("scene_grading")
-    if grading and grading.get("enabled", False):
+    if grading:
         # Aplicado só no fundo, antes de colar qualquer fruta: um realce
         # aplicado na cena inteira já composta também "esculpe" as frutas
         # já ajustadas pelo hsv_cast, empilhando saturação/nitidez até
@@ -1234,9 +1157,9 @@ def _render_one(task: dict) -> dict:
             rejected["larger_than_canvas"] += 1
             continue
         depth_scale = config["objects"].get("depth_scale")
-        if depth_scale and depth_scale.get("enabled", False):
+        if depth_scale:
             instance = _placement_with_depth_scale(
-                canvas, depth, fruit, config, rng, depth_scale, instances
+                canvas, depth, fruit, config, rng, depth_scale
             )
         else:
             instance = _placement(canvas, depth, fruit, config, rng)
@@ -1397,16 +1320,6 @@ def generate_dataset(
         ],
         "cutouts": [str(asset_root / path) for path in source_assets["cutouts"]],
     }
-    # EXPLORATORIO: limita quantas identidades distintas de fruta o pool pode
-    # usar, mantendo tudo o mais igual. Serve para medir se o desempenho ainda
-    # depende do numero de recortes distintos ou se ja saturou.
-    pool_size = config["objects"].get("cutout_pool_size")
-    if pool_size:
-        # Aninhado: embaralha uma vez com semente fixa e corta o prefixo, entao
-        # o conjunto de 32 esta contido no de 64, que esta contido no de 127.
-        ordered = sorted(assets["cutouts"])
-        random.Random(int(config["seed"])).shuffle(ordered)
-        assets["cutouts"] = sorted(ordered[: int(pool_size)])
     if not assets["backgrounds"] or not assets["cutouts"]:
         raise RuntimeError("catálogo de ativos sintéticos vazio")
 

@@ -47,17 +47,23 @@ def tiny_config() -> dict:
             "max": 1,
             "min_scale": 0.25,
             "max_scale": 0.25,
-            "scale_mode": "canvas",
             "rotation_degrees": 0,
         },
         "placement": {
             "min_depth": 0,
             "min_visibility": 0.25,
             "max_attempts_per_object": 5,
-            "z_method": "quantile",
-            "z_quantile": 0.5,
         },
-        "appearance": {"hardlight_power": 0.0},
+        # hsv_cast neutro: nenhum canal adota o alvo ambiental, então a fruta
+        # sai idêntica ao recorte e os testes de geometria ficam isolados da
+        # etapa de aparência.
+        "appearance": {
+            "hsv_cast": {
+                "hue_power": 0.0,
+                "saturation_power": 0.0,
+                "value_power": 0.0,
+            }
+        },
         "occlusion": {"edge_blur": 0.0},
         "annotation": {"mode": "visible", "min_box_pixels": 2},
         "output": {"jpeg_quality": 90},
@@ -522,7 +528,6 @@ def test_center_patch_occlusion_config_validates_bounds(
     key: str, value: float, message: str
 ) -> None:
     config = tiny_config()
-    config["placement"]["z_method"] = "center_patch"
     if key == "z_patch_fraction":
         config["placement"][key] = value
     else:
@@ -557,7 +562,6 @@ def test_center_patch_anchors_z_and_binarizes_blurred_mask() -> None:
     config = tiny_config()
     config["placement"].update(
         {
-            "z_method": "center_patch",
             "z_patch_fraction": 0.1,
             "z_offset": 0.0,
             "min_visibility": 0.0,
@@ -593,7 +597,6 @@ def test_contact_shadow_darkens_only_next_to_occluded_region() -> None:
     config = tiny_config()
     config["placement"].update(
         {
-            "z_method": "center_patch",
             "z_patch_fraction": 0.1,
             "min_visibility": 0.0,
         }
@@ -702,7 +705,6 @@ def test_depth_scale_generation_is_deterministic_and_labels_are_valid(
 
 def test_z_offset_jitter_validates_non_negative() -> None:
     config = tiny_config()
-    config["placement"]["z_method"] = "center_patch"
     config["placement"]["z_offset_jitter"] = -1.0
     with pytest.raises(ValueError, match="z_offset_jitter"):
         validate_synthesis_config(config)
@@ -713,7 +715,6 @@ def test_z_offset_jitter_generation_is_deterministic(tmp_path: Path) -> None:
     output = tmp_path / "generated"
     build_assets(assets)
     config = tiny_config()
-    config["placement"]["z_method"] = "center_patch"
     config["placement"]["z_offset_jitter"] = 40.0
     first = generate_dataset(
         assets, output, config, train_ratio=0.5, split_seed=42, workers=1
