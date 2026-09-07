@@ -2,26 +2,29 @@
 
 Este documento descreve somente os dados que participam do protocolo atual:
 a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e o
-CitDet como teste externo. As contagens abaixo foram conferidas nos manifestos
-materializados pela pipeline.
+CitDet como avaliação em coleta externa. As contagens de imagens vêm da
+configuração; as caixas sintéticas totais são as publicadas em
+[RESULTS.md](RESULTS.md). A auditoria histórica da base manual é preservada abaixo.
 
 ## Visão geral
 
 | Conjunto | Papel | Treino | Validação | Teste | Caixas conhecidas |
 |---|---|---:|---:|---:|---:|
 | `manual-full` | referência com anotação humana | 104 | 26 | — | 2.093 |
-| `controlled` | ablação sem composição sintética | 284 | 71 | — | 127 |
-| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 2.043 |
-| `synthetic-2x` | síntese | 208 | 52 | — | 4.054 |
-| `synthetic-3x` | síntese | 312 | 78 | — | 6.017 |
-| `synthetic-5x` | síntese principal | 520 | 130 | — | 10.011 |
-| `synthetic-10x` | síntese para análise de saturação | 1.040 | 260 | — | 19.934 |
+| `controlled` | controle sem composição | 284 | 71 | — | 127 |
+| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 8.302 |
+| `synthetic-2x` | síntese | 208 | 52 | — | 18.084 |
+| `synthetic-3x` | síntese | 312 | 78 | — | 26.853 |
+| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 44.284 |
+| `synthetic-10x` | maior volume sintético avaliado | 1.040 | 260 | — | 91.623 |
 | CitDet | teste externo comum | — | — | 119 | 10.082 |
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
 de cada execução é escolhido sem consultar o CitDet; somente após a seleção ser
 congelada em `model_selection.json` o teste externo é preparado e avaliado. O
-split de treino do CitDet nunca é usado.
+split de treino do CitDet não é usado no treinamento dos detectores. Esse
+controle não impede calibração do gerador com estatísticas da avaliação,
+limitação presente nesta versão.
 
 Todas as condições são convertidas para detecção YOLO com uma única classe,
 `poncan`. No CitDet, isso significa colapsar as categorias de localização do
@@ -79,8 +82,8 @@ O pré-processamento produz:
 4. um catálogo que associa os 228 fundos aos respectivos mapas e indexa os 127
    recortes.
 
-O catálogo atual tem fingerprint `57736194067b48433e6c73d5`. Modelos e revisões
-do pré-processamento ficam registrados em
+O fingerprint do catálogo depende dos ativos e da versão do pré-processamento.
+Consulte-o no manifesto da execução. Modelos e revisões ficam registrados em
 `data/assets/regenerated/preprocess_manifest.json`, e a lista exata de ativos
 fica em `data/assets/regenerated/asset_catalog.json`.
 
@@ -92,8 +95,8 @@ automaticamente direitos sobre as imagens.
 ## Condição `controlled`
 
 `controlled` responde a uma pergunta específica: quanto o detector aprende com
-os ativos de campo antes de qualquer composição de cena? Ela é uma ablação, não
-uma versão reduzida da base manual e tampouco um conjunto sintético.
+os ativos de campo antes de qualquer composição de cena? Ela é uma condição de controle sem
+composição. Não isola uma única transformação do gerador.
 
 ### Construção
 
@@ -124,9 +127,10 @@ o compositor. Ela também expõe o detector a uma proporção alta de negativos
 
 Ela não reproduz a tarefa final: as fotos positivas são close-ups com uma fruta,
 enquanto as fotos reais anotadas e o CitDet contêm cenas de copa com muitas
-instâncias, oclusões e escalas. Uma diferença de desempenho entre `controlled`
-e os conjuntos sintéticos deve ser atribuída ao conjunto da composição,
-diversidade de poses e densidade de objetos — não apenas ao número de imagens.
+instâncias, oclusões e escalas. A comparação com os conjuntos sintéticos altera
+simultaneamente composição,
+escala, pose, densidade de objetos e número de caixas. Não permite atribuir
+o desempenho a apenas um desses fatores.
 
 ## Conjuntos sintéticos
 
@@ -136,53 +140,56 @@ O gerador cria primeiro um pool único de 1.300 identidades de cena em resoluç�
 720×960. Para cada identidade, uma semente estável determina toda a composição:
 
 1. escolhe um par fundo/mapa de profundidade do catálogo;
-2. solicita entre 1 e 30 recortes de fruta;
-3. varia escala, rotação e aparência de cada recorte;
-4. usa a profundidade local para ajustar escala, posição e oclusão por elementos
-   do fundo;
-5. aplica suavização de borda, sombra de contato e, probabilisticamente, sombra
-   projetada;
-6. calcula cada caixa sobre a parte **visível** da fruta após as oclusões;
-7. salva imagem, rótulo YOLO e metadados completos da cena.
+2. corrige contraste, brilho e nitidez do fundo antes de inserir frutas;
+3. solicita 1–30 frutas ou, com probabilidade de 50%, 60–200 frutas;
+4. sorteia escala-base e rotação do recorte;
+5. tenta posições, usa a proximidade local para ajustar escala e oclusão e
+   verifica a visibilidade mínima na inserção;
+6. ajusta matiz, HSV cast e exposição, aplica sombras e compõe a fruta,
+   atualizando a oclusão das instâncias anteriores;
+7. após todas as inserções, extrai cada caixa da parte visível final;
+8. salva imagem, rótulo YOLO e metadados da cena.
 
 Parâmetros que definem o pool confirmatório:
 
 | Propriedade | Valor atual |
 |---|---|
 | resolução gerada | 720×960, retrato |
-| objetos solicitados por cena | uniforme entre 1 e 30 |
-| escala relativa ao canvas | 0,02 a 0,065 |
+| objetos solicitados por cena | 1–30 ou 60–200, com 50% de probabilidade para cada faixa |
+| escala-base | maior lado do recorte = 0,01–0,065 do menor lado do canvas |
 | rotação | até ±180° |
 | escala guiada por profundidade | 0,6× (longe) a 1,3× (perto) |
 | visibilidade mínima na inserção | 15% |
 | região inferior excluída da colocação | 15% |
-| caixas | parte visível, mínimo de 2 pixels |
+| caixas | parte visível final, largura e altura mínimas de 2 px |
 | split do pool | 80/20, semente 42 |
 | qualidade JPEG | 95, sem subamostragem de croma |
 
 A configuração integral e versionável está em
-`configs/synthesis/confirmatory_pool.yaml`. Nos artefatos atuais, o pool contém
-19.934 caixas (média 15,33 e mediana 16 por imagem), usa todos os 127 recortes e
-225 dos 228 fundos. Foram inseridas 19.957 instâncias; 23 ficaram sem caixa final
-por terem menos de dois pixels visíveis. Não há cenas negativas no pool atual.
+`configs/synthesis/confirmatory_pool.yaml`. As contagens abaixo são as publicadas
+em [`RESULTS.md`](RESULTS.md), agregando
+treino e validação. O pool avaliado contém 91.623 caixas; as contagens da versão
+anterior, de 19.934 caixas, não descrevem o gerador atual. A divisão de caixas
+por split e a cobertura dos ativos precisam ser consultadas nos manifestos da
+execução, não inferidas da proporção de imagens.
 
 ### Formação de `synthetic-1x` a `synthetic-10x`
 
 O pool é dividido uma única vez em 1.040 cenas de treino e 260 de validação.
 Depois disso, cada condição toma prefixos crescentes de ambas as partições:
 
-| Condição | Imagens treino | Caixas treino | Imagens validação | Caixas validação |
-|---|---:|---:|---:|---:|
-| `synthetic-1x` | 104 | 1.650 | 26 | 393 |
-| `synthetic-2x` | 208 | 3.223 | 52 | 831 |
-| `synthetic-3x` | 312 | 4.783 | 78 | 1.234 |
-| `synthetic-5x` | 520 | 7.930 | 130 | 2.081 |
-| `synthetic-10x` | 1.040 | 15.798 | 260 | 4.136 |
+| Condição | Imagens treino | Imagens validação | Caixas totais publicadas |
+|---|---:|---:|---:|
+| `synthetic-1x` | 104 | 26 | 8.302 |
+| `synthetic-2x` | 208 | 52 | 18.084 |
+| `synthetic-3x` | 312 | 78 | 26.853 |
+| `synthetic-5x` | 520 | 130 | 44.284 |
+| `synthetic-10x` | 1.040 | 260 | 91.623 |
 
 Os conjuntos são estritamente aninhados: `2x` contém todas as cenas de `1x`,
 `3x` contém todas as de `2x` e assim por diante, tanto no treino quanto na
-validação. Isso isola o efeito de adicionar dados; não há cinco gerações
-independentes que introduziriam variação de composição entre condições.
+validação. Isso controla a identidade das cenas compartilhadas entre volumes. Não isola
+apenas o número de imagens, pois validação, caixas e passos por época variam.
 
 A identidade da cena é definida antes do split. Mudar apenas a proporção
 treino/validação não altera seus pixels ou rótulos. Cada registro em
@@ -197,14 +204,14 @@ manifesto do pool.
   recortes e fundos podem reaparecer em cenas diferentes de treino e validação;
   portanto, a validação sintética mede generalização para novas composições dos
   ativos conhecidos, não para um novo pomar.
-- Todas as cenas têm pelo menos uma anotação. Um modelo treinado somente em uma
-  condição sintética vê regiões de fundo, mas nenhuma imagem inteiramente
-  negativa; `controlled` é uma execução separada e não complementa esse treino.
+- Solicitar frutas não garante uma caixa final. A frequência de cenas negativas
+  deve ser consultada em `summary.json`; `controlled` é uma execução separada
+  e não acrescenta seus fundos negativos ao treino sintético.
 - Profundidade, segmentação e caixas visíveis são estimativas automáticas e
   podem propagar erros sistemáticos.
 - A aparência dos fundos disponíveis é mais difusa/nublada e em ângulo distinto
-  da base manual. O ajuste global de contraste, brilho e nitidez reduz, mas não
-  elimina, essa diferença de domínio.
+  da base manual. A correção tonal modifica o fundo antes da
+  composição; seu efeito isolado no desempenho não foi medido.
 - Como as condições são aninhadas, resultados entre tamanhos são comparáveis;
   porém, não estimam a variância que seria obtida com pools sintéticos gerados
   independentemente.
@@ -261,6 +268,11 @@ continuam obrigatórios. O arquivo e o teste materializado permanecem fora do
 Git por tamanho e licença.
 
 ### Como interpretar o resultado externo
+
+Nesta versão, estatísticas do CitDet orientaram ajustes do gerador. O conjunto
+é externo à coleta local, mas não foi mantido intocado durante o desenvolvimento.
+Esse uso limita conclusões confirmatórias mesmo que suas imagens não entrem
+no treinamento dos detectores.
 
 O CitDet não mede reconhecimento taxonômico de poncã: após o colapso de classes,
 mede detecção genérica de fruto cítrico. Seu alto número de objetos pequenos por

@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Consolida test_results_{citdet,manual_full_val}.json num Markdown único
 com tabelas comparativas e um gráfico de tendência (volume de dados sintéticos
-x mAP), para os dois testes externos mantidos após a fase confirmatória.
+x mAP), para CitDet e a validação manual reutilizada na avaliação.
 
 Não participa do pipeline reprodutível (`run_pipeline.sh`); é um script de
 análise executado manualmente sobre artefatos já gerados.
 """
+
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 from pathlib import Path
@@ -16,7 +18,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / "artifacts" / "confirmatory"
@@ -24,8 +25,8 @@ FIGURES = ROOT / "docs" / "figures" / "results"
 HEATMAPS_OUT = FIGURES / "heatmaps"
 
 TESTS = {
-    "citdet": "CitDet (externo, outro pomar/câmera)",
-    "manual_full_val": "manual-full · val (26 imgs, real, mesmo domínio dos fundos sintéticos)",
+    "citdet": "CitDet · coleta externa usada na calibração",
+    "manual_full_val": "Validação manual · reusada na seleção de manual-full",
 }
 
 CONDITION_ORDER = [
@@ -50,9 +51,9 @@ SYNTHETIC_CONDITIONS = [c for c in CONDITION_ORDER if c.startswith("synthetic-")
 
 DETECTOR_ORDER = ["yolov8s", "rtdetr-l", "yolo26s"]
 DETECTOR_COLOR = {
-    "yolov8s": "#2a78d6",   # categorical slot 1 (blue)
+    "yolov8s": "#2a78d6",  # categorical slot 1 (blue)
     "rtdetr-l": "#eb6834",  # categorical slot 2 (orange)
-    "yolo26s": "#1baf7a",   # categorical slot 3 (aqua)
+    "yolo26s": "#1baf7a",  # categorical slot 3 (aqua)
 }
 INK_PRIMARY = "#0b0b0b"
 INK_SECONDARY = "#52514e"
@@ -62,8 +63,8 @@ BASELINE = "#c3c2b7"
 SURFACE = "#fcfcfb"
 
 
-def load_results(name: str) -> dict:
-    path = ARTIFACTS / f"test_results_{name}.json"
+def load_results(name: str, directory: Path) -> dict:
+    path = directory / f"test_results_{name}.json"
     return json.loads(path.read_text(encoding="utf-8"))["summary"]
 
 
@@ -83,10 +84,18 @@ def markdown_table(name: str, summary: dict) -> str:
             row = summary.get(detector, {}).get(condition)
             if not row:
                 continue
-            flag = " ⚠️" if (name == "manual_full_val" and condition == "manual-full") else ""
+            flag = (
+                " [val]"
+                if (name == "manual_full_val" and condition == "manual-full")
+                else ""
+            )
             best = condition == best_condition
-            label = f"🏆 **{condition}**{flag}" if best else f"{condition}{flag}"
-            map_value = f"**{row['map50_95_mean']:.3f}**" if best else f"{row['map50_95_mean']:.3f}"
+            label = f"**{condition}**{flag}" if best else f"{condition}{flag}"
+            map_value = (
+                f"**{row['map50_95_mean']:.3f}**"
+                if best
+                else f"{row['map50_95_mean']:.3f}"
+            )
             lines.append(
                 f"| {detector} | {label} | {row['precision_mean']:.3f} | "
                 f"{row['recall_mean']:.3f} | {row['f1_mean']:.3f} | {row['map50_mean']:.3f} | "
@@ -94,88 +103,126 @@ def markdown_table(name: str, summary: dict) -> str:
                 f"{row['count_mae_mean']:.1f} |"
             )
     lines.append("")
-    lines.append("🏆 = maior mAP@.50:.95 para aquele detector, nesse teste.")
+    lines.append(
+        "Negrito = maior média observada; não indica significância estatística."
+    )
     lines.append("")
     return "\n".join(lines)
 
 
-def build_trend_chart(results_by_test: dict[str, dict]) -> Path:
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6), facecolor=SURFACE)
-    fig.subplots_adjust(wspace=0.32, top=0.86, bottom=0.16, left=0.07, right=0.97)
-
-    for ax, (test_name, summary) in zip(axes, results_by_test.items()):
+def build_trend_chart(
+    results_by_test: dict[str, dict], *, rounded: bool = False
+) -> Path:
+    # Fixed SVG IDs and no timestamp make the snapshot reproducible.
+    plt.rcParams["svg.hashsalt"] = "synthetic-fruit-results"
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5.2), sharey=True, facecolor=SURFACE)
+    fig.subplots_adjust(wspace=0.18, top=0.73, bottom=0.22, left=0.07, right=0.98)
+    maximum = max(
+        row["map50_95_mean"]
+        for summary in results_by_test.values()
+        for conditions in summary.values()
+        for row in conditions.values()
+    )
+    upper = min(1.0, max(0.6, maximum + 0.05))
+    for ax, (test_name, summary) in zip(axes, results_by_test.items(), strict=True):
         ax.set_facecolor(SURFACE)
-        ax.set_xticks([104, 208, 312, 520, 1040])
-        ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{int(v)}"))
-        ax.grid(axis="y", color=GRIDLINE, linewidth=1, zorder=0)
+        ax.set_ylim(0, upper)
+        ax.set_xlim(70, 1080)
+        ax.grid(axis="y", color=GRIDLINE, linewidth=0.8, zorder=0)
         for spine in ("top", "right"):
             ax.spines[spine].set_visible(False)
         for spine in ("left", "bottom"):
             ax.spines[spine].set_color(BASELINE)
-        ax.tick_params(colors=INK_MUTED, labelsize=9)
-
-        end_points = []
+        ax.tick_params(colors=INK_SECONDARY, labelsize=9)
         for detector in DETECTOR_ORDER:
             color = DETECTOR_COLOR[detector]
             xs = [TRAIN_IMAGES[c] for c in SYNTHETIC_CONDITIONS]
             ys = [summary[detector][c]["map50_95_mean"] for c in SYNTHETIC_CONDITIONS]
             ax.plot(
-                xs, ys, color=color, linewidth=2, marker="o", markersize=6,
-                solid_capstyle="round", zorder=3,
+                xs, ys, color=color, linewidth=2, marker="o", markersize=5, zorder=3
             )
-            manual_full = summary[detector]["manual-full"]["map50_95_mean"]
-            ax.axhline(manual_full, color=color, linewidth=1.2, linestyle=(0, (4, 3)), alpha=0.55, zorder=2)
-            end_points.append([detector, color, xs[-1], ys[-1]])
-
-        # Anti-colisão simples: garante espaçamento vertical mínimo entre
-        # rótulos cujos valores finais ficam próximos (ex.: yolo26s/yolov8s).
-        end_points.sort(key=lambda item: item[3], reverse=True)
-        y_range = max(p[3] for p in end_points) - min(p[3] for p in end_points)
-        min_gap = max(y_range * 0.16, 1e-6)
-        for i in range(1, len(end_points)):
-            if end_points[i - 1][3] - end_points[i][3] < min_gap:
-                end_points[i][3] = end_points[i - 1][3] - min_gap
-        for detector, color, x_end, y_label in end_points:
-            y_actual = summary[detector][SYNTHETIC_CONDITIONS[-1]]["map50_95_mean"]
-            ax.annotate(
-                detector, xy=(x_end, y_actual), xytext=(8, (y_label - y_actual) / y_range * 200 if y_range else 0),
-                textcoords="offset points", color=color, fontsize=9, fontweight="bold", va="center",
+            ax.axhline(
+                summary[detector]["manual-full"]["map50_95_mean"],
+                color=color,
+                linewidth=1.3,
+                linestyle=(0, (5, 3)),
+                alpha=0.8,
             )
-
-        ax.set_title(TESTS[test_name], fontsize=10.5, color=INK_PRIMARY, loc="left", pad=10)
-        ax.set_xlabel("imagens de treino (rótulo = synthetic-Nx)", fontsize=8.5, color=INK_SECONDARY)
-        ax.set_ylabel("mAP@0.50:0.95", fontsize=8.5, color=INK_SECONDARY)
-        ax.set_xticklabels(["1x\n104", "2x\n208", "3x\n312", "5x\n520", "10x\n1040"], fontsize=8)
-
-    handles = [
-        plt.Line2D([0], [0], color=DETECTOR_COLOR[d], linewidth=2, marker="o", markersize=6, label=d)
+            ax.axhline(
+                summary[detector]["controlled"]["map50_95_mean"],
+                color=color,
+                linewidth=1.4,
+                linestyle=(0, (1, 3)),
+                alpha=0.9,
+            )
+        ax.set_title(
+            TESTS[test_name], fontsize=10, color=INK_PRIMARY, loc="left", pad=12
+        )
+        ax.set_xticks(
+            [104, 208, 312, 520, 1040],
+            ["1x\n104", "2x\n208", "3x\n312", "5x\n520", "10x\n1.040"],
+        )
+        ax.set_xlabel("Volume sintético / imagens de treino", fontsize=10, labelpad=10)
+    axes[0].set_ylabel("mAP@0.50:0.95", fontsize=10)
+    model_handles = [
+        plt.Line2D([0], [0], color=DETECTOR_COLOR[d], linewidth=2, marker="o", label=d)
         for d in DETECTOR_ORDER
     ]
-    handles.append(
-        plt.Line2D([0], [0], color=INK_MUTED, linewidth=1.2, linestyle=(0, (4, 3)), alpha=0.7, label="manual-full (referência, mesmo detector)")
+    style_handles = [
+        plt.Line2D([0], [0], color=INK_SECONDARY, linewidth=1.4, label="synthetic-Nx"),
+        plt.Line2D(
+            [0],
+            [0],
+            color=INK_SECONDARY,
+            linewidth=1.4,
+            linestyle=(0, (5, 3)),
+            label="manual-full",
+        ),
+        plt.Line2D(
+            [0],
+            [0],
+            color=INK_SECONDARY,
+            linewidth=1.4,
+            linestyle=(0, (1, 3)),
+            label="controlled",
+        ),
+    ]
+    fig.suptitle(
+        "Desempenho por volume de dados sintéticos",
+        x=0.07,
+        ha="left",
+        y=0.98,
+        fontsize=16,
+        color=INK_PRIMARY,
     )
     fig.legend(
-        handles=handles, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=4,
-        frameon=False, fontsize=9, labelcolor=INK_SECONDARY,
+        handles=model_handles + style_handles,
+        loc="upper left",
+        bbox_to_anchor=(0.06, 0.92),
+        ncol=6,
+        frameon=False,
+        fontsize=9,
     )
-    fig.suptitle(
-        "mAP@0.50:0.95 por volume de dados sintéticos (condição controlled ≈ 0, fora de escala)",
-        fontsize=11, color=INK_PRIMARY, y=1.10,
-    )
-
+    note = "Médias de duas sementes; sem intervalos de incerteza."
+    if rounded:
+        note += " Fonte: médias publicadas, arredondadas a 3 casas."
+    fig.text(0.07, 0.04, note, fontsize=9, color=INK_SECONDARY)
     FIGURES.mkdir(parents=True, exist_ok=True)
     out_path = FIGURES / "synthetic-volume-vs-map.svg"
-    fig.savefig(out_path, facecolor=SURFACE, bbox_inches="tight")
+    fig.savefig(out_path, facecolor=SURFACE, metadata={"Date": None})
     plt.close(fig)
+    out_path.write_text(
+        "\n".join(line.rstrip() for line in out_path.read_text().splitlines()) + "\n"
+    )
     return out_path
 
 
-def copy_heatmaps() -> list[str]:
+def copy_heatmaps(directory: Path) -> list[str]:
     HEATMAPS_OUT.mkdir(parents=True, exist_ok=True)
     keep = CONDITION_ORDER + ["citdet", "manual_full_val"]
     copied = []
     for name in keep:
-        src = ARTIFACTS / "annotation_heatmaps" / f"{name}.png"
+        src = directory / "annotation_heatmaps" / f"{name}.png"
         if src.exists():
             dst = HEATMAPS_OUT / src.name
             shutil.copy2(src, dst)
@@ -189,17 +236,35 @@ def copy_detection_examples() -> list[str]:
 
 
 def main() -> None:
-    results = {name: load_results(name) for name in TESTS}
-    tables = "\n".join(markdown_table(name, summary) for name, summary in results.items())
-    chart_path = build_trend_chart(results)
-    heatmaps = copy_heatmaps()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        help="Use original test_results_*.json instead of the published snapshot",
+    )
+    args = parser.parse_args()
+    if args.results_dir:
+        results = {name: load_results(name, args.results_dir) for name in TESTS}
+    else:
+        snapshot = json.loads((ROOT / "docs/results-summary.json").read_text())
+        results = {name: snapshot["tests"][name] for name in TESTS}
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    tables = "\n".join(
+        markdown_table(name, summary) for name, summary in results.items()
+    )
+    chart_path = build_trend_chart(results, rounded=args.results_dir is None)
+    heatmaps = copy_heatmaps(args.results_dir) if args.results_dir else []
     examples = copy_detection_examples()
     print(f"tabelas geradas para: {list(results)}")
     print(f"gráfico salvo em: {chart_path.relative_to(ROOT)}")
     print(f"heatmaps copiados: {heatmaps}")
-    print(f"exemplos de detecção presentes: {examples or '(rode scripts/render_detection_examples.py antes)'}")
+    print(
+        f"exemplos de detecção presentes: {examples or '(rode scripts/render_detection_examples.py antes)'}"
+    )
     (ARTIFACTS / "results_tables.md").write_text(tables, encoding="utf-8")
-    print(f"tabelas markdown intermediárias em: {(ARTIFACTS / 'results_tables.md').relative_to(ROOT)}")
+    print(
+        f"tabelas markdown intermediárias em: {(ARTIFACTS / 'results_tables.md').relative_to(ROOT)}"
+    )
 
 
 if __name__ == "__main__":

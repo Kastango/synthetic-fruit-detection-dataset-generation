@@ -1,0 +1,57 @@
+{
+  "purpose": "Ilustração, não amostra do pool usado nos resultados publicados",
+  "loop_config_hash": "03cba86d726f99b19caede61",
+  "preview_summary": {
+    "annotations": {
+      "train": 5148,
+      "val": 1181
+    },
+    "asset_catalog_fingerprint": "09c2be12e9d9bf02e8189a21",
+    "asset_counts": {
+      "backgrounds": 228,
+      "cutouts": 127
+    },
+    "config_hash": "367395f5212cf3e297e277c0",
+    "generator_schema_version": 6,
+    "images": {
+      "train": 64,
+      "val": 16
+    },
+    "manifest_sha256": "c7993eda37d204358e2e3e51622c08da48a107b663e0da0d5bf34b944e9d96ac",
+    "name": "confirmatory_pool",
+    "negative_images": {
+      "train": 0,
+      "val": 0
+    },
+    "scene_split": {
+      "seed": 42,
+      "sha256": "e82b344ab9e773ef4d8af8b4e90d60733e983886af7454c1e18fbd58c93ff74f",
+      "train_ratio": 0.8
+    }
+  },
+  "scale_band": "Insertion cutout enlarged for legibility",
+  "backgrounds": [
+    "IMG_3466",
+    "IMG_3518",
+    "IMG_3541"
+  ],
+  "fruit_photos": [
+    "IMG_2145",
+    "IMG_2190",
+    "IMG_2217"
+  ],
+  "preview_scenes": [
+    "train_000000",
+    "train_000001",
+    "train_000002"
+  ],
+  "loop": {
+    "cutout": "img_2190-trimmed.png",
+    "background": "IMG_3466",
+    "rotation": 24,
+    "placement_seed": 13,
+    "x": 252,
+    "y": 283,
+    "visibility_at_insert": 0.5158
+  }
+}

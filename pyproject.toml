@@ -23,6 +23,7 @@ preprocess = [
   "transformers==5.15.0",
 ]
 dev = ["pytest==8.4.1"]
+diagrams = ["fonttools==4.63.0", "matplotlib==3.11.1"]
 
 [tool.setuptools]
 packages = ["fruit_pipeline"]
