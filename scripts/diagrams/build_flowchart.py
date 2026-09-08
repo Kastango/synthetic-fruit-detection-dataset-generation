@@ -681,10 +681,10 @@ def panel_generation() -> Canvas:
         C1,
         RB_Y,
         CW,
-        RH,
+        RH + 16,
         "loop_compor",
         ["Composite the fruit"],
-        ["Update prior visibility"],
+        ["Update visibility masks", "of previously placed fruit"],
     )
 
     node(
