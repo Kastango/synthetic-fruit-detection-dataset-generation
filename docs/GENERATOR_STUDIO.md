@@ -313,6 +313,15 @@ frequência sem mover o centro. É o único candidato que não perdeu no CitDet:
 perdido 0,0096. Na validação local, porém, caiu para 0,3667. Uma mistura
 recupera o eixo externo e custa no local; não é um ganho conjunto.
 
+`paired_highlights` recebeu duas sementes extras, 43 e 44, em
+`configs/hl4_yolov8.yaml`, por ser a única candidata que corrige um defeito
+objetivo, o teto de luminância de 209, e que ficava indistinguível da
+referência. Com quatro sementes de cada lado a diferença é de 0,0026 no CitDet
+e 0,0055 na validação local, isto é, 0,6 e 0,5 vezes o erro padrão da
+diferença. É um empate, com estimativas pontuais levemente negativas nos dois
+cenários: a correção não custa desempenho mensurável, mas também não é um
+ganho e não foi promovida por esse critério.
+
 Antes de aceitar o padrão de doze resultados negativos, a receita de referência
 foi regerada com o código atual e comparada byte a byte com o pool que foi
 treinado: as 312 imagens de treino são idênticas e o `config_hash` coincide,
