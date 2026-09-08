@@ -280,6 +280,50 @@ mudam de área, com razão mediana 1,042 e percentil 90 em 1,586, então a mudan
 é estrutural e não cosmética. O resultado foi 0,1991 no CitDet e 0,3702 na
 validação local, cerca de 2,8 desvios abaixo da referência no CitDet.
 
+Décima hipótese: a fração de fruta verde. A augmentação de treino usa
+`hsv_h: 0.015`, ou seja, quase não desloca o matiz, ao contrário de saturação e
+valor. Diferenças de matiz são portanto visíveis para o detector. Medindo o
+matiz mediano do núcleo interno de cada caixa, o sintético tem 17,5% de fruta
+verde contra 6,0% no treino manual, 5,3% na validação local e 13,7% no CitDet.
+A precisão do modelo sintético é 0,803 contra 0,925 do real, compatível com um
+detector treinado com excesso de esfera verde. `paired_ripeness` baixa
+`ripeness.fraction_affected` de 0,18 para 0,06. A sonda mostra que o parâmetro
+responde por cerca de quatro pontos e que há um piso de aproximadamente 13%
+vindo dos próprios recortes do catálogo, alguns naturalmente verdes: o
+resultado é 14,0% de verde, sobre os 13,7% do CitDet. O treino ficou em 0,2037
+no CitDet e 0,3775 na validação local, ou seja, perda de 0,0067 e empate.
+
+Décima primeira hipótese: o piso de visibilidade. `placement.min_visibility`
+rejeita colocações abaixo de 15% de área visível, e o diagnóstico mostra que é
+justamente a fruta muito escondida que o detector não encontra: recall de 0,375
+nas caixas com menos de 10% de pixels alaranjados, contra 0,910 acima de 45%.
+`paired_visibility` baixa o piso para 0,05. A contagem de caixas por imagem não
+muda, 18,8 nos dois casos, porque uma colocação recusada é sorteada de novo; o
+que muda é a mistura, com as caixas abaixo de 20% de laranja indo de 31,2% para
+34,7%, contra 33,7% do treino manual. O resultado foi 0,1968 no CitDet e 0,3679
+na validação local, cerca de 3,4 desvios abaixo da referência.
+
+Décima segunda: mistura em vez de deslocamento. As receitas de aparência
+produzem rótulos byte a byte iguais, isto é, as mesmas cenas renderizadas de
+outra forma, o que permite montar um conjunto misto sem código novo.
+`paired_mixture` alterna cena a cena entre `paired_reference` e
+`paired_sharpness`, 195 imagens de cada, aumentando a variância no eixo de alta
+frequência sem mover o centro. É o único candidato que não perdeu no CitDet:
+0,2105 contra 0,2104 da referência, enquanto a receita pura de nitidez havia
+perdido 0,0096. Na validação local, porém, caiu para 0,3667. Uma mistura
+recupera o eixo externo e custa no local; não é um ganho conjunto.
+
+Antes de aceitar o padrão de doze resultados negativos, a receita de referência
+foi regerada com o código atual e comparada byte a byte com o pool que foi
+treinado: as 312 imagens de treino são idênticas e o `config_hash` coincide,
+apesar de o SHA-256 do compositor ter mudado. As opções acrescentadas são
+neutras na saída quando não são ativadas, e as comparações do ciclo são válidas.
+
+A seleção de checkpoint também foi verificada, porque ela usa a validação
+sintética. Comparando `best.pt` e `last.pt` nas quatro corridas da referência,
+`best.pt` vence por 0,007 a 0,018 em três delas e empata na quarta, nos dois
+cenários. A regra de seleção atual não está deixando desempenho na mesa.
+
 ## Controle de reprodutibilidade e leitura do ciclo
 
 Depois de oito candidatas todas abaixo da referência no CitDet, a mesma receita
@@ -329,15 +373,31 @@ treino real, que usa a augmentação completa.
 
 ## Situação ao fim do ciclo
 
-Nove candidatas de gerador e uma sonda de protocolo foram medidas contra
+Doze candidatas de gerador e uma sonda de protocolo foram medidas contra
 `paired_reference`, todas com duas sementes e avaliação nos dois cenários.
 Nenhuma superou a referência em nenhum dos dois. Sob o piso de ruído do
 controle, `paired_count_scale` e `paired_highlights` empatam, `paired_saturation`
 e `paired_exposure` ficam perto de um desvio, e `paired_canopy`,
 `paired_sharpness`, `paired_occlusion`, `paired_relief` e `paired_shade` são
-pioras de duas a cinco vezes o desvio. A receita de referência permanece a
-recomendada e nada foi promovido. A grade completa não foi executada porque
-ela só se justifica após um ganho, e não houve.
+pioras de duas a cinco vezes o desvio. `paired_ripeness` e `paired_visibility` também
+regridem, a primeira dentro de dois desvios e a segunda em 3,4. A receita de
+referência permanece a recomendada e nada foi promovido. A grade completa não
+foi executada porque ela só se justifica após um ganho, e não houve.
+
+Doze perturbações de mecanismo único a partir da mesma receita, todas negativas
+ou empatadas, com média de cerca de 0,009 abaixo no CitDet, descrevem um ótimo
+estreito e não um platô. Isso é coerente com a origem da receita, que já é
+produto de afinação em ciclos anteriores. As duas alavancas que a história do
+projeto registra como eficazes, a exposição por instância e a densidade de
+cena, já estão nela nos valores escolhidos.
+
+O que resta como caminho não é outro parâmetro de aparência. As distribuições
+mensuráveis já coincidem, a augmentação cobre cor e luminância, a seleção de
+checkpoint está correta e as mudanças de estrutura pioram. A única alavanca que
+a história do projeto associa a um salto no CitDet é a proporção de cenas
+densas, hoje fixada em 6% por uma decisão de projeto que casa as 104 imagens
+com as 2.093 caixas reais do conjunto manual. Alterá-la é uma decisão de
+escopo, não uma hipótese técnica, e não foi tomada aqui.
 
 As distribuições que este ciclo sabe medir já coincidem entre sintético e real:
 contagem por imagem, tamanho da caixa no espaço de entrada da rede, posição

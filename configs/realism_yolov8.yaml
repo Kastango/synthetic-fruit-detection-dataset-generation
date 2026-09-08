@@ -71,6 +71,27 @@ conditions:
     manifests:
     - data/generated/paired_occlusion/manifest.jsonl
     - data/generated/paired_occlusion/generation_config.json
+  paired_ripeness:
+    train:
+    - data/generated/paired_ripeness/images/train
+    validation: data/generated/paired_ripeness/images/val
+    manifests:
+    - data/generated/paired_ripeness/manifest.jsonl
+    - data/generated/paired_ripeness/generation_config.json
+  paired_visibility:
+    train:
+    - data/generated/paired_visibility/images/train
+    validation: data/generated/paired_visibility/images/val
+    manifests:
+    - data/generated/paired_visibility/manifest.jsonl
+    - data/generated/paired_visibility/generation_config.json
+  paired_mixture:
+    train:
+    - data/generated/paired_mixture/images/train
+    validation: data/generated/paired_mixture/images/val
+    manifests:
+    - data/generated/paired_mixture/manifest.jsonl
+    - data/generated/paired_mixture/generation_config.json
 models:
 - name: yolov8s
   checkpoint: yolov8s.pt

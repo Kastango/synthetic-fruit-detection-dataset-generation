@@ -1192,6 +1192,176 @@
       ]
     },
     {
+      "condition": "paired_mixture",
+      "domain": "citdet",
+      "map50_95_mean": 0.2105375,
+      "runs": [
+        {
+          "checkpoint_sha256": "e711bf27a15442c9e0d294d38561c47a570a19b99f18cc51f8ef22361d1201f1",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.516957,
+              "0.55": 0.468761,
+              "0.60": 0.402948,
+              "0.65": 0.31724,
+              "0.70": 0.220497,
+              "0.75": 0.12985,
+              "0.80": 0.065303,
+              "0.85": 0.021706,
+              "0.90": 0.005095,
+              "0.95": 0.000192
+            },
+            "best_f1": 0.564252,
+            "best_f1_confidence": 0.195195,
+            "f1": 0.563411,
+            "map50": 0.516957,
+            "map50_95": 0.214855,
+            "map75": 0.12985,
+            "per_class": {
+              "poncan": {
+                "map50": 0.516957,
+                "map50_95": 0.214855
+              }
+            },
+            "precision": 0.723292,
+            "recall": 0.461416,
+            "speed_ms_per_image": {
+              "inference": 9.195624,
+              "loss": 0.007328,
+              "postprocess": 6.831928,
+              "preprocess": 1.313968
+            }
+          },
+          "run_id": "paired_mixture__yolov8s__s41__c3da4e558b",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "1f3fa4e8edbce4904cba71839368a7062d344fd7fb728b448854bbbed391c412",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.511915,
+              "0.55": 0.456129,
+              "0.60": 0.388159,
+              "0.65": 0.298607,
+              "0.70": 0.201359,
+              "0.75": 0.118605,
+              "0.80": 0.058481,
+              "0.85": 0.022008,
+              "0.90": 0.006616,
+              "0.95": 0.000323
+            },
+            "best_f1": 0.560002,
+            "best_f1_confidence": 0.184184,
+            "f1": 0.559034,
+            "map50": 0.511915,
+            "map50_95": 0.20622,
+            "map75": 0.118605,
+            "per_class": {
+              "poncan": {
+                "map50": 0.511915,
+                "map50_95": 0.20622
+              }
+            },
+            "precision": 0.702127,
+            "recall": 0.464392,
+            "speed_ms_per_image": {
+              "inference": 8.96434,
+              "loss": 0.000498,
+              "postprocess": 6.964891,
+              "preprocess": 1.264128
+            }
+          },
+          "run_id": "paired_mixture__yolov8s__s42__ece1cbd9d1",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_mixture",
+      "domain": "manual_full_val",
+      "map50_95_mean": 0.36665400000000004,
+      "runs": [
+        {
+          "checkpoint_sha256": "e711bf27a15442c9e0d294d38561c47a570a19b99f18cc51f8ef22361d1201f1",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.649973,
+              "0.55": 0.622499,
+              "0.60": 0.570972,
+              "0.65": 0.513143,
+              "0.70": 0.457212,
+              "0.75": 0.364273,
+              "0.80": 0.295783,
+              "0.85": 0.175693,
+              "0.90": 0.027151,
+              "0.95": 0.001024
+            },
+            "best_f1": 0.664888,
+            "best_f1_confidence": 0.278278,
+            "f1": 0.658915,
+            "map50": 0.649973,
+            "map50_95": 0.367772,
+            "map75": 0.364273,
+            "per_class": {
+              "poncan": {
+                "map50": 0.649973,
+                "map50_95": 0.367772
+              }
+            },
+            "precision": 0.757309,
+            "recall": 0.583149,
+            "speed_ms_per_image": {
+              "inference": 15.855252,
+              "loss": 0.000672,
+              "postprocess": 2.795568,
+              "preprocess": 5.742658
+            }
+          },
+          "run_id": "paired_mixture__yolov8s__s41__c3da4e558b",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "1f3fa4e8edbce4904cba71839368a7062d344fd7fb728b448854bbbed391c412",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.645077,
+              "0.55": 0.612308,
+              "0.60": 0.566797,
+              "0.65": 0.507521,
+              "0.70": 0.445848,
+              "0.75": 0.385865,
+              "0.80": 0.289234,
+              "0.85": 0.16581,
+              "0.90": 0.036037,
+              "0.95": 0.000863
+            },
+            "best_f1": 0.667488,
+            "best_f1_confidence": 0.375375,
+            "f1": 0.6632,
+            "map50": 0.645077,
+            "map50_95": 0.365536,
+            "map75": 0.385865,
+            "per_class": {
+              "poncan": {
+                "map50": 0.645077,
+                "map50_95": 0.365536
+              }
+            },
+            "precision": 0.757464,
+            "recall": 0.5898,
+            "speed_ms_per_image": {
+              "inference": 17.379511,
+              "loss": 0.000625,
+              "postprocess": 1.263414,
+              "preprocess": 4.688085
+            }
+          },
+          "run_id": "paired_mixture__yolov8s__s42__ece1cbd9d1",
+          "seed": 42
+        }
+      ]
+    },
+    {
       "condition": "paired_occlusion",
       "domain": "citdet",
       "map50_95_mean": 0.199064,
@@ -1527,6 +1697,176 @@
             }
           },
           "run_id": "paired_relief__yolov8s__s42__33e58090ab",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_ripeness",
+      "domain": "citdet",
+      "map50_95_mean": 0.20369150000000003,
+      "runs": [
+        {
+          "checkpoint_sha256": "71c6952f4665cbbba999f79583469c5cfaa1566b5bc9d2e755ba2e94a04c5a35",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.50245,
+              "0.55": 0.450213,
+              "0.60": 0.384778,
+              "0.65": 0.299916,
+              "0.70": 0.206781,
+              "0.75": 0.11908,
+              "0.80": 0.059034,
+              "0.85": 0.017262,
+              "0.90": 0.003611,
+              "0.95": 0.00018
+            },
+            "best_f1": 0.554689,
+            "best_f1_confidence": 0.249249,
+            "f1": 0.554689,
+            "map50": 0.50245,
+            "map50_95": 0.204331,
+            "map75": 0.11908,
+            "per_class": {
+              "poncan": {
+                "map50": 0.50245,
+                "map50_95": 0.204331
+              }
+            },
+            "precision": 0.708707,
+            "recall": 0.455664,
+            "speed_ms_per_image": {
+              "inference": 9.228381,
+              "loss": 0.004402,
+              "postprocess": 7.850897,
+              "preprocess": 1.302294
+            }
+          },
+          "run_id": "paired_ripeness__yolov8s__s41__da273b5e07",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "ea4a31a3571ed4e10efa8814645cac3b5d5920656505b7f2ac4a0a48221b50a0",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.505293,
+              "0.55": 0.45284,
+              "0.60": 0.38209,
+              "0.65": 0.295195,
+              "0.70": 0.19944,
+              "0.75": 0.11458,
+              "0.80": 0.056626,
+              "0.85": 0.018138,
+              "0.90": 0.004651,
+              "0.95": 0.001667
+            },
+            "best_f1": 0.555728,
+            "best_f1_confidence": 0.261261,
+            "f1": 0.555166,
+            "map50": 0.505293,
+            "map50_95": 0.203052,
+            "map75": 0.11458,
+            "per_class": {
+              "poncan": {
+                "map50": 0.505293,
+                "map50_95": 0.203052
+              }
+            },
+            "precision": 0.695149,
+            "recall": 0.462111,
+            "speed_ms_per_image": {
+              "inference": 9.011428,
+              "loss": 0.049448,
+              "postprocess": 7.044638,
+              "preprocess": 1.341769
+            }
+          },
+          "run_id": "paired_ripeness__yolov8s__s42__6fe09d863b",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_ripeness",
+      "domain": "manual_full_val",
+      "map50_95_mean": 0.377488,
+      "runs": [
+        {
+          "checkpoint_sha256": "71c6952f4665cbbba999f79583469c5cfaa1566b5bc9d2e755ba2e94a04c5a35",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.670932,
+              "0.55": 0.623294,
+              "0.60": 0.591358,
+              "0.65": 0.53823,
+              "0.70": 0.482625,
+              "0.75": 0.40656,
+              "0.80": 0.315663,
+              "0.85": 0.170303,
+              "0.90": 0.020074,
+              "0.95": 0.001181
+            },
+            "best_f1": 0.680603,
+            "best_f1_confidence": 0.321321,
+            "f1": 0.675673,
+            "map50": 0.670932,
+            "map50_95": 0.382022,
+            "map75": 0.40656,
+            "per_class": {
+              "poncan": {
+                "map50": 0.670932,
+                "map50_95": 0.382022
+              }
+            },
+            "precision": 0.775795,
+            "recall": 0.59844,
+            "speed_ms_per_image": {
+              "inference": 19.438401,
+              "loss": 0.000698,
+              "postprocess": 1.553192,
+              "preprocess": 5.169817
+            }
+          },
+          "run_id": "paired_ripeness__yolov8s__s41__da273b5e07",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "ea4a31a3571ed4e10efa8814645cac3b5d5920656505b7f2ac4a0a48221b50a0",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.652184,
+              "0.55": 0.622473,
+              "0.60": 0.564236,
+              "0.65": 0.527509,
+              "0.70": 0.462059,
+              "0.75": 0.39177,
+              "0.80": 0.306979,
+              "0.85": 0.174525,
+              "0.90": 0.024775,
+              "0.95": 0.003034
+            },
+            "best_f1": 0.662366,
+            "best_f1_confidence": 0.367367,
+            "f1": 0.660619,
+            "map50": 0.652184,
+            "map50_95": 0.372954,
+            "map75": 0.39177,
+            "per_class": {
+              "poncan": {
+                "map50": 0.652184,
+                "map50_95": 0.372954
+              }
+            },
+            "precision": 0.740255,
+            "recall": 0.596452,
+            "speed_ms_per_image": {
+              "inference": 10.349256,
+              "loss": 0.015707,
+              "postprocess": 3.740395,
+              "preprocess": 4.713549
+            }
+          },
+          "run_id": "paired_ripeness__yolov8s__s42__6fe09d863b",
           "seed": 42
         }
       ]
@@ -2037,6 +2377,176 @@
             }
           },
           "run_id": "paired_sharpness__yolov8s__s42__6338b3526e",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_visibility",
+      "domain": "citdet",
+      "map50_95_mean": 0.196834,
+      "runs": [
+        {
+          "checkpoint_sha256": "75991d99af0986b14dc2e593a5f89a0b4b6f405915b7bd15abe0279307cedfca",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.492316,
+              "0.55": 0.441254,
+              "0.60": 0.368302,
+              "0.65": 0.2798,
+              "0.70": 0.186899,
+              "0.75": 0.103953,
+              "0.80": 0.049367,
+              "0.85": 0.017651,
+              "0.90": 0.006226,
+              "0.95": 0.0025
+            },
+            "best_f1": 0.544408,
+            "best_f1_confidence": 0.228228,
+            "f1": 0.544386,
+            "map50": 0.492316,
+            "map50_95": 0.194827,
+            "map75": 0.103953,
+            "per_class": {
+              "poncan": {
+                "map50": 0.492316,
+                "map50_95": 0.194827
+              }
+            },
+            "precision": 0.71094,
+            "recall": 0.441058,
+            "speed_ms_per_image": {
+              "inference": 9.38205,
+              "loss": 0.003959,
+              "postprocess": 9.432353,
+              "preprocess": 1.356613
+            }
+          },
+          "run_id": "paired_visibility__yolov8s__s41__a541ac5e64",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "50fbc22df679551d38a494e7ae88a34867a74a5408885476cf1f733e349fff8c",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.496926,
+              "0.55": 0.443568,
+              "0.60": 0.374896,
+              "0.65": 0.28625,
+              "0.70": 0.198921,
+              "0.75": 0.111936,
+              "0.80": 0.053631,
+              "0.85": 0.017817,
+              "0.90": 0.00347,
+              "0.95": 0.001
+            },
+            "best_f1": 0.549491,
+            "best_f1_confidence": 0.237237,
+            "f1": 0.549218,
+            "map50": 0.496926,
+            "map50_95": 0.198841,
+            "map75": 0.111936,
+            "per_class": {
+              "poncan": {
+                "map50": 0.496926,
+                "map50_95": 0.198841
+              }
+            },
+            "precision": 0.717824,
+            "recall": 0.444753,
+            "speed_ms_per_image": {
+              "inference": 9.017912,
+              "loss": 0.004589,
+              "postprocess": 6.489364,
+              "preprocess": 1.298039
+            }
+          },
+          "run_id": "paired_visibility__yolov8s__s42__3ce252a010",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_visibility",
+      "domain": "manual_full_val",
+      "map50_95_mean": 0.367939,
+      "runs": [
+        {
+          "checkpoint_sha256": "75991d99af0986b14dc2e593a5f89a0b4b6f405915b7bd15abe0279307cedfca",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.637898,
+              "0.55": 0.607619,
+              "0.60": 0.5536,
+              "0.65": 0.494172,
+              "0.70": 0.446902,
+              "0.75": 0.370491,
+              "0.80": 0.278564,
+              "0.85": 0.156703,
+              "0.90": 0.029612,
+              "0.95": 0.000588
+            },
+            "best_f1": 0.660644,
+            "best_f1_confidence": 0.368368,
+            "f1": 0.653503,
+            "map50": 0.637898,
+            "map50_95": 0.357615,
+            "map75": 0.370491,
+            "per_class": {
+              "poncan": {
+                "map50": 0.637898,
+                "map50_95": 0.357615
+              }
+            },
+            "precision": 0.791745,
+            "recall": 0.556361,
+            "speed_ms_per_image": {
+              "inference": 15.165001,
+              "loss": 0.001089,
+              "postprocess": 2.000185,
+              "preprocess": 5.20731
+            }
+          },
+          "run_id": "paired_visibility__yolov8s__s41__a541ac5e64",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "50fbc22df679551d38a494e7ae88a34867a74a5408885476cf1f733e349fff8c",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.663043,
+              "0.55": 0.617229,
+              "0.60": 0.576627,
+              "0.65": 0.529446,
+              "0.70": 0.477512,
+              "0.75": 0.389119,
+              "0.80": 0.311551,
+              "0.85": 0.186739,
+              "0.90": 0.031018,
+              "0.95": 0.000345
+            },
+            "best_f1": 0.67402,
+            "best_f1_confidence": 0.384384,
+            "f1": 0.671885,
+            "map50": 0.663043,
+            "map50_95": 0.378263,
+            "map75": 0.389119,
+            "per_class": {
+              "poncan": {
+                "map50": 0.663043,
+                "map50_95": 0.378263
+              }
+            },
+            "precision": 0.748111,
+            "recall": 0.609756,
+            "speed_ms_per_image": {
+              "inference": 9.951314,
+              "loss": 0.029648,
+              "postprocess": 2.438927,
+              "preprocess": 5.3541
+            }
+          },
+          "run_id": "paired_visibility__yolov8s__s42__3ce252a010",
           "seed": 42
         }
       ]
@@ -3891,7 +4401,7 @@
     },
     {
       "path": "artifacts/realism_yolov8/paired_results.json",
-      "sha256": "9f48edf73b33b9ff0913e7eb22d89c3c6292996ecd57a65c261aab942bd839d4"
+      "sha256": "68f18243ccf7c37e5f0b723fb5739ca33707429ffd4ebc0879ebabe4558725f0"
     },
     {
       "path": "artifacts/studio/essential_similarity.json",
