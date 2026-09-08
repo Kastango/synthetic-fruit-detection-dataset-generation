@@ -25,7 +25,7 @@ da pasta em que o script é chamado.
 | Arquivo | O que editar |
 |---|---|
 | [`build_flowchart.py`](../scripts/diagrams/build_flowchart.py) | `panel_acquisition`, `panel_generation` e `combined_svg` definem nós, rótulos, setas e zonas. As constantes iniciais definem cores, fontes e espaçamento. |
-| [`build_conditions.py`](../scripts/diagrams/build_conditions.py) | `deck_size`, `row_extent`, `MAX_OFF`, `TRAIN_MAX_DECK` e `VAL_MAX_DECK` controlam a escala e a largura das pilhas. |
+| [`build_conditions.py`](../scripts/diagrams/build_conditions.py) | `row_extent`, `CARD_W`, `CARD_H` e `GUTTER` controlam o tamanho das miniaturas e os espaços entre conjuntos. |
 | [`fontkit.py`](../scripts/diagrams/fontkit.py) | Incorpora somente os glifos usados, a partir das fontes locais. Falha se faltar um glifo. |
 | [`diagram-assets/`](figures/diagram-assets/) | Miniaturas e registros de origem usados nas figuras. |
 | [`fonts/`](figures/fonts/) | Geist, Geist Mono e Instrument Serif, com as respectivas licenças SIL OFL. |
@@ -39,16 +39,14 @@ precisam ser conferidas contra `fruit_pipeline/synthesis.py`.
 Saídas:
 
 - `docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg`;
-- `docs/figures/condicoes/condicao-*.svg`, um arquivo por linha da tabela;
+- `docs/figures/condicoes/condicao-*.svg`, um arquivo por condição;
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
-O estilo preserva as decisões da thread `3b553545-c7fb-4c56-92f4-9d8286cbb5fd`:
-roxo e laranja, conectores ortogonais, zonas com vãos iguais, miniaturas
-quadradas e pilhas horizontais nas condições. Treino e validação usam 3 cartas
-por 26 imagens, com arredondamento. O espaçamento encolhe quando a pilha atinge
-seu limite; sua largura não é uma escala linear. O teste tem 3 cartas fixas e
-não segue essa proporção. As setas entre treino e validação indicam a avaliação
-entre épocas, sem uso da validação para atualizar pesos.
+O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
+As condições usam três miniaturas por conjunto, com contagens nos rótulos.
+As pilhas são ilustrativas e não representam o volume de dados pela largura.
+As setas entre treino e validação representam a avaliação entre épocas.
+A validação não atualiza os pesos.
 
 ## Atualizar as miniaturas
 
@@ -139,13 +137,15 @@ os arquivos. A licença do código não substitui os termos desses recursos.
 
 Esse comando usa [`results-summary.json`](results-summary.json), que preserva
 as médias arredondadas publicadas, e não exige checkpoints. Para usar os JSONs
-originais, passe `--results-dir artifacts/confirmatory`. O comando gera o SVG
+originais, passe `--results-dir artifacts/confirmatory`. O comando gera quatro SVGs
 e tabelas intermediárias, mas não reescreve a interpretação em `RESULTS.md`.
 O snapshot não contém valores por semente; não derive barras de erro dele.
 
 Os exemplos de detecção usam `scripts/render_detection_examples.py`, que
-requer checkpoints, CitDet preparado e GPU. Imagem, modelo e semente ficam no
-topo do script. Preserve a mesma imagem e limiar entre condições e informe
+requer checkpoints e o conjunto escolhido preparado. Use `--dataset`,
+`--model`, `--image-stem` e `--seed`; `--device cpu` permite executar sem GPU.
+Os comandos e exemplos sintéticos estão em [RESULTS.md](RESULTS.md).
+Preserve a mesma imagem e limiar entre condições e informe
 esses valores na legenda. Uma imagem escolhida para ilustração não demonstra
 desempenho médio.
 

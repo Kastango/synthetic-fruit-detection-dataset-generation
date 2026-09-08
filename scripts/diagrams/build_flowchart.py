@@ -26,7 +26,7 @@ PIPELINE = yaml.safe_load((ROOT / "configs/pipeline.yaml").read_text())
 
 
 def number(value):
-    return f"{value:g}".replace(".", ",")
+    return f"{value:g}"
 
 
 # --- tokens (skin tcc-roxo-laranja) -------------------------------------------------
@@ -324,7 +324,7 @@ def legend(c: Canvas, y, items) -> None:
     c.text(
         ZX,
         y + 30,
-        "LEGENDA",
+        "Legend",
         family=MONO,
         size=FS_LABEL,
         fill=MUTED,
@@ -381,7 +381,7 @@ def g_dashed(x, y):
 def panel_acquisition() -> Canvas:
     c = Canvas(
         "aquisicao",
-        "Preparação dos ativos-fonte para a síntese",
+        "Prepare fruit cutouts and tree proximity maps",
         "Fotos de frutas em fundo uniforme e de árvores fora do período produtivo são "
         "segmentadas e convertidas em mapas de profundidade DepthPro; todos os ativos "
         "regenerados permanecem disponíveis durante a composição do pool sintético.",
@@ -395,8 +395,8 @@ def panel_acquisition() -> Canvas:
 
     # O terminal pertence ao fluxo completo, não ao agrupamento de aquisição.
     # A zona começa abaixo dele e recebe apenas as duas etapas de captura.
-    zone(c, ZX, 140, ZW, 240, "COLETA DAS IMAGENS")
-    zone(c, ZX, 140 + 240 + SECTION_GAP, ZW, 296, "PRÉ-PROCESSAMENTO")
+    zone(c, ZX, 140, ZW, 240, "Image collection")
+    zone(c, ZX, 140 + 240 + SECTION_GAP, ZW, 296, "Asset preparation")
 
     # setas — ramos espelhados em torno do eixo central
     arrow(c, [(CENTER - 24, 98), (CENTER - 24, 120), (CX_L, 120), (CX_L, A_Y)])
@@ -431,9 +431,15 @@ def panel_acquisition() -> Canvas:
         f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
     )
 
-    oval(c, CENTER, 68, 64, 30, "Início")
+    oval(c, CENTER, 68, 64, 30, "Start")
     node(
-        c, COL_L, A_Y, COL_W, A_H, ["Fotografar frutas"], ["127 fotos · fundo uniforme"]
+        c,
+        COL_L,
+        A_Y,
+        COL_W,
+        A_H,
+        ["Photograph fruit"],
+        ["127 plain-background photos"],
     )
     node(
         c,
@@ -441,25 +447,33 @@ def panel_acquisition() -> Canvas:
         A_Y,
         COL_W,
         A_H,
-        ["Fotografar árvores"],
-        ["228 fotos · período sem frutos"],
+        ["Photograph trees"],
+        ["228 photos without fruit"],
     )
-    node(c, COL_L, B_Y, COL_W, B_H, ["Segmentar as frutas"], ["rembg · recortes RGBA"])
+    node(
+        c,
+        COL_L,
+        B_Y,
+        COL_W,
+        B_H,
+        ["Remove fruit backgrounds"],
+        ["rembg / ISNet, RGBA cutouts", "Alpha defines visible fruit"],
+    )
     node(
         c,
         COL_R,
         B_Y,
         COL_W,
         B_H,
-        ["Estimar a profundidade"],
-        ["DepthPro · mapas de 8 bits"],
+        ["Estimate depth"],
+        ["DepthPro, 8-bit proximity maps", "Higher values mean nearer"],
     )
     dot(c, CENTER, 668)
 
-    photo(c, "stack_frutas", RAIL_L, 200, RAIL, RAIL, "fotos de frutas")
-    photo(c, "stack_arvores", RAIL_R, 200, RAIL, RAIL, "fotos de árvores")
-    photo(c, "stack_recortes", RAIL_L, 484, RAIL, RAIL, "recortes sem fundo")
-    photo(c, "stack_mapas", RAIL_R, 484, RAIL, RAIL, "mapas DepthPro")
+    photo(c, "stack_frutas", RAIL_L, 200, RAIL, RAIL, "fruit photos")
+    photo(c, "stack_arvores", RAIL_R, 200, RAIL, RAIL, "tree photos")
+    photo(c, "stack_recortes", RAIL_L, 484, RAIL, RAIL, "RGBA cutouts")
+    photo(c, "stack_mapas", RAIL_R, 484, RAIL, RAIL, "proximity maps")
 
     return c
 
@@ -470,7 +484,7 @@ def panel_acquisition() -> Canvas:
 def panel_generation() -> Canvas:
     c = Canvas(
         "geracao",
-        "Composição, split e materialização dos synthetic-*",
+        "Depth-guided composition and nested datasets",
         "Para cada cena, um fundo, seu mapa e os recortes são amostrados do catálogo completo; cada "
         "fruta é inserida por tentativa e erro guiada pela profundidade; encerrada a inserção, "
         "as caixas são extraídas, as 1.300 cenas são divididas em train/val e delas saem os "
@@ -500,11 +514,11 @@ def panel_generation() -> Canvas:
         32,
         ZW,
         952,
-        f"GERAÇÃO DAS {CONFIG['images']['total']:,} CENAS".replace(",", "."),
+        f"Generate {CONFIG['images']['total']:,} scenes".replace(",", ","),
         loop=True,
     )
-    zone(c, ZX, 32 + 952 + SECTION_GAP, ZW, 328, "SPLIT E SUBCONJUNTOS")
-    frame(c, IN_X, IN_Y, IN_W, IN_H, "PARA CADA FRUTA", loop=True)
+    zone(c, ZX, 32 + 952 + SECTION_GAP, ZW, 328, "Scene split and nested subsets")
+    frame(c, IN_X, IN_Y, IN_W, IN_H, "For each sampled fruit", loop=True)
 
     arrow(
         c, [(CENTER, N_Y + N_H), (CENTER, 336), (C1 + CW / 2, 336), (C1 + CW / 2, RA_Y)]
@@ -525,11 +539,11 @@ def panel_generation() -> Canvas:
             (C2 + CW // 2, RA_Y),
         ],
     )
-    arrow_label(c, 876, 340, "NÃO: tentar outro X, Y", bg=WHITE)
+    arrow_label(c, 876, 340, "No: retry X, Y", bg=WHITE)
     c.text(
         1072,
         298,
-        f"Após {CONFIG['placement']['max_attempts_per_object']} falhas, próxima fruta",
+        f"Skip fruit after {CONFIG['placement']['max_attempts_per_object']} failed attempts",
         family=MONO,
         size=16,
         fill=MUTED,
@@ -538,7 +552,7 @@ def panel_generation() -> Canvas:
 
     # SIM: a fruta é ajustada e composta
     arrow(c, [(DIA_CX - DIA_HW, RB_CY), (C2 + CW, RB_CY)])
-    arrow_label(c, C3, RB_CY - 20, "SIM", bg=WHITE)
+    arrow_label(c, C3, RB_CY - 20, "Yes", bg=WHITE)
     arrow(c, [(C2, RB_CY), (C1 + CW, RB_CY)])
     arrow(c, [(C1, RB_CY), (DOT_X, RB_CY), (DOT_X, RA_CY), (C1, RA_CY)])
 
@@ -605,10 +619,11 @@ def panel_generation() -> Canvas:
         N_Y,
         560,
         N_H,
-        ["Selecionar fundo + mapa e preparar a cena"],
+        ["Sample a background and its proximity map"],
         [
-            "Correção tonal só no fundo · suavizar mapa",
-            f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']} ou {CONFIG['objects']['dense']['min']}–{CONFIG['objects']['dense']['max']} frutas · {CONFIG['objects']['dense']['probability']:.0%} de cenas densas",
+            "Grade the background, smooth the proximity map",
+            "RNG: seed, recipe hash, assets, scene index",
+            f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']} or {CONFIG['objects']['dense']['min']}–{CONFIG['objects']['dense']['max']} fruit, {CONFIG['objects']['dense']['probability']:.0%} dense-scene probability",
         ],
     )
 
@@ -619,13 +634,20 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_escala",
-        ["Sortear escala e giro"],
+        ["Sample size and rotation"],
         [
-            f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} · giro ±{CONFIG['objects']['rotation_degrees']}°"
+            f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} / rotation ±{CONFIG['objects']['rotation_degrees']}°"
         ],
     )
     illustrated(
-        c, C2, RA_Y, CW, RH, "loop_xy", ["Sortear X, Y"], ["fora dos 15 % inferiores"]
+        c,
+        C2,
+        RA_Y,
+        CW,
+        RH,
+        "loop_xy",
+        ["Sample X, Y"],
+        ["Exclude the bottom 15%"],
     )
     illustrated(
         c,
@@ -634,8 +656,8 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_profundidade",
-        ["Ajustar pela profundidade"],
-        ["escala 0,6×–1,3×"],
+        ["Apply local depth"],
+        ["Depth scaling and Z jitter"],
     )
     diamond(
         c,
@@ -644,8 +666,8 @@ def panel_generation() -> Canvas:
         DIA_HW,
         DIA_HH,
         [
-            f"Proximidade ≥ {CONFIG['placement']['min_depth']}?",
-            f"Visibilidade ≥ {CONFIG['placement']['min_visibility']:.0%}?",
+            f"Proximity ≥ {CONFIG['placement']['min_depth']}?",
+            f"Visibility ≥ {CONFIG['placement']['min_visibility']:.0%}?",
         ],
     )
     illustrated(
@@ -655,8 +677,8 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_aparencia",
-        ["Maturação, luz e sombras"],
-        ["HSV cast → exposição"],
+        ["Adjust fruit appearance"],
+        ["Hue, light and shadows"],
     )
     illustrated(
         c,
@@ -665,8 +687,8 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_compor",
-        ["Compor a instância"],
-        ["atualizar oclusões anteriores"],
+        ["Composite the fruit"],
+        ["Update earlier visibility masks"],
     )
 
     node(
@@ -675,8 +697,8 @@ def panel_generation() -> Canvas:
         SAVE_Y,
         SAVE_W,
         SAVE_H,
-        ["Extrair caixas finais e salvar"],
-        ["Após todas as inserções · JPG / TXT / JSON"],
+        ["Extract final boxes and save"],
+        ["After all insertions, omit boxes below 2 px"],
     )
     photo(
         c,
@@ -685,7 +707,7 @@ def panel_generation() -> Canvas:
         CARD_Y,
         CARD_W,
         CARD_H,
-        ("cenas", "sintéticas"),
+        ("scene", "JPG"),
     )
     photo(
         c,
@@ -694,7 +716,7 @@ def panel_generation() -> Canvas:
         CARD_Y,
         CARD_W,
         CARD_H,
-        ("caixas", "geradas"),
+        ("YOLO boxes", "TXT"),
     )
     photo(
         c,
@@ -703,7 +725,7 @@ def panel_generation() -> Canvas:
         CARD_Y,
         CARD_W,
         CARD_H,
-        ("metadados", "JSON"),
+        ("provenance", "JSON"),
     )
     node(
         c,
@@ -711,8 +733,8 @@ def panel_generation() -> Canvas:
         SPLIT_Y,
         SPLIT_W,
         SPLIT_H,
-        [f"Dividir as {CONFIG['images']['total']:,} cenas".replace(",", ".")],
-        ["80/20 por cena · ativos compartilhados"],
+        [f"Split {CONFIG['images']['total']:,} scenes".replace(",", ",")],
+        ["80% train, 20% validation, shared source assets"],
         radius=20,
         bg=PAPER,
     )
@@ -739,8 +761,8 @@ def panel_generation() -> Canvas:
             FINAL_H,
             [f"synthetic-{multiplier}x"],
             [
-                f"{train_count:,}".replace(",", ".") + " treino",
-                f"{val_count} validação",
+                f"{train_count:,}".replace(",", ",") + " train",
+                f"{val_count} validation",
             ],
             radius=20,
             bg=PAPER,
@@ -750,10 +772,10 @@ def panel_generation() -> Canvas:
         c,
         1360,
         [
-            (g_step, "etapa"),
-            (g_decision, "decisão"),
-            (g_terminal, "início / conjunto"),
-            (g_dashed, "fluxo de artefatos"),
+            (g_step, "process"),
+            (g_decision, "decision"),
+            (g_terminal, "start / dataset"),
+            (g_dashed, "artifact flow"),
         ],
     )
 
@@ -763,7 +785,7 @@ def panel_generation() -> Canvas:
 # ====================================================================================
 # Emissão
 # ====================================================================================
-PAGE_TITLE = "Geração dos conjuntos synthetic-1x a synthetic-10x"
+PAGE_TITLE = "Synthetic orchard dataset generation"
 
 
 def font_css(panels: list[Canvas]) -> str:
@@ -841,9 +863,9 @@ def combined_svg(panels: list[Canvas], css: str) -> str:
         'aria-labelledby="fluxograma-sintese-v3-title fluxograma-sintese-v3-desc" '
         'xmlns="http://www.w3.org/2000/svg">\n'
         f'<title id="fluxograma-sintese-v3-title">{esc(PAGE_TITLE)}</title>\n'
-        '<desc id="fluxograma-sintese-v3-desc">Fluxograma da preparação do catálogo completo de ativos, '
-        "da composição guiada por profundidade, do split das cenas geradas e da materialização dos "
-        "subconjuntos synthetic-1x a synthetic-10x.</desc>\n"
+        '<desc id="fluxograma-sintese-v3-desc">Prepare source assets, compose scenes using depth, '
+        "split generated scenes and materialize "
+        "nested synthetic-1x to synthetic-10x datasets.</desc>\n"
         "<defs>\n<style>" + css + "</style>\n"
         f'<marker id="arrow" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">'
         f'<polygon points="0 0, 9 3.5, 0 7" fill="{MUTED}"/></marker>\n'
@@ -876,7 +898,7 @@ def main() -> None:
     markup = combined_svg(panels, css)
 
     page = f"""<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

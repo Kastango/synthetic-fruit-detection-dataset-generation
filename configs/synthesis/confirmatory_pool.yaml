@@ -2,29 +2,20 @@ name: confirmatory_pool
 seed: 42
 images:
   total: 1300
-canvas: [720, 960]
+canvas:
+- 720
+- 960
 objects:
   min: 1
   max: 30
-  # Fração linear (sqrt(w*h)) do tamanho aparente da fruta. Calibrado contra
-  # a distribuição real de caixas dos testes externos: cobre tanto o
-  # tamanho típico do manual-full (câmera mais próxima) quanto o do CitDet
-  # (câmera mais distante, frutos bem menores na imagem).
   min_scale: 0.01
   max_scale: 0.065
   rotation_degrees: 180
   depth_scale:
     near_scale: 1.3
     far_scale: 0.6
-  # As duas coletas reais discordam por um fator de cinco na densidade: o
-  # manual-full tem mediana de 14,5 caixas por imagem (máximo 40) e o CitDet,
-  # 78 (máximo 233). O gerador sorteia dos dois regimes — a maioria das cenas
-  # da faixa esparsa, uma minoria da densa — para que o pool contenha tanto
-  # imagem de pomar visto de perto quanto de longe. A média resultante fica
-  # próxima da densidade do conjunto real anotado à mão, e a variedade entre
-  # cenas fica a cargo da mistura, não de um valor médio único.
   dense:
-    probability: 0.06
+    probability: 0.25
     min: 60
     max: 110
 placement:
@@ -36,33 +27,21 @@ placement:
   z_offset_jitter: 30
   exclude_bottom_fraction: 0.15
 appearance:
-  # Os recortes-fonte são fotos de fruta madura; sem isso, o pool sintético
-  # nunca teria fruta verde/em maturação, embora pomares reais tenham. Gira
-  # o matiz de uma fração dos objetos em direção a um verde-amarelado (mais
-  # "de vez" que folha), com força e saturação moderadas para não colidir
-  # cromaticamente com a folhagem real ao redor, e acha o brilho especular
-  # (fruta madura é mais cerosa que a "de vez"). Aplicado antes do hsv_cast
-  # ambiental, que continua respondendo à luz da cena por cima.
-  # Ver fruit_pipeline/synthesis.py:_apply_ripeness_shift.
   ripeness:
     enabled: true
     fraction_affected: 0.18
     green_hue_degrees: 85
-    strength_range: [0.25, 0.75]
+    strength_range:
+    - 0.25
+    - 0.75
     saturation_scale: 0.8
     gloss_reduction: 0.4
-  # O hsv_cast abaixo puxa a fruta na direção da cor do fundo local, então por
-  # construção ele só reduz o contraste entre fruta e cena. Nas fotos reais o
-  # contraste se espalha muito mais para os dois lados: fruta em sombra profunda
-  # quase some na folhagem, fruta em sol direto estoura contra a copa escura.
-  # Este fator de exposição por instância, aplicado depois do cast e
-  # independente do fundo, é o que reproduz esse espalhamento — calibrado
-  # contra os percentis de contraste medidos nas fotos reais.
-  # Ver fruit_pipeline/synthesis.py:_apply_exposure_jitter.
   exposure_jitter:
     enabled: true
     probability: 0.8
-    range: [0.40, 1.90]
+    range:
+    - 0.4
+    - 1.9
     saturation_pull: 0.35
   hsv_cast:
     use_hardlight_target: true
