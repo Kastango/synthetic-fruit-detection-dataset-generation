@@ -1,6 +1,13 @@
-"""Ilustra treino, validação e CitDet com três miniaturas por conjunto.
+"""Um micro-fluxograma por condição de treinamento, para caber numa célula da tabela.
 
-As contagens vêm de configs/pipeline.yaml. As pilhas não codificam volume.
+Cada arquivo mostra, da esquerda para a direita, os três conjuntos que a condição
+usa — treino, validação e o teste externo — com quadros reais de cada um. A
+profundidade do baralho de treino cresce com o volume da condição, então a coluna
+inteira se lê como uma escala.
+
+Fontes de verdade: `configs/confirmatory.yaml` (diretórios de cada condição),
+`configs/pipeline.yaml` (104/26 reais, 80/20 do controlled) e
+`fruit_pipeline/synthesis.py::materialize_nested_subsets` (base 104/26 dos sintéticos).
 """
 
 from __future__ import annotations
@@ -15,29 +22,59 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "docs/figures/diagram-assets"
 OUT = ROOT / "docs/figures/condicoes"
 
+# Cartão e moldura branca em volta da foto. O deslocamento é só horizontal: o
+# baralho cresce para a direita, sem cascata na diagonal.
 CARD_W, CARD_H, CARD_PAD = 64, 64, 2
+# Vão largo o bastante para a seta ler como seta ao lado de um baralho de 176 px.
+GAP = 88
 FS = 12
+
+# O baralho ocupa exatamente o que suas cartas pedem, com a folga fixa em MAX_OFF,
+# até bater no teto da coluna; daí em diante a folga é que encolhe. A seta fica com
+# a sobra, então um conjunto pequeno tem baralho curto e seta longa.
 MAX_OFF = 16
-TRAIN_MAX_DECK = VAL_MAX_DECK = 96
-ARROW, GUTTER = 40, 14
-TEST_CARDS_WIDTH = 96
-DECK_Y, LABEL_Y = 16, 100
-HEIGHT, TRAIN_X = 116, 20
+# Tetos distintos: a mesma escala vale para as duas colunas, mas o treino chega a
+# 120 cartas e a validação a 30. Espremer as 120 no teto da validação daria 1,9 px
+# por carta — a borda comeria a foto e o baralho viraria uma mancha. Abaixo de
+# ~3,5 px a carta deixa de ler como carta, e é isso que fixa o teto do treino.
+TRAIN_MAX_DECK, VAL_MAX_DECK = 520, 288
+# A seta tem comprimento fixo e cada linha flui da esquerda para a direita a partir
+# das larguras reais dos baralhos. Colunas fixas obrigariam a seta do manual-full a
+# esticar 304 px para alcançar a validação; assim a própria extensão da linha fica
+# proporcional ao volume da condição.
+ARROW = 40
+GUTTER = 14  # folga entre baralho e seta
+TEST_CARDS_WIDTH = 140  # o teste não escala: são sempre as mesmas 119 imagens
+
+DECK_Y, LABEL_Y = 18, 102
+HEIGHT = 120
+TRAIN_X = 16
 
 
 def row_extent(train: int, val: int) -> tuple[float, float, float, float]:
-    train_w = 96
+    """Posições x de cada baralho na linha, e onde ela termina."""
+    train_w = CARD_W + (deck_size(train) - 1) * card_offset(
+        deck_size(train), deck_width(deck_size(train), TRAIN_MAX_DECK)
+    )
+    val_w = CARD_W + (deck_size(val) - 1) * card_offset(
+        deck_size(val), deck_width(deck_size(val), VAL_MAX_DECK)
+    )
     val_x = TRAIN_X + train_w + GUTTER + ARROW + GUTTER
-    test_x = val_x + 96 + GUTTER + ARROW + GUTTER
-    return train_w, val_x, test_x, test_x + TEST_CARDS_WIDTH + 20
+    test_x = val_x + val_w + GUTTER + ARROW + GUTTER
+    return train_w, val_x, test_x, test_x + TEST_CARDS_WIDTH + 16
 
 
 def deck_width(cards: int, ceiling: int) -> int:
+    """A largura que as cartas pedem com folga MAX_OFF, limitada ao teto da coluna."""
     return min(ceiling, CARD_W + (cards - 1) * MAX_OFF)
 
 
 def card_offset(cards: int, width: int) -> float:
-    return (width - CARD_W) / (cards - 1) if cards > 1 else 0
+    """Folga fracionária: presa a inteiros, um baralho de 30 cartas só conseguiria
+    5 px (209 de largura) ou 6 px (238), e o 6 não deixaria seta nenhuma."""
+    if cards < 2:
+        return 0.0
+    return max(3.5, (width - CARD_W) / (cards - 1))
 
 
 def pool_size(slug: str) -> int:
@@ -76,9 +113,16 @@ TEST_IMAGES = PIPELINE["external_datasets"]["citdet"]["expected_images"]
 TEST_CARDS = 3
 
 
+# Uma unidade só para as duas colunas: 26 imagens (a validação do `1x`, o menor
+# conjunto do experimento) valem 3 cartas. Medir treino e validação contra bases
+# diferentes fazia os dois baralhos empatarem, escondendo que a validação é um
+# quarto do treino.
+UNIT_IMAGES, UNIT_CARDS = 26, 3
+
+
 def deck_size(count: int) -> int:
-    """Três exemplos por conjunto; o rótulo informa o volume exato."""
-    return 3
+    """Cartas proporcionais ao volume, na mesma escala para treino e validação."""
+    return max(1, round(UNIT_CARDS * count / UNIT_IMAGES))
 
 
 WIDTH = max(row_extent(train, val)[3] for _, train, val, _ in CONDITIONS)
@@ -164,16 +208,17 @@ def build(name: str, train: int, val: int, slug: str) -> tuple[str, set[str]]:
     m.label(f"{val} validação", val_x + val_w / 2)
     m.label(f"{TEST_IMAGES} teste", test_x + test_w / 2)
 
+    width = row_extent(train, val)[3]
     ident = name.replace(".", "-")
     title = f"Conjuntos da condição {name}"
     desc = (
         f"Da esquerda para a direita: {thousands(train)} imagens de treino, {val} de "
         f"validação e as {TEST_IMAGES} imagens do teste externo CitDet, o mesmo para "
         "todas as condições. Fotos ilustram os tipos de dados, não identificam os splits. "
-        "Cada conjunto usa três miniaturas ilustrativas; as contagens estão nos rótulos."
+        "Treino e validação usam 3 cartas por 26 imagens; as 3 cartas de teste são fixas."
     )
     svg = (
-        f'<svg viewBox="0 0 {WIDTH} {HEIGHT}" width="{WIDTH}" role="img" '
+        f'<svg viewBox="0 0 {width} {HEIGHT}" width="{width}" role="img" '
         f'aria-labelledby="{ident}-t {ident}-d" xmlns="http://www.w3.org/2000/svg">\n'
         f'<title id="{ident}-t">{esc(title)}</title>\n'
         f'<desc id="{ident}-d">{esc(desc)}</desc>\n'
@@ -182,7 +227,7 @@ def build(name: str, train: int, val: int, slug: str) -> tuple[str, set[str]]:
         f'<polygon points="0 0, 8 3, 0 6" fill="{MUTED}"/></marker>\n'
         + "\n".join(m.defs.values())
         + "\n</defs>\n"
-        f'<rect width="{WIDTH}" height="{HEIGHT}" fill="{PAPER}"/>\n'
+        f'<rect width="{width}" height="{HEIGHT}" fill="{PAPER}"/>\n'
         + "\n".join(m.parts)
         + "\n</svg>\n"
     )
@@ -211,7 +256,7 @@ def main() -> None:
             '<?xml version="1.0" encoding="UTF-8"?>\n' + svg.replace("{css}", css),
             encoding="utf-8",
         )
-        print(f"{path.name} · {WIDTH}×{HEIGHT} · {path.stat().st_size / 1024:.0f} KB")
+        print(f"{path.name} · {path.stat().st_size / 1024:.0f} KB")
 
 
 if __name__ == "__main__":

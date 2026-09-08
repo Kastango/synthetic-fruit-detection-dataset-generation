@@ -42,7 +42,6 @@ Depois de todas as inserções, calcula as caixas das partes visíveis.
 
 Abra a figura para ler os detalhes. As miniaturas ilustram o processo.
 O gerador usa fotos RGB, sem exigir sensor de profundidade ou modelagem 3D.
-Os [scripts das figuras](docs/DIAGRAMS.md) permitem regenerar o SVG sem rede.
 
 ## Ajustar o gerador
 
@@ -79,39 +78,27 @@ Os manifestos registram sementes e hashes para identificar cada geração.
 
 ## Experimento
 
-Duas condições usam fotografias. Outras cinco usam cenas compostas, com
-volumes crescentes. As miniaturas mostram o tipo de imagem, não uma escala
-de quantidade.
+O experimento compara sete condições de treinamento. As pilhas crescem com
+o número de imagens, e cada conjunto sintético contém o menor nas duas partições.
 
-### Fotografias
+| Condição | Treino, validação e teste |
+|---|---|
+| `manual-full` | Fotografias de campo<br><br><img src="docs/figures/condicoes/condicao-manual-full.svg" alt="Conjuntos de manual-full, com pilhas proporcionais ao volume" width="644"> |
+| `controlled` | Frutas isoladas e fundos negativos<br><br><img src="docs/figures/condicoes/condicao-controlled.svg" alt="Conjuntos de controlled, com pilhas proporcionais ao volume" width="1004"> |
+| `synthetic-1x` | Cenas sintéticas<br><br><img src="docs/figures/condicoes/condicao-synthetic-1x.svg" alt="Conjuntos de synthetic-1x, com pilhas proporcionais ao volume" width="644"> |
+| `synthetic-2x` | Contém synthetic-1x<br><br><img src="docs/figures/condicoes/condicao-synthetic-2x.svg" alt="Conjuntos de synthetic-2x, com pilhas proporcionais ao volume" width="884"> |
+| `synthetic-3x` | Contém synthetic-2x<br><br><img src="docs/figures/condicoes/condicao-synthetic-3x.svg" alt="Conjuntos de synthetic-3x, com pilhas proporcionais ao volume" width="1020"> |
+| `synthetic-5x` | Contém synthetic-3x<br><br><img src="docs/figures/condicoes/condicao-synthetic-5x.svg" alt="Conjuntos de synthetic-5x, com pilhas proporcionais ao volume" width="1116"> |
+| `synthetic-10x` | Contém synthetic-5x<br><br><img src="docs/figures/condicoes/condicao-synthetic-10x.svg" alt="Conjuntos de synthetic-10x, com pilhas proporcionais ao volume" width="1116"> |
 
-`manual-full` usa as fotos anotadas de campo. São 104 imagens de treino e 26
-de validação.
+Treino e validação usam três cartas por 26 imagens, com arredondamento.
+As pilhas ficam mais compactas nos volumes maiores. As três cartas de teste
+representam sempre as mesmas 119 imagens do CitDet. As miniaturas ilustram
+o tipo de dado; os rótulos informam as contagens exatas.
 
-![Condição manual-full](docs/figures/condicoes/condicao-manual-full.svg)
-
-`controlled` usa frutas isoladas e fundos sem frutas. São 284 imagens de
-treino e 71 de validação.
-
-![Condição controlled](docs/figures/condicoes/condicao-controlled.svg)
-
-### Cenas sintéticas
-
-O gerador cria um único pool e o divide em treino e validação. Cada conjunto
-maior contém o menor nas duas partições.
-
-| Condição | Treino | Validação |
-|---|---:|---:|
-| `synthetic-1x` | 104 | 26 |
-| `synthetic-2x` | 208 | 52 |
-| `synthetic-3x` | 312 | 78 |
-| `synthetic-5x` | 520 | 130 |
-| `synthetic-10x` | 1.040 | 260 |
-
-![Exemplo da organização do conjunto synthetic-3x](docs/figures/condicoes/condicao-synthetic-3x.svg)
-
-Todas as condições passam pelo mesmo CitDet de 119 imagens. A avaliação
-local usa as 26 imagens de `manual-full.val`.
+A avaliação local também usa as 26 imagens de `manual-full.val`.
+As setas entre treino e validação representam a avaliação entre épocas,
+sem atualização de pesos pela validação.
 
 ### Treino e avaliação
 

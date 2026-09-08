@@ -306,6 +306,15 @@ def illustrated(c: Canvas, x, y, w, h, band, names, subs=(), *, band_h=64) -> No
         f'<g clip-path="url(#{clip})"><image x="{x}" y="{y}" width="{w}" height="{band_h}" '
         f'preserveAspectRatio="xMidYMid slice" href="data:image/{mime};base64,{data}"/></g>'
     )
+    if band == "loop_xy":
+        # Vector overlay remains legible when the README scales the figure.
+        cx, cy = x + w / 2, y + band_h / 2
+        path = f"M {cx - 12} {cy} H {cx + 12} M {cx} {cy - 12} V {cy + 12}"
+        for color, width in ((INK, 6), (WHITE, 4), (ACCENT, 2)):
+            c.add(
+                f'<path d="{path}" fill="none" stroke="{color}" '
+                f'stroke-width="{width}" stroke-linecap="round"/>'
+            )
     c.add(
         f'<line x1="{x}" y1="{y + band_h}" x2="{x + w}" y2="{y + band_h}" '
         f'stroke="{INK}" stroke-width="1.2"/>'
@@ -489,7 +498,7 @@ def panel_generation() -> Canvas:
         "fruta é inserida por tentativa e erro guiada pela profundidade; encerrada a inserção, "
         "as caixas são extraídas, as 1.300 cenas são divididas em train/val e delas saem os "
         "subconjuntos aninhados synthetic-1x, 2x, 3x, 5x e 10x.",
-        1420,
+        1740,
     )
     CENTER = W // 2
     N_Y, N_H = 96, 120
@@ -513,11 +522,12 @@ def panel_generation() -> Canvas:
         ZX,
         32,
         ZW,
-        952,
+        1272,
         f"Generate {CONFIG['images']['total']:,} scenes".replace(",", ","),
         loop=True,
     )
-    zone(c, ZX, 32 + 952 + SECTION_GAP, ZW, 328, "Scene split and nested subsets")
+    zone(c, ZX, 32 + 1272 + SECTION_GAP, ZW, 328, "Scene split and nested subsets")
+    c.add('<g transform="translate(0 320)">')
     frame(c, IN_X, IN_Y, IN_W, IN_H, "For each sampled fruit", loop=True)
 
     arrow(
@@ -613,20 +623,6 @@ def panel_generation() -> Canvas:
     for center in final_centers:
         arrow(c, [(center, final_bus_y), (center, FINAL_Y)])
 
-    node(
-        c,
-        296,
-        N_Y,
-        560,
-        N_H,
-        ["Sample a background and its proximity map"],
-        [
-            "Grade the background, smooth the proximity map",
-            "RNG: seed, recipe hash, assets, scene index",
-            f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']} or {CONFIG['objects']['dense']['min']}–{CONFIG['objects']['dense']['max']} fruit, {CONFIG['objects']['dense']['probability']:.0%} dense-scene probability",
-        ],
-    )
-
     illustrated(
         c,
         C1,
@@ -688,7 +684,7 @@ def panel_generation() -> Canvas:
         RH,
         "loop_compor",
         ["Composite the fruit"],
-        ["Update earlier visibility masks"],
+        ["Update prior visibility"],
     )
 
     node(
@@ -777,6 +773,57 @@ def panel_generation() -> Canvas:
             (g_terminal, "start / dataset"),
             (g_dashed, "artifact flow"),
         ],
+    )
+
+    c.add("</g>")
+    node(
+        c,
+        296,
+        96,
+        560,
+        120,
+        ["Prepare the scene"],
+        [
+            "Sample background and map; grade and smooth",
+            "RNG: seed, recipe hash, assets, scene index",
+        ],
+    )
+    arrow(c, [(CENTER, 216), (CENTER, 248)])
+    diamond(c, CENTER, 304, 128, 56, ["Dense scene?"], bg=DECISION)
+    arrow(c, [(448, 304), (280, 304), (280, 384)])
+    arrow(c, [(704, 304), (872, 304), (872, 384)])
+    probability = CONFIG["objects"]["dense"]["probability"]
+    arrow_label(c, 338, 284, f"No ({1 - probability:.0%})")
+    arrow_label(c, 814, 284, f"Yes ({probability:.0%})")
+    node(
+        c,
+        128,
+        384,
+        304,
+        80,
+        ["Sample fruit count"],
+        [f"{CONFIG['objects']['min']} to {CONFIG['objects']['max']} fruit"],
+    )
+    node(
+        c,
+        720,
+        384,
+        304,
+        80,
+        ["Sample fruit count"],
+        [
+            f"{CONFIG['objects']['dense']['min']} to {CONFIG['objects']['dense']['max']} fruit"
+        ],
+    )
+    for x in (280, 872):
+        c.add(
+            f'<path d="{ortho([(x, 464), (x, 520), (CENTER, 520)])}" '
+            f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
+        )
+    dot(c, CENTER, 520)
+    c.add(
+        f'<path d="M {CENTER} 520 L {CENTER} 536" '
+        f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
     )
 
     return c

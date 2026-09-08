@@ -43,8 +43,9 @@ Saídas:
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
 O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
-As condições usam três miniaturas por conjunto, com contagens nos rótulos.
-As pilhas são ilustrativas e não representam o volume de dados pela largura.
+Treino e validação usam três cartas por 26 imagens. O espaçamento diminui
+nas pilhas maiores; a largura não é uma escala linear. O teste usa três
+cartas fixas. Cada SVG termina após a última pilha, sem faixa vazia à direita.
 As setas entre treino e validação representam a avaliação entre épocas.
 A validação não atualiza os pesos.
 
