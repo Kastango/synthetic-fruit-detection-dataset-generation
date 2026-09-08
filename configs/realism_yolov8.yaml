@@ -64,6 +64,13 @@ conditions:
     manifests:
     - data/generated/paired_sharpness/manifest.jsonl
     - data/generated/paired_sharpness/generation_config.json
+  paired_occlusion:
+    train:
+    - data/generated/paired_occlusion/images/train
+    validation: data/generated/paired_occlusion/images/val
+    manifests:
+    - data/generated/paired_occlusion/manifest.jsonl
+    - data/generated/paired_occlusion/generation_config.json
 models:
 - name: yolov8s
   checkpoint: yolov8s.pt

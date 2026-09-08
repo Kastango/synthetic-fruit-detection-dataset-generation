@@ -1192,6 +1192,176 @@
       ]
     },
     {
+      "condition": "paired_occlusion",
+      "domain": "citdet",
+      "map50_95_mean": 0.199064,
+      "runs": [
+        {
+          "checkpoint_sha256": "523d3c36efdf34ab05676413661edaee32b8f58dd7609742c59c1f28d93e5f2a",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.499443,
+              "0.55": 0.449621,
+              "0.60": 0.382266,
+              "0.65": 0.295237,
+              "0.70": 0.201214,
+              "0.75": 0.117964,
+              "0.80": 0.058292,
+              "0.85": 0.021489,
+              "0.90": 0.00685,
+              "0.95": 0.000455
+            },
+            "best_f1": 0.549046,
+            "best_f1_confidence": 0.216216,
+            "f1": 0.548241,
+            "map50": 0.499443,
+            "map50_95": 0.203283,
+            "map75": 0.117964,
+            "per_class": {
+              "poncan": {
+                "map50": 0.499443,
+                "map50_95": 0.203283
+              }
+            },
+            "precision": 0.686004,
+            "recall": 0.456556,
+            "speed_ms_per_image": {
+              "inference": 12.106386,
+              "loss": 0.000727,
+              "postprocess": 4.229411,
+              "preprocess": 1.396574
+            }
+          },
+          "run_id": "paired_occlusion__yolov8s__s41__63c37d5892",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "fa9139a4e1c4037ecb62af77064a72b8977fb014b9dd9d2c2d7c6525ceda8d50",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.487142,
+              "0.55": 0.4372,
+              "0.60": 0.367114,
+              "0.65": 0.283182,
+              "0.70": 0.189804,
+              "0.75": 0.108904,
+              "0.80": 0.050529,
+              "0.85": 0.018192,
+              "0.90": 0.006026,
+              "0.95": 0.000357
+            },
+            "best_f1": 0.538142,
+            "best_f1_confidence": 0.159159,
+            "f1": 0.537203,
+            "map50": 0.487142,
+            "map50_95": 0.194845,
+            "map75": 0.108904,
+            "per_class": {
+              "poncan": {
+                "map50": 0.487142,
+                "map50_95": 0.194845
+              }
+            },
+            "precision": 0.702352,
+            "recall": 0.434934,
+            "speed_ms_per_image": {
+              "inference": 11.323323,
+              "loss": 0.000587,
+              "postprocess": 7.771628,
+              "preprocess": 1.523062
+            }
+          },
+          "run_id": "paired_occlusion__yolov8s__s42__a923cc2465",
+          "seed": 42
+        }
+      ]
+    },
+    {
+      "condition": "paired_occlusion",
+      "domain": "manual_full_val",
+      "map50_95_mean": 0.370177,
+      "runs": [
+        {
+          "checkpoint_sha256": "523d3c36efdf34ab05676413661edaee32b8f58dd7609742c59c1f28d93e5f2a",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.646872,
+              "0.55": 0.608421,
+              "0.60": 0.565634,
+              "0.65": 0.506708,
+              "0.70": 0.445738,
+              "0.75": 0.364068,
+              "0.80": 0.287594,
+              "0.85": 0.176955,
+              "0.90": 0.031238,
+              "0.95": 0.001806
+            },
+            "best_f1": 0.652192,
+            "best_f1_confidence": 0.278278,
+            "f1": 0.643862,
+            "map50": 0.646872,
+            "map50_95": 0.363503,
+            "map75": 0.364068,
+            "per_class": {
+              "poncan": {
+                "map50": 0.646872,
+                "map50_95": 0.363503
+              }
+            },
+            "precision": 0.779429,
+            "recall": 0.548467,
+            "speed_ms_per_image": {
+              "inference": 17.684018,
+              "loss": 0.000694,
+              "postprocess": 1.388673,
+              "preprocess": 4.509842
+            }
+          },
+          "run_id": "paired_occlusion__yolov8s__s41__63c37d5892",
+          "seed": 41
+        },
+        {
+          "checkpoint_sha256": "fa9139a4e1c4037ecb62af77064a72b8977fb014b9dd9d2c2d7c6525ceda8d50",
+          "metrics": {
+            "ap_by_iou": {
+              "0.50": 0.661568,
+              "0.55": 0.632647,
+              "0.60": 0.570274,
+              "0.65": 0.530168,
+              "0.70": 0.474542,
+              "0.75": 0.380327,
+              "0.80": 0.298843,
+              "0.85": 0.188603,
+              "0.90": 0.029446,
+              "0.95": 0.002094
+            },
+            "best_f1": 0.66829,
+            "best_f1_confidence": 0.278278,
+            "f1": 0.66471,
+            "map50": 0.661568,
+            "map50_95": 0.376851,
+            "map75": 0.380327,
+            "per_class": {
+              "poncan": {
+                "map50": 0.661568,
+                "map50_95": 0.376851
+              }
+            },
+            "precision": 0.801854,
+            "recall": 0.567627,
+            "speed_ms_per_image": {
+              "inference": 17.135438,
+              "loss": 0.000959,
+              "postprocess": 1.035981,
+              "preprocess": 4.60824
+            }
+          },
+          "run_id": "paired_occlusion__yolov8s__s42__a923cc2465",
+          "seed": 42
+        }
+      ]
+    },
+    {
       "condition": "paired_relief",
       "domain": "citdet",
       "map50_95_mean": 0.196293,
@@ -3721,7 +3891,7 @@
     },
     {
       "path": "artifacts/realism_yolov8/paired_results.json",
-      "sha256": "23dad6212180dfd12119f38e4a45943cbe0da10652adf4cac42319496eb065ad"
+      "sha256": "9f48edf73b33b9ff0913e7eb22d89c3c6292996ecd57a65c261aab942bd839d4"
     },
     {
       "path": "artifacts/studio/essential_similarity.json",

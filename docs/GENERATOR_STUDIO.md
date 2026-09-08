@@ -268,6 +268,18 @@ de 20%, contra 33,7% no manual e 33,6% no CitDet), então a população
 ausente não era de fruta opaca e sim, provavelmente, de fruta vista atrás
 de folhagem, que a dessaturação não reproduz.
 
+Nona hipótese: a estrutura da oclusão. O conjunto sintético já contém oclusão
+em quantidade: comparando o mesmo pool anotado em `visible` e em `amodal`,
+27,2% das instâncias ficam abaixo de 70% de visibilidade e 14,2% abaixo de 50%.
+Mesmo assim o recall nas caixas com menos de 10% de pixels alaranjados é 0,375,
+contra 0,910 nas caixas acima de 45%. A suspeita é a forma da oclusão, não a
+quantidade: `occlusion.depth_smooth_radius` borra o mapa de profundidade antes
+do limiar e apaga oclusores finos, deixando manchas grossas. A candidata
+`paired_occlusion` zera esse raio. Em sondas de 80 imagens, 55,2% das caixas
+mudam de área, com razão mediana 1,042 e percentil 90 em 1,586, então a mudança
+é estrutural e não cosmética. O resultado foi 0,1991 no CitDet e 0,3702 na
+validação local, cerca de 2,8 desvios abaixo da referência no CitDet.
+
 ## Controle de reprodutibilidade e leitura do ciclo
 
 Depois de oito candidatas todas abaixo da referência no CitDet, a mesma receita
@@ -314,6 +326,33 @@ ela está cobrindo uma lacuna que o conjunto sintético não cobre sozinho. É p
 isso que ajustar cor na geração é redundante, e não porque o efeito se perde.
 Essa é uma sonda de protocolo, não uma receita: o número não é comparável ao
 treino real, que usa a augmentação completa.
+
+## Situação ao fim do ciclo
+
+Nove candidatas de gerador e uma sonda de protocolo foram medidas contra
+`paired_reference`, todas com duas sementes e avaliação nos dois cenários.
+Nenhuma superou a referência em nenhum dos dois. Sob o piso de ruído do
+controle, `paired_count_scale` e `paired_highlights` empatam, `paired_saturation`
+e `paired_exposure` ficam perto de um desvio, e `paired_canopy`,
+`paired_sharpness`, `paired_occlusion`, `paired_relief` e `paired_shade` são
+pioras de duas a cinco vezes o desvio. A receita de referência permanece a
+recomendada e nada foi promovido. A grade completa não foi executada porque
+ela só se justifica após um ganho, e não houve.
+
+As distribuições que este ciclo sabe medir já coincidem entre sintético e real:
+contagem por imagem, tamanho da caixa no espaço de entrada da rede, posição
+vertical, contraste entre caixa e entorno, fração de pixels alaranjados dentro
+da caixa e proporção de instâncias parcialmente ocluídas. O que resta de
+diferença não aparece nesses descritores.
+
+O diagnóstico por recall delimita onde procurar em seguida. Na validação local
+a lacuna já vale 0,226 em IoU 0,50 e permanece plana até 0,80, então não é
+ajuste de caixa. Separando por fração de pixels alaranjados, o recall sintético
+é 0,910 acima de 45% e 0,375 abaixo de 10%. O detector sintético praticamente
+alcança o real na fruta bem visível e falha na fruta vista atrás de folhagem.
+Duas tentativas de atacar essa população, por dessaturação (`paired_shade`) e
+por oclusão mais fina (`paired_occlusion`), pioraram; a aparência local do
+encontro entre folha e fruto continua sem hipótese testada que a descreva.
 
 ```bash
 .venv/bin/python scripts/generate_synthetic.py \
