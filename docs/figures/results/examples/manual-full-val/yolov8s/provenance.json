@@ -1,0 +1,33 @@
+{
+  "confidence": 0.25,
+  "dataset": "manual_full_val",
+  "ground_truth_boxes": 25,
+  "image": "data/real_yolo_confirmatory/images/val/img_2021.jpg",
+  "image_sha256": "56d7dad450e4868d62ad9f6cd05826d9b863f238f4696e27b96cc37558e912b8",
+  "imgsz": 960,
+  "label_sha256": "011bb7618320c197b221f17671dfa692d67a2433e23a3d8620a7045d71368952",
+  "max_det": 1000,
+  "model": "yolov8s",
+  "runs": [
+    {
+      "checkpoint_sha256": "e5cf864cc56d99d67c33f419a3929e78d6c5e24c1af0b9d1edffdfd4482abb40",
+      "condition": "manual-full",
+      "detections": 25,
+      "run_id": "manual-full__yolov8s__s41__a53729b645"
+    },
+    {
+      "checkpoint_sha256": "dc3e25308dfe6f037fe80a9f9a10d85b97267192885f1a5e821f49e6e426cc09",
+      "condition": "controlled",
+      "detections": 0,
+      "run_id": "controlled__yolov8s__s41__8af5986160"
+    },
+    {
+      "checkpoint_sha256": "04572664ddce7800e34de56297e1b75fbebcada456338bcbb04a9a8c5ddb13a6",
+      "condition": "synthetic-3x",
+      "detections": 25,
+      "run_id": "synthetic-3x__yolov8s__s41__726f918e93"
+    }
+  ],
+  "seed": 41,
+  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+}

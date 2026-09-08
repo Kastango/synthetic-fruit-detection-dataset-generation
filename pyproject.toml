@@ -28,6 +28,9 @@ diagrams = ["fonttools==4.63.0", "matplotlib==3.11.1"]
 [tool.setuptools]
 packages = ["fruit_pipeline"]
 
+[tool.setuptools.package-data]
+fruit_pipeline = ["studio_static/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

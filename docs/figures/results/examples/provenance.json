@@ -1,0 +1,57 @@
+{
+  "confidence": 0.25,
+  "dataset": "citdet",
+  "ground_truth_boxes": 49,
+  "image": "data/external_tests/citdet/images/test/ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07_jpg.jpg",
+  "image_sha256": "5a1df27d8fb27671fb5b7eba68c0f254693c8f10deb75b771f79fd2642939980",
+  "imgsz": 960,
+  "label_sha256": "5fe997ecbb1c5228f5a26902cb25df82d577d64acd3661f5f956198d1eb63239",
+  "max_det": 1000,
+  "model": "yolo26s",
+  "runs": [
+    {
+      "checkpoint_sha256": "ed780dca65259feac8e573ec6a5ec1dcd22d0ffa94b19c427573758347c20bd1",
+      "condition": "manual-full",
+      "detections": 60,
+      "run_id": "manual-full__yolo26s__s41__8fe92922b8"
+    },
+    {
+      "checkpoint_sha256": "c1126e003f8057cdd94e8b489a557304b4dc1e2f5f3ec509eab3143caff774e0",
+      "condition": "controlled",
+      "detections": 0,
+      "run_id": "controlled__yolo26s__s41__dfead72217"
+    },
+    {
+      "checkpoint_sha256": "bb56fd3986180afd90544d195b0cd598e290e661f508e8871b47bf9ac6278176",
+      "condition": "synthetic-1x",
+      "detections": 47,
+      "run_id": "synthetic-1x__yolo26s__s41__2bcbdcaf33"
+    },
+    {
+      "checkpoint_sha256": "1afb0a527dcf1fa32217b6925a2c5c84b3c27b0c8cde326862ba26a09d2d8410",
+      "condition": "synthetic-2x",
+      "detections": 66,
+      "run_id": "synthetic-2x__yolo26s__s41__845aebdd07"
+    },
+    {
+      "checkpoint_sha256": "fcf7c653ff732154dce1a89358901ed172873f177b1ad47029b7f52bc7928f18",
+      "condition": "synthetic-3x",
+      "detections": 56,
+      "run_id": "synthetic-3x__yolo26s__s41__25c04e2dde"
+    },
+    {
+      "checkpoint_sha256": "3776ea0094401d569879b061d2bb84511da81778c940a5cbc2d8c8c4b6e99545",
+      "condition": "synthetic-5x",
+      "detections": 54,
+      "run_id": "synthetic-5x__yolo26s__s41__820aa83360"
+    },
+    {
+      "checkpoint_sha256": "993970050cab9d7d91064637e4c4b8f21c3dab78e6c5ad2a206c25a2ed87d8ff",
+      "condition": "synthetic-10x",
+      "detections": 48,
+      "run_id": "synthetic-10x__yolo26s__s41__a859706a33"
+    }
+  ],
+  "seed": 41,
+  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+}

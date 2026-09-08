@@ -1,0 +1,558 @@
+{
+  "status": "candidate_rejected",
+  "reason": "mAP decreased in both domains and both training seeds; saturation distances increased.",
+  "model": "yolov8s",
+  "training_images": 312,
+  "validation_images": 78,
+  "training_boxes": 5582,
+  "validation_boxes": 1484,
+  "generation_seed": 42,
+  "generator_sha256": "2522bd40c1d3503a1b7b19f3796543be30826b648b88039f1b205ef265464e42",
+  "sampling": "paired-v1",
+  "training_seeds": [
+    41,
+    42
+  ],
+  "results": [
+    {
+      "condition": "paired_essential",
+      "domain": "manual_full_val",
+      "seed": 41,
+      "map50_95": 0.367916,
+      "map50": 0.647472,
+      "precision": 0.771898,
+      "recall": 0.592765,
+      "checkpoint_sha256": "bc13ac37eeb8401871fb54db8747f52e12e2f087bda966e2e87ca958c96c312f"
+    },
+    {
+      "condition": "paired_essential",
+      "domain": "citdet",
+      "seed": 41,
+      "map50_95": 0.206601,
+      "map50": 0.518713,
+      "precision": 0.706313,
+      "recall": 0.47441,
+      "checkpoint_sha256": "bc13ac37eeb8401871fb54db8747f52e12e2f087bda966e2e87ca958c96c312f"
+    },
+    {
+      "condition": "paired_essential",
+      "domain": "manual_full_val",
+      "seed": 42,
+      "map50_95": 0.349688,
+      "map50": 0.621914,
+      "precision": 0.812032,
+      "recall": 0.523282,
+      "checkpoint_sha256": "031c2cdfcc1798ff9d3570fde517dfc37697073e0c80c007fd23e44752013b79"
+    },
+    {
+      "condition": "paired_essential",
+      "domain": "citdet",
+      "seed": 42,
+      "map50_95": 0.181912,
+      "map50": 0.469725,
+      "precision": 0.670552,
+      "recall": 0.43176,
+      "checkpoint_sha256": "031c2cdfcc1798ff9d3570fde517dfc37697073e0c80c007fd23e44752013b79"
+    },
+    {
+      "condition": "paired_reference",
+      "domain": "manual_full_val",
+      "seed": 41,
+      "map50_95": 0.379996,
+      "map50": 0.672769,
+      "precision": 0.789172,
+      "recall": 0.597585,
+      "checkpoint_sha256": "41928c050120664584d2fc805d264374313724e4e879704984e3bfae81145719"
+    },
+    {
+      "condition": "paired_reference",
+      "domain": "citdet",
+      "seed": 41,
+      "map50_95": 0.214497,
+      "map50": 0.512715,
+      "precision": 0.689059,
+      "recall": 0.476195,
+      "checkpoint_sha256": "41928c050120664584d2fc805d264374313724e4e879704984e3bfae81145719"
+    },
+    {
+      "condition": "paired_reference",
+      "domain": "manual_full_val",
+      "seed": 42,
+      "map50_95": 0.377453,
+      "map50": 0.667875,
+      "precision": 0.815893,
+      "recall": 0.592018,
+      "checkpoint_sha256": "67574526c371ddc46927eddc1411f6fd4c76ccbc61f6128838b38990db6e2b68"
+    },
+    {
+      "condition": "paired_reference",
+      "domain": "citdet",
+      "seed": 42,
+      "map50_95": 0.205714,
+      "map50": 0.515165,
+      "precision": 0.702307,
+      "recall": 0.474548,
+      "checkpoint_sha256": "67574526c371ddc46927eddc1411f6fd4c76ccbc61f6128838b38990db6e2b68"
+    }
+  ],
+  "similarity": {
+    "reference": {
+      "boxes": 5582,
+      "citdet": {
+        "boxes": 10082,
+        "features": [
+          {
+            "distance": 66.60237623762376,
+            "key": "count",
+            "label": "Caixas por imagem",
+            "real": [
+              25.0,
+              78.0,
+              161.60000000000002
+            ],
+            "synthetic": [
+              3.0,
+              15.0,
+              29.0
+            ]
+          },
+          {
+            "distance": 1.2792973193599373,
+            "key": "size",
+            "label": "Tamanho √(área) / imagem",
+            "real": [
+              1.1231801376822865,
+              1.697720495232946,
+              2.6532638245470426
+            ],
+            "synthetic": [
+              1.1410888440432674,
+              2.89675740252338,
+              5.231891314289413
+            ]
+          },
+          {
+            "distance": 13.805829430594057,
+            "key": "center_y",
+            "label": "Posição vertical",
+            "real": [
+              29.090073999999998,
+              60.860907,
+              83.026961
+            ],
+            "synthetic": [
+              11.09375,
+              44.010417000000004,
+              76.24479170000002
+            ]
+          },
+          {
+            "distance": 11.03179399211808,
+            "key": "brightness",
+            "label": "Luminância na caixa",
+            "real": [
+              20.61848223209381,
+              36.47948056459427,
+              56.460642218589776
+            ],
+            "synthetic": [
+              13.925343900918962,
+              25.244146585464478,
+              40.57265788316727
+            ]
+          },
+          {
+            "distance": 16.61391425505281,
+            "key": "saturation",
+            "label": "Saturação na caixa",
+            "real": [
+              21.57682865858078,
+              45.47547847032547,
+              66.54550373554228
+            ],
+            "synthetic": [
+              40.86500197649002,
+              63.683706521987915,
+              79.1744077205658
+            ]
+          },
+          {
+            "distance": 0.1153750823593244,
+            "key": "contrast",
+            "label": "Contraste caixa / entorno",
+            "real": [
+              -0.3787968402123936,
+              0.024821387094370366,
+              0.446910185207564
+            ],
+            "synthetic": [
+              -0.510632085800356,
+              -0.04184049118783986,
+              0.5658297099947162
+            ]
+          },
+          {
+            "distance": 2.178453173503288,
+            "key": "clipped",
+            "label": "Pixels claros saturados",
+            "real": [
+              0.0,
+              0.08333333333333334,
+              8.179723502304148
+            ],
+            "synthetic": [
+              0.0,
+              0.0,
+              0.11107419712070896
+            ]
+          }
+        ],
+        "images": 119
+      },
+      "dataset": "data/generated/paired_reference",
+      "images": 312,
+      "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. CitDet usado no desenvolvimento.",
+      "manual_train": {
+        "boxes": 1642,
+        "features": [
+          {
+            "distance": 3.7981188118811877,
+            "key": "count",
+            "label": "Caixas por imagem",
+            "real": [
+              4.600000000000001,
+              14.5,
+              29.0
+            ],
+            "synthetic": [
+              3.0,
+              15.0,
+              29.0
+            ]
+          },
+          {
+            "distance": 0.8136235912324785,
+            "key": "size",
+            "label": "Tamanho √(área) / imagem",
+            "real": [
+              1.9477321405868018,
+              3.1503533757829043,
+              6.442055606714366
+            ],
+            "synthetic": [
+              1.1410888440432674,
+              2.89675740252338,
+              5.231891314289413
+            ]
+          },
+          {
+            "distance": 5.82849575188119,
+            "key": "center_y",
+            "label": "Posição vertical",
+            "real": [
+              20.147520000000004,
+              49.449549999999995,
+              75.95181000000001
+            ],
+            "synthetic": [
+              11.09375,
+              44.010417000000004,
+              76.24479170000002
+            ]
+          },
+          {
+            "distance": 3.8799736858299467,
+            "key": "brightness",
+            "label": "Luminância na caixa",
+            "real": [
+              11.709993481636047,
+              21.584539115428925,
+              35.471847653388984
+            ],
+            "synthetic": [
+              13.925343900918962,
+              25.244146585464478,
+              40.57265788316727
+            ]
+          },
+          {
+            "distance": 7.903060335186446,
+            "key": "saturation",
+            "label": "Saturação na caixa",
+            "real": [
+              27.614421248435978,
+              54.08965349197388,
+              79.23379123210907
+            ],
+            "synthetic": [
+              40.86500197649002,
+              63.683706521987915,
+              79.1744077205658
+            ]
+          },
+          {
+            "distance": 0.07829783928015675,
+            "key": "contrast",
+            "label": "Contraste caixa / entorno",
+            "real": [
+              -0.48869618015013766,
+              0.018476403059535185,
+              0.5404266091383534
+            ],
+            "synthetic": [
+              -0.510632085800356,
+              -0.04184049118783986,
+              0.5658297099947162
+            ]
+          },
+          {
+            "distance": 1.0948749436603973,
+            "key": "clipped",
+            "label": "Pixels claros saturados",
+            "real": [
+              0.0,
+              0.2513669260822923,
+              4.168084213245506
+            ],
+            "synthetic": [
+              0.0,
+              0.0,
+              0.11107419712070896
+            ]
+          }
+        ],
+        "images": 104
+      },
+      "split": "train"
+    },
+    "essential": {
+      "boxes": 5582,
+      "citdet": {
+        "boxes": 10082,
+        "features": [
+          {
+            "distance": 66.60237623762376,
+            "key": "count",
+            "label": "Caixas por imagem",
+            "real": [
+              25.0,
+              78.0,
+              161.60000000000002
+            ],
+            "synthetic": [
+              3.0,
+              15.0,
+              29.0
+            ]
+          },
+          {
+            "distance": 1.2792973193599373,
+            "key": "size",
+            "label": "Tamanho √(área) / imagem",
+            "real": [
+              1.1231801376822865,
+              1.697720495232946,
+              2.6532638245470426
+            ],
+            "synthetic": [
+              1.1410888440432674,
+              2.89675740252338,
+              5.231891314289413
+            ]
+          },
+          {
+            "distance": 13.805829430594057,
+            "key": "center_y",
+            "label": "Posição vertical",
+            "real": [
+              29.090073999999998,
+              60.860907,
+              83.026961
+            ],
+            "synthetic": [
+              11.09375,
+              44.010417000000004,
+              76.24479170000002
+            ]
+          },
+          {
+            "distance": 12.110809642194521,
+            "key": "brightness",
+            "label": "Luminância na caixa",
+            "real": [
+              20.61848223209381,
+              36.47948056459427,
+              56.460642218589776
+            ],
+            "synthetic": [
+              14.518449157476427,
+              24.63826984167099,
+              37.18791216611862
+            ]
+          },
+          {
+            "distance": 21.13647958374407,
+            "key": "saturation",
+            "label": "Saturação na caixa",
+            "real": [
+              21.57682865858078,
+              45.47547847032547,
+              66.54550373554228
+            ],
+            "synthetic": [
+              44.81097489595413,
+              68.94766986370087,
+              83.22305083274841
+            ]
+          },
+          {
+            "distance": 0.09964930868391554,
+            "key": "contrast",
+            "label": "Contraste caixa / entorno",
+            "real": [
+              -0.3787968402123936,
+              0.024821387094370366,
+              0.446910185207564
+            ],
+            "synthetic": [
+              -0.42674918354298325,
+              -0.07449611440622812,
+              0.4067794471396278
+            ]
+          },
+          {
+            "distance": 3.0525143716494996,
+            "key": "clipped",
+            "label": "Pixels claros saturados",
+            "real": [
+              0.0,
+              0.08333333333333334,
+              8.179723502304148
+            ],
+            "synthetic": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "images": 119
+      },
+      "dataset": "data/generated/paired_essential",
+      "images": 312,
+      "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. CitDet usado no desenvolvimento.",
+      "manual_train": {
+        "boxes": 1642,
+        "features": [
+          {
+            "distance": 3.7981188118811877,
+            "key": "count",
+            "label": "Caixas por imagem",
+            "real": [
+              4.600000000000001,
+              14.5,
+              29.0
+            ],
+            "synthetic": [
+              3.0,
+              15.0,
+              29.0
+            ]
+          },
+          {
+            "distance": 0.8136235912324785,
+            "key": "size",
+            "label": "Tamanho √(área) / imagem",
+            "real": [
+              1.9477321405868018,
+              3.1503533757829043,
+              6.442055606714366
+            ],
+            "synthetic": [
+              1.1410888440432674,
+              2.89675740252338,
+              5.231891314289413
+            ]
+          },
+          {
+            "distance": 5.82849575188119,
+            "key": "center_y",
+            "label": "Posição vertical",
+            "real": [
+              20.147520000000004,
+              49.449549999999995,
+              75.95181000000001
+            ],
+            "synthetic": [
+              11.09375,
+              44.010417000000004,
+              76.24479170000002
+            ]
+          },
+          {
+            "distance": 2.7990889506469863,
+            "key": "brightness",
+            "label": "Luminância na caixa",
+            "real": [
+              11.709993481636047,
+              21.584539115428925,
+              35.471847653388984
+            ],
+            "synthetic": [
+              14.518449157476427,
+              24.63826984167099,
+              37.18791216611862
+            ]
+          },
+          {
+            "distance": 12.360241024505973,
+            "key": "saturation",
+            "label": "Saturação na caixa",
+            "real": [
+              27.614421248435978,
+              54.08965349197388,
+              79.23379123210907
+            ],
+            "synthetic": [
+              44.81097489595413,
+              68.94766986370087,
+              83.22305083274841
+            ]
+          },
+          {
+            "distance": 0.11633991713814348,
+            "key": "contrast",
+            "label": "Contraste caixa / entorno",
+            "real": [
+              -0.48869618015013766,
+              0.018476403059535185,
+              0.5404266091383534
+            ],
+            "synthetic": [
+              -0.42674918354298325,
+              -0.07449611440622812,
+              0.4067794471396278
+            ]
+          },
+          {
+            "distance": 1.7343532730888986,
+            "key": "clipped",
+            "label": "Pixels claros saturados",
+            "real": [
+              0.0,
+              0.2513669260822923,
+              4.168084213245506
+            ],
+            "synthetic": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          }
+        ],
+        "images": 104
+      },
+      "split": "train"
+    }
+  }
+}

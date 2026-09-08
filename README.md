@@ -5,11 +5,23 @@ seu uso no treinamento de detectores de poncãs. A avaliação no CitDet mede
 transferência para detecção de cítricos, com todas as categorias reunidas em
 uma classe.
 
-Os 42 treinamentos previstos foram concluídos. As tabelas e os exemplos estão
-em [`docs/RESULTS.md`](docs/RESULTS.md). Os resultados são exploratórios: o
-gerador foi ajustado com estatísticas dos conjuntos de avaliação. O nome
-`confirmatory` identifica os arquivos da pipeline, não garante independência
-experimental.
+A interface local permite ajustar o gerador por sliders, inspecionar quatro
+cenas de árvores preenchidas com poncãs e gerar um dataset YOLO em ZIP. Ela
+usa somente fundos, mapas de profundidade e recortes de frutas, sem exigir
+um dataset real anotado.
+
+```bash
+.venv/bin/python scripts/studio.py
+```
+
+Abra http://127.0.0.1:8765. Consulte [interface e sementes](docs/GENERATOR_STUDIO.md)
+e os [resultados](docs/RESULTS.md). Os novos experimentos usam
+somente YOLOv8s; a grade completa fica para uma etapa posterior.
+
+Os resultados dos 42 treinamentos anteriores estão em
+[`docs/RESULTS.md`](docs/RESULTS.md). Eles correspondem ao pool mais denso
+usado naquela rodada, não à receita atual. São resultados exploratórios:
+o gerador foi ajustado com estatísticas dos conjuntos de avaliação.
 
 ## Problema e pergunta de pesquisa
 
@@ -59,17 +71,18 @@ Os scripts, fontes e miniaturas estão versionados. Veja
 
 Todos ficam em [`configs/synthesis/confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml)
 e são consumidos por [`fruit_pipeline/synthesis.py`](fruit_pipeline/synthesis.py).
-A geração usa sementes por cena e registra hashes da configuração e do catálogo
-de ativos. A reprodução depende também das mesmas fontes, versão do código e
+A geração usa sementes por cena e registra hashes da configuração, do compositor
+e do conteúdo dos ativos. A reprodução depende também das mesmas fontes, versão do código e
 bibliotecas. Mudanças no gerador exigem regenerar os dados e conferir os
-manifestos antes de reutilizar treinamentos; o hash da configuração, sozinho,
-não detecta uma alteração no código.
+manifestos antes de reutilizar treinamentos. O marcador de geração verifica
+também o SHA-256 do compositor.
 
 ### Cena
 
 | Parâmetro | O que faz |
 |---|---|
-| `seed` | Semente única de toda a geração. Cada cena deriva sua própria semente de `seed` + hash da configuração + índice da cena. |
+| `seed` | Semente raiz da geração. No modo legado inclui o hash da configuração; em `sampling.mode: paired-v1`, usa o conteúdo dos ativos e o índice da cena, preservando a geometria ao mudar a aparência. |
+| `sampling.mode` | Opcional: `paired-v1` mantém a identidade das cenas ao alterar aparência, nome ou total do pool; a ausência usa a derivação legada. |
 | `images.total` | Tamanho do pool antes do split. As frações `1x`–`10x` são prefixos aninhados desse pool. |
 | `canvas` | Resolução `[largura, altura]`, como em Pillow. O valor atual `[720, 960]` produz imagens em retrato. |
 
@@ -79,7 +92,7 @@ não detecta uma alteração no código.
 |---|---|
 | `min` / `max` | Faixa esparsa de frutas solicitadas, sorteada uniformemente entre 1 e 30. Inserções podem ser rejeitadas. |
 | `dense.probability` | Probabilidade de a cena sortear da faixa densa em vez da esparsa, atualmente 6%. A distribuição final depende das rejeições e oclusões. |
-| `dense.min` / `dense.max` | Faixa densa de frutas solicitadas, de 60 a 110. Junto com a faixa esparsa (`min`/`max`), produz uma mistura de dois modos: a maioria das cenas fica perto das 14,5 caixas por imagem medianas do `manual-full` e uma minoria perto das 78 do CitDet. Em 104 imagens isso dá cerca de 2.100 caixas, próximo das 2.093 do conjunto real. |
+| `dense.min` / `dense.max` | Faixa densa de frutas solicitadas, de 60 a 110. Junto com a faixa esparsa (`min`/`max`), produz uma mistura de dois modos: a maioria das cenas fica perto das 14,5 caixas por imagem medianas do `manual-full` e uma minoria perto das 78 do CitDet. O total resultante varia com a semente e as rejeições. As 2.093 caixas reais pertencem às 130 imagens; o split de treino de 104 imagens tem 1.642 caixas. |
 | `min_scale` / `max_scale` | Fração do menor lado do canvas que define o maior lado do recorte antes da rotação e do ajuste por profundidade. Faixa atual 0,01–0,065, calibrada com estatísticas de caixas do CitDet e da base manual. |
 | `rotation_degrees` | Rotação no plano da imagem, sorteada em `[-x, +x]` por instância. Gira também o brilho registrado na foto; não recalcula a iluminação em 3D. |
 | `depth_scale.near_scale` / `far_scale` | Multiplicadores do tamanho para fruta no primeiro plano e no fundo. Interpolados linearmente pela proximidade estimada. |

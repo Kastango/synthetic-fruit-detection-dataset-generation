@@ -1,4 +1,12 @@
-# Resultados dos 42 treinamentos
+# Resultados dos detectores e exemplos de dados
+
+Grade histórica, gráficos e exemplos abaixo. A rodada atual está em
+[Primeira comparação pareada com YOLOv8s](#primeira-comparação-pareada-com-yolov8s).
+
+**Rastreabilidade:** estas tabelas pertencem ao pool anterior mais denso.
+A configuração atual usa 6% de cenas densas entre 60 e 110 objetos e não
+reproduz estes números. A nova rodada de desenvolvimento usa somente YOLOv8s,
+conforme [o protocolo do estúdio](GENERATOR_STUDIO.md).
 
 Consolida 7 condições × 3 detectores × 2 sementes, com o protocolo de
 [`configs/confirmatory.yaml`](../configs/confirmatory.yaml). Os nomes de pastas
@@ -95,6 +103,20 @@ sintética supere a referência, nem que as diferenças sejam estatisticamente
 sustentadas. Em `manual_full_val`, `manual-full` tem as maiores médias nos três
 detectores, mas também usou esse conjunto na seleção dos checkpoints.
 
+## Precision, recall e F1 por volume sintético
+
+![Precision para YOLOv8s, YOLO26s e RT-DETR-L nos dois conjuntos](figures/results/synthetic-volume-vs-precision.svg)
+
+![Recall para YOLOv8s, YOLO26s e RT-DETR-L nos dois conjuntos](figures/results/synthetic-volume-vs-recall.svg)
+
+![F1 para YOLOv8s, YOLO26s e RT-DETR-L nos dois conjuntos](figures/results/synthetic-volume-vs-f1.svg)
+
+Os três gráficos seguem a convenção do mAP: médias das sementes 41 e 42,
+uma cor por detector, curvas sintéticas contínuas e referências `manual-full`
+tracejadas e `controlled` pontilhadas. Cada métrica compartilha a escala entre
+os dois conjuntos. F1 é a média registrada pelo avaliador, não a média
+harmônica calculada a partir de precision e recall já arredondados.
+
 ## Tabela completa
 
 `[val]` identifica checkpoints selecionados nas mesmas 26 imagens em que a
@@ -163,6 +185,12 @@ Negrito = maior média de mAP@.50:.95 entre as condições desse detector.
 
 ## Exemplos de detecção
 
+O gabarito usa caixas amarelas de 5 pixels com contorno preto, desenhadas
+depois do redimensionamento para manter a legibilidade. As predições aparecem
+em ciano. As coordenadas das anotações permanecem as originais.
+
+### CitDet
+
 Mesma imagem do teste CitDet (`ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07`,
 49 caixas de gabarito), avaliada com o checkpoint `yolo26s` (seed 41) de cada
 condição, `conf ≥ 0.25`. É uma imagem ilustrativa, sem amostragem aleatória
@@ -176,9 +204,59 @@ completa abre ao clicar na miniatura.
 | **synthetic-2x**<br><a href="figures/results/examples/synthetic-2x.jpg"><img src="figures/results/examples/synthetic-2x.jpg" width="360" alt="Detecções ou gabarito: synthetic-2x"></a> | **synthetic-3x**<br><a href="figures/results/examples/synthetic-3x.jpg"><img src="figures/results/examples/synthetic-3x.jpg" width="360" alt="Detecções ou gabarito: synthetic-3x"></a> |
 | **synthetic-5x**<br><a href="figures/results/examples/synthetic-5x.jpg"><img src="figures/results/examples/synthetic-5x.jpg" width="360" alt="Detecções ou gabarito: synthetic-5x"></a> | **synthetic-10x**<br><a href="figures/results/examples/synthetic-10x.jpg"><img src="figures/results/examples/synthetic-10x.jpg" width="360" alt="Detecções ou gabarito: synthetic-10x"></a> |
 
-Os exemplos de `synthetic-2x` e `synthetic-3x` também estão incluídos acima. Reproduza com
-`scripts/render_detection_examples.py` (troca a imagem/modelo editando as
-constantes no topo do arquivo).
+### manual-full.val
+
+Imagem `img_2021.jpg`, com **25 caixas de gabarito**, primeira em ordem
+lexicográfica no split de validação. A seleção independe das predições.
+Os três detectores usam os checkpoints históricos da semente 41, `conf=0.25`,
+`imgsz=960` e `max_det=1000`. Esta cena ilustra diferenças de detecção;
+contagens iguais não significam caixas corretas nem desempenho equivalente.
+
+![Gabarito manual-full.val com 25 caixas amarelas](figures/results/examples/manual-full-val/yolov8s/ground-truth.jpg)
+
+| Detector | manual-full | controlled | synthetic-3x |
+|---|---|---|---|
+| YOLOv8s | ![YOLOv8s manual-full, 25 detecções](figures/results/examples/manual-full-val/yolov8s/manual-full.jpg) | ![YOLOv8s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolov8s/controlled.jpg) | ![YOLOv8s synthetic-3x, 25 detecções](figures/results/examples/manual-full-val/yolov8s/synthetic-3x.jpg) |
+| YOLO26s | ![YOLO26s manual-full, 26 detecções](figures/results/examples/manual-full-val/yolo26s/manual-full.jpg) | ![YOLO26s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolo26s/controlled.jpg) | ![YOLO26s synthetic-3x, 21 detecções](figures/results/examples/manual-full-val/yolo26s/synthetic-3x.jpg) |
+| RT-DETR-L | ![RT-DETR-L manual-full, 41 detecções](figures/results/examples/manual-full-val/rtdetr-l/manual-full.jpg) | ![RT-DETR-L controlled, nenhuma detecção](figures/results/examples/manual-full-val/rtdetr-l/controlled.jpg) | ![RT-DETR-L synthetic-3x, 33 detecções](figures/results/examples/manual-full-val/rtdetr-l/synthetic-3x.jpg) |
+
+Reprodução, sem novos treinos:
+
+```bash
+.venv/bin/python scripts/render_detection_examples.py
+for model in yolov8s yolo26s rtdetr-l; do
+  .venv/bin/python scripts/render_detection_examples.py \
+    --dataset manual_full_val --model "$model" \
+    --condition manual-full --condition controlled --condition synthetic-3x
+done
+```
+
+Use `--image-stem` e `--seed` para escolher outra imagem e semente.
+Os arquivos `provenance.json` junto das imagens registram hashes dos dados,
+checkpoints, condições e contagens. O script verifica o hash de cada peso
+contra a seleção histórica antes da inferência.
+
+## Exemplos de dados sintéticos
+
+Cenas existentes de `paired_reference`, geradas com semente raiz 42 e
+`paired-v1`. São exemplos do gerador atual, separados do pool histórico dos
+42 treinamentos acima. A seleção usa os quantis 25%, 50%, 75% e 97% da
+contagem de caixas nas 390 cenas, com desempate pelo índice de geração;
+não usa resultados de detector nem seleção estética. À direita, os rótulos
+automáticos da mesma cena. As imagens sem caixas permitem inspecionar
+problemas de inserção, escala e iluminação que as métricas não resumem.
+
+| Cena composta | Gabarito automático |
+|---|---|
+| ![Cena 188, 7 frutas](figures/results/synthetic-examples/scene-1.jpg) | ![Cena 188, 7 caixas](figures/results/synthetic-examples/scene-1-boxes.jpg) |
+| ![Cena 1, 16 frutas](figures/results/synthetic-examples/scene-2.jpg) | ![Cena 1, 16 caixas](figures/results/synthetic-examples/scene-2-boxes.jpg) |
+| ![Cena 7, 25 frutas](figures/results/synthetic-examples/scene-3.jpg) | ![Cena 7, 25 caixas](figures/results/synthetic-examples/scene-3-boxes.jpg) |
+| ![Cena 360, 73 frutas](figures/results/synthetic-examples/scene-4.jpg) | ![Cena 360, 73 caixas](figures/results/synthetic-examples/scene-4-boxes.jpg) |
+
+Reproduza a exportação com `.venv/bin/python scripts/render_synthetic_examples.py`.
+O dataset deve estar gerado conforme o [guia do estúdio](GENERATOR_STUDIO.md).
+O [registro de origem](figures/results/synthetic-examples/provenance.json)
+preserva sementes por cena, hashes, índices e a regra de seleção.
 
 ## Distribuição espacial das anotações
 
@@ -232,3 +310,141 @@ coleta, preparação e revisão dos rótulos automáticos.
   de estatísticas no gerador nem o reuso da validação manual para seleção.
 - As médias versionadas registram a precisão das tabelas publicadas; auditoria
   por execução depende dos JSONs originais e dos manifestos do pool utilizado.
+
+## Primeira comparação pareada com YOLOv8s
+
+A candidata sem exposição independente e sem sombras projetadas foi
+**rejeitada como melhoria**. O mAP@.50:.95 caiu nos dois cenários, nas duas
+sementes. A distância de saturação também aumentou em ambas as coletas.
+A interface mantém a receita atual como ponto de partida.
+
+| Cenário | Receita atual, média | Candidata, média | Diferença |
+|---|---:|---:|---:|
+| Validação manual | 0,3787 | 0,3588 | −0,0199 |
+| CitDet | 0,2101 | 0,1943 | −0,0158 |
+
+| Receita | Semente de treino | Validação manual | CitDet |
+|---|---:|---:|---:|
+| Atual | 41 | 0,379996 | 0,214497 |
+| Atual | 42 | 0,377453 | 0,205714 |
+| Candidata | 41 | 0,367916 | 0,206601 |
+| Candidata | 42 | 0,349688 | 0,181912 |
+
+Cada braço usa 312 imagens de treino e 78 de validação, com 5.582 e 1.484
+caixas respectivamente. As 390 imagens têm a mesma geometria e rótulos
+entre os braços; apenas a aparência muda. Geração com semente 42,
+`sampling.mode: paired-v1`, catálogo de 228 fundos e 127 recortes. Dois
+mecanismos foram removidos em conjunto, reduzindo as folhas do YAML de 62
+para 50; este resultado não isola a contribuição individual de cada um.
+
+Treino com YOLOv8s, 50 épocas, tamanho 960, batch 8, SGD e pesos pré-treinados,
+conforme [a configuração](../configs/similarity_yolov8.yaml). Os checkpoints
+foram selecionados na validação sintética; os quatro foram congelados em
+`artifacts/similarity_yolov8/paired_selection.json` antes da avaliação real.
+
+Na comparação de aparência sobre o treino sintético inteiro, a distância
+entre quantis de saturação subiu de 7,90 para 12,36 na coleta local e de 16,61
+para 21,14 no CitDet (pontos percentuais da escala de saturação). A distância
+de luminância caiu de 3,88 para 2,80 no local, mas subiu de 11,03 para 12,11
+no CitDet. Logo, também não houve melhora conjunta das distribuições.
+Essas medidas incluem o conteúdo das caixas, não apenas a casca das frutas.
+
+Os dois conjuntos reais já participaram do desenvolvimento anterior. São
+resultados exploratórios, não confirmação de generalização nem teste de
+significância. Os números publicados da grade antiga pertencem a outro pool
+e não substituem o controle pareado desta comparação.
+
+O [snapshot com resultados, hashes e medidas de similaridade](studio-results.json)
+permite consultar os números sem os pesos locais. Os artefatos completos
+ficam em `artifacts/similarity_yolov8` e os checkpoints em
+`runs/similarity_yolov8/training`.
+
+A meta de melhorar o detector com menos parâmetros continua aberta. A
+amostragem pareada, a rastreabilidade e a interface foram implementadas e
+validadas; esta simplificação específica não foi adotada. A próxima hipótese
+deve tratar um mecanismo por vez e partir de um problema visível nas cenas,
+como contexto, posicionamento ou aparência local, preservando a densidade
+escolhida no projeto.
+
+## Ciclo de verossimilhança com YOLOv8s
+
+<!-- realism-metrics:start -->
+![YOLOv8s por receita e semente nos dois cenários](figures/results/realism/map.svg)
+
+| Receita | CitDet 41 | CitDet 42 | Média | Local 41 | Local 42 | Média |
+|---|---:|---:|---:|---:|---:|---:|
+| manual-full | 0.223432 | 0.204814 | 0.214123 | 0.543716 | 0.554439 | 0.549077 |
+| paired_essential | 0.206601 | 0.181912 | 0.194256 | 0.367916 | 0.349688 | 0.358802 |
+| paired_reference | 0.214497 | 0.205714 | 0.210106 | 0.379996 | 0.377453 | 0.378725 |
+| paired_canopy | 0.186433 | 0.216165 | 0.201299 | 0.304351 | 0.378800 | 0.341576 |
+| paired_count_scale | 0.203593 | 0.213430 | 0.208512 | 0.351961 | 0.363115 | 0.357538 |
+| paired_exposure | 0.208765 | 0.198986 | 0.203875 | 0.381753 | 0.360261 | 0.371007 |
+| paired_highlights | 0.213855 | 0.201245 | 0.207550 | 0.399793 | 0.358221 | 0.379007 |
+| paired_relief | 0.196127 | 0.196459 | 0.196293 | 0.382208 | 0.389005 | 0.385606 |
+| paired_saturation | 0.213395 | 0.198733 | 0.206064 | 0.380718 | 0.382966 | 0.381842 |
+| paired_shade | 0.186947 | 0.192797 | 0.189872 | 0.360671 | 0.373438 | 0.367055 |
+| paired_sharpness | 0.196401 | 0.204688 | 0.200545 | 0.368514 | 0.360088 | 0.364301 |
+
+Valores de mAP@.50:.95. Os pontos mostram as duas sementes de treino,
+não intervalos de confiança. Todos os ciclos são exploratórios; ambos
+os conjuntos reais já participaram do desenvolvimento. Os checkpoints
+sintéticos foram selecionados somente na validação sintética.
+
+O [snapshot completo](realism-results.json) registra métricas, similaridade
+e hashes das fontes. Reproduza este bloco com
+`.venv/bin/python scripts/report_realism.py` após a avaliação dos dois cenários.
+<!-- realism-metrics:end -->
+
+As três novas hipóteses mantêm 390 imagens, os 127 recortes, os mesmos fundos,
+as sementes de treino 41/42 e 50 épocas. A geração usa semente 42, modo
+pareado e a mistura original: 1–30 frutas, com probabilidade de 6% para
+60–110. Foram realizadas 18 cenas densas neste pool; não se aumentou essa
+probabilidade para perseguir mAP. O protocolo e a motivação anteriores aos
+treinos estão no [guia do gerador](GENERATOR_STUDIO.md#experimento-reduzido).
+
+| Receita | Mudança e referência | Inspeção das mesmas cenas |
+|---|---|---|
+| `paired_saturation` | Sobre `paired_reference`, perda de saturação ligada à exposição de 0,35 para 0,70. Mesmos 390 rótulos, byte a byte. | [Cenas 1 e 188](figures/results/realism/saturation.jpg) |
+| `paired_relief` | Sobre `paired_saturation`, remove `bright_flatten_strength`. Mesmos rótulos; uma folha a menos no YAML. | [Cenas 1 e 188](figures/results/realism/relief.jpg) |
+| `paired_count_scale` | Sobre `paired_reference`, escala proporcional a `sqrt(30 / contagem)` somente acima de 30 frutas. Nenhum novo ajuste numérico. | [Cenas densas 36 e 360](figures/results/realism/count-scale.jpg) |
+
+As cenas 1 e 188 já integravam a inspeção anterior por quantis de contagem.
+A cena 36 é a primeira cena densa em ordem de geração e a 360 já era o
+exemplo denso publicado. Os índices foram definidos antes dos resultados
+dos respectivos detectores; cada figura tem um JSON de proveniência junto.
+As comparações mantêm a proporção e não retocam os resultados do compositor.
+
+Na ablação de escala, 372 imagens esparsas e seus rótulos permaneceram
+idênticos. As 18 cenas densas mantiveram fundos, recortes, sementes e contagens
+sorteadas, com mudanças de tamanho e possíveis mudanças de inserção/oclusão.
+São as mesmas 7.086 frutas solicitadas; as caixas finais passaram de 7.066
+para 7.074, por menor perda na composição. A mediana do tamanho nas cenas de
+treino com mais de 60 caixas caiu de 2,826% para 1,804%; no CitDet é 1,668%.
+Isso aproxima a escala desse domínio, mas piora a distância global de tamanho
+no domínio local: de 0,814 para 1,040 ponto percentual. No CitDet, essa
+distância cai de 1,279 para 1,078. Não há melhora uniforme em todos os descritores.
+
+A candidata de saturação não foi promovida: aproximou a distribuição de cor,
+mas reduziu o mAP do CitDet nas duas sementes contra a receita de referência.
+As cenas ainda revelam problemas de contexto, frutas sem ligação aparente
+com galhos e oclusões fragmentadas. Uma distância menor de cor ou escala
+não certifica que todo o dataset seja verossímil.
+
+Para reproduzir o ciclo com os ativos preparados:
+
+```bash
+for recipe in paired_saturation paired_relief paired_count_scale; do
+  .venv/bin/python scripts/generate_synthetic.py \
+    --synthesis-config "configs/synthesis/$recipe.yaml" --workers 6
+done
+.venv/bin/python scripts/train_grid.py --config configs/realism_yolov8.yaml --device 0 --workers 4
+.venv/bin/python scripts/evaluate_similarity.py --config configs/realism_yolov8.yaml --device 0
+.venv/bin/python scripts/report_realism.py
+.venv/bin/python scripts/render_realism_examples.py \
+  --candidate paired_count_scale --scene 36 --scene 360 --output count-scale
+```
+
+O gerador recusa reutilizar diretórios de outra versão do código; use um
+diretório novo para reconstruir dados antigos. Alterações somente no código
+de proveniência podem preservar os pixels e ainda mudar o identificador do
+experimento. Os hashes publicados registram a versão efetivamente avaliada.

@@ -1,0 +1,57 @@
+{
+  "examples": [
+    {
+      "annotations": 16,
+      "config_hash": "48dd6b9948ee458173d1fb44",
+      "dataset": "paired_reference",
+      "generation_index": 1,
+      "generator_sha256": "2522bd40c1d3503a1b7b19f3796543be30826b648b88039f1b205ef265464e42",
+      "image": "data/generated/paired_reference/images/train/train_000001.jpg",
+      "image_sha256": "21e1bf0a8bc441d3b4298901443ff7e5a747dd958f32b2b4b181197ac786ebfd",
+      "label_sha256": "a38f96a4995695f2824a7177f1677337eaa3b26240e9e39b5678dd8abf4ea5bf",
+      "manifest_sha256": "b5d22191ae34669299e62ff46cf97bc5e58be0e64dbfe7fb063934c4ae3b2b4f",
+      "requested_objects": 16,
+      "seed": 10876665545185080536
+    },
+    {
+      "annotations": 7,
+      "config_hash": "48dd6b9948ee458173d1fb44",
+      "dataset": "paired_reference",
+      "generation_index": 188,
+      "generator_sha256": "2522bd40c1d3503a1b7b19f3796543be30826b648b88039f1b205ef265464e42",
+      "image": "data/generated/paired_reference/images/train/train_000148.jpg",
+      "image_sha256": "f56b61d9f2e287dc032103ef59116e4b1bf8baf0309e482acde7ca247a00e290",
+      "label_sha256": "4179a8dd0f763b9d1d14c82c5e0b605a198d7fda02a25e5ba5e8730395be812b",
+      "manifest_sha256": "b5d22191ae34669299e62ff46cf97bc5e58be0e64dbfe7fb063934c4ae3b2b4f",
+      "requested_objects": 7,
+      "seed": 13290417370362835197
+    },
+    {
+      "annotations": 16,
+      "config_hash": "ccd4e83d6c83b20e8f37c992",
+      "dataset": "paired_saturation",
+      "generation_index": 1,
+      "generator_sha256": "2522bd40c1d3503a1b7b19f3796543be30826b648b88039f1b205ef265464e42",
+      "image": "data/generated/paired_saturation/images/train/train_000001.jpg",
+      "image_sha256": "b1fa1e38b3d5637a307ce8f210a029ba1898fba25f91e408ccc5981abcb5d729",
+      "label_sha256": "a38f96a4995695f2824a7177f1677337eaa3b26240e9e39b5678dd8abf4ea5bf",
+      "manifest_sha256": "5796d07e048969029b5383e403e882f557b065bffc5b47ecc9c357472c9b24f4",
+      "requested_objects": 16,
+      "seed": 10876665545185080536
+    },
+    {
+      "annotations": 7,
+      "config_hash": "ccd4e83d6c83b20e8f37c992",
+      "dataset": "paired_saturation",
+      "generation_index": 188,
+      "generator_sha256": "2522bd40c1d3503a1b7b19f3796543be30826b648b88039f1b205ef265464e42",
+      "image": "data/generated/paired_saturation/images/train/train_000148.jpg",
+      "image_sha256": "617f55d902195ef1a4f34664924a9eb4003265c924383fc334c64e9cfd197c68",
+      "label_sha256": "4179a8dd0f763b9d1d14c82c5e0b605a198d7fda02a25e5ba5e8730395be812b",
+      "manifest_sha256": "5796d07e048969029b5383e403e882f557b065bffc5b47ecc9c357472c9b24f4",
+      "requested_objects": 7,
+      "seed": 13290417370362835197
+    }
+  ],
+  "selection": "Índices fixados antes da avaliação dos detectores; ver protocolo."
+}

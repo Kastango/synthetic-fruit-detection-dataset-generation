@@ -1,0 +1,33 @@
+{
+  "confidence": 0.25,
+  "dataset": "manual_full_val",
+  "ground_truth_boxes": 25,
+  "image": "data/real_yolo_confirmatory/images/val/img_2021.jpg",
+  "image_sha256": "56d7dad450e4868d62ad9f6cd05826d9b863f238f4696e27b96cc37558e912b8",
+  "imgsz": 960,
+  "label_sha256": "011bb7618320c197b221f17671dfa692d67a2433e23a3d8620a7045d71368952",
+  "max_det": 1000,
+  "model": "rtdetr-l",
+  "runs": [
+    {
+      "checkpoint_sha256": "eb420e8f73f48b7b679467e608ec8659f03d8e321292fb9cf2656ff54f8c84e4",
+      "condition": "manual-full",
+      "detections": 41,
+      "run_id": "manual-full__rtdetr-l__s41__d7bce45d70"
+    },
+    {
+      "checkpoint_sha256": "68e6d229c95a0e4e9ce28b2a490fc2dcb7be665fb6d7f2400a0c8c93b2f01c31",
+      "condition": "controlled",
+      "detections": 0,
+      "run_id": "controlled__rtdetr-l__s41__8ff45da659"
+    },
+    {
+      "checkpoint_sha256": "a6268563667b29af224005910930fdefb172c84bb934664e16c1d6d9d7a6dbfe",
+      "condition": "synthetic-3x",
+      "detections": 33,
+      "run_id": "synthetic-3x__rtdetr-l__s41__6010b4dc1d"
+    }
+  ],
+  "seed": 41,
+  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+}

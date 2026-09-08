@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pomar · Gerador sintético</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script defer src="/app.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="/" aria-label="Pomar início"
+        ><span class="mark" aria-hidden="true"></span>Pomar</a
+      >
+      <h1>Gerador sintético</h1>
+      <div class="header-actions">
+        <button id="export" class="secondary" disabled>Salvar receita</button
+        ><button id="generate" class="primary" disabled>Gerar dataset</button>
+      </div>
+    </header>
+    <div class="layout">
+      <aside>
+        <div class="seed">
+          <label for="seed">Semente</label
+          ><input id="seed" type="number" min="0" max="2147483647" value="42" />
+        </div>
+        <div id="controls"></div>
+        <button id="reset" class="secondary full">Restaurar ajustes</button>
+        <details class="seed-help">
+          <summary>Como reproduzir</summary>
+          <p>
+            Salve a receita com a semente. Com os mesmos fundos, recortes e
+            código, ela reproduz as cenas. Mudar a aparência preserva as
+            posições.
+          </p>
+        </details>
+      </aside>
+      <main>
+        <div class="toolbar">
+          <div class="segmented">
+            <button id="scene-tab" class="selected">Cenas</button
+            ><button id="crop-tab">Frutas</button>
+          </div>
+          <label class="check"
+            ><input id="boxes" type="checkbox" /> Caixas</label
+          ><label class="check"
+            ><input id="background" type="checkbox" /> Fundo original</label
+          ><button id="next" class="secondary">Novas cenas</button>
+        </div>
+        <div id="status" role="status" aria-live="polite">
+          Preparando imagens…
+        </div>
+        <section
+          id="scenes"
+          class="comparison"
+          aria-label="Prévias do dataset sintético"
+        ></section>
+        <details class="metrics-section">
+          <summary>Resumo da amostra</summary>
+          <div class="metrics-body">
+            <div class="metric-actions">
+              <p id="sample-note"></p>
+              <button id="report" class="secondary" disabled>
+                Baixar relatório
+              </button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Característica</th>
+                    <th>p10</th>
+                    <th>Mediana</th>
+                    <th>p90</th>
+                  </tr>
+                </thead>
+                <tbody id="metrics"></tbody>
+              </table>
+            </div>
+            <p class="metric-note">
+              Estas medidas descrevem as quatro cenas da prévia. Revise as
+              frutas e as caixas antes de gerar o dataset completo.
+            </p>
+            <p id="fingerprint" class="metric-note"></p>
+          </div>
+        </details>
+      </main>
+    </div>
+    <dialog id="zoom">
+      <button id="close-zoom" class="secondary">Fechar</button
+      ><img id="zoom-image" alt="Imagem ampliada" />
+    </dialog>
+    <dialog id="generation">
+      <form id="generation-form">
+        <div class="dialog-head">
+          <h2>Gerar dataset</h2>
+          <button type="button" id="close-generation" class="secondary">
+            Fechar
+          </button>
+        </div>
+        <label class="field-label" for="total">Quantidade de imagens</label
+        ><input
+          id="total"
+          type="number"
+          min="2"
+          max="5000"
+          value="390"
+          required
+        /><label class="field-label" for="train-ratio"
+          >Imagens para treino (%)</label
+        ><input
+          id="train-ratio"
+          type="number"
+          min="50"
+          max="95"
+          value="80"
+          required
+        />
+        <p class="help">
+          O restante será usado para validação. O arquivo ZIP inclui imagens,
+          caixas, receita e sementes.
+        </p>
+        <button type="submit" id="start-generation" class="primary full">
+          Gerar imagens
+        </button>
+      </form>
+      <div id="job-status" role="status" aria-live="polite"></div>
+      <progress id="job-progress" value="0" max="100" hidden></progress
+      ><a id="download-dataset" class="primary download" hidden
+        >Baixar dataset</a
+      >
+    </dialog>
+    <button
+      id="mobile-controls"
+      class="primary mobile-controls"
+      aria-expanded="false"
+    >
+      Ajustar receita
+    </button>
+  </body>
+</html>

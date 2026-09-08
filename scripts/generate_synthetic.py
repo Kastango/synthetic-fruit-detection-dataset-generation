@@ -18,10 +18,18 @@ def main() -> None:
     parser.add_argument("--asset-root", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--workers", type=int)
+    parser.add_argument("--seed", type=int, help="Sobrescreve a semente da geração.")
+    parser.add_argument("--sampling-mode", choices=["legacy", "paired-v1"])
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     pipeline = load_yaml(project_path(args.pipeline_config))
     synthesis = load_yaml(args.synthesis_config.expanduser().resolve())
+    if args.seed is not None:
+        if args.seed < 0:
+            parser.error("--seed deve ser um inteiro não negativo")
+        synthesis["seed"] = args.seed
+    if args.sampling_mode is not None:
+        synthesis["sampling"] = {"mode": args.sampling_mode}
     asset_root = (
         args.asset_root.expanduser().resolve()
         if args.asset_root

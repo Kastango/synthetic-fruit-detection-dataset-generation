@@ -111,14 +111,14 @@ def markdown_table(name: str, summary: dict) -> str:
 
 
 def build_trend_chart(
-    results_by_test: dict[str, dict], *, rounded: bool = False
+    results_by_test: dict[str, dict], *, rounded: bool = False, metric: str = "map50_95"
 ) -> Path:
     # Fixed SVG IDs and no timestamp make the snapshot reproducible.
     plt.rcParams["svg.hashsalt"] = "synthetic-fruit-results"
     fig, axes = plt.subplots(1, 2, figsize=(12, 5.2), sharey=True, facecolor=SURFACE)
     fig.subplots_adjust(wspace=0.18, top=0.73, bottom=0.22, left=0.07, right=0.98)
     maximum = max(
-        row["map50_95_mean"]
+        row[f"{metric}_mean"]
         for summary in results_by_test.values()
         for conditions in summary.values()
         for row in conditions.values()
@@ -137,19 +137,19 @@ def build_trend_chart(
         for detector in DETECTOR_ORDER:
             color = DETECTOR_COLOR[detector]
             xs = [TRAIN_IMAGES[c] for c in SYNTHETIC_CONDITIONS]
-            ys = [summary[detector][c]["map50_95_mean"] for c in SYNTHETIC_CONDITIONS]
+            ys = [summary[detector][c][f"{metric}_mean"] for c in SYNTHETIC_CONDITIONS]
             ax.plot(
                 xs, ys, color=color, linewidth=2, marker="o", markersize=5, zorder=3
             )
             ax.axhline(
-                summary[detector]["manual-full"]["map50_95_mean"],
+                summary[detector]["manual-full"][f"{metric}_mean"],
                 color=color,
                 linewidth=1.3,
                 linestyle=(0, (5, 3)),
                 alpha=0.8,
             )
             ax.axhline(
-                summary[detector]["controlled"]["map50_95_mean"],
+                summary[detector]["controlled"][f"{metric}_mean"],
                 color=color,
                 linewidth=1.4,
                 linestyle=(0, (1, 3)),
@@ -163,7 +163,13 @@ def build_trend_chart(
             ["1x\n104", "2x\n208", "3x\n312", "5x\n520", "10x\n1.040"],
         )
         ax.set_xlabel("Volume sintético / imagens de treino", fontsize=10, labelpad=10)
-    axes[0].set_ylabel("mAP@0.50:0.95", fontsize=10)
+    labels = {
+        "map50_95": "mAP@0.50:0.95",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1",
+    }
+    axes[0].set_ylabel(labels[metric], fontsize=10)
     model_handles = [
         plt.Line2D([0], [0], color=DETECTOR_COLOR[d], linewidth=2, marker="o", label=d)
         for d in DETECTOR_ORDER
@@ -188,7 +194,7 @@ def build_trend_chart(
         ),
     ]
     fig.suptitle(
-        "Desempenho por volume de dados sintéticos",
+        f"{labels[metric]} por volume de dados sintéticos",
         x=0.07,
         ha="left",
         y=0.98,
@@ -208,7 +214,8 @@ def build_trend_chart(
         note += " Fonte: médias publicadas, arredondadas a 3 casas."
     fig.text(0.07, 0.04, note, fontsize=9, color=INK_SECONDARY)
     FIGURES.mkdir(parents=True, exist_ok=True)
-    out_path = FIGURES / "synthetic-volume-vs-map.svg"
+    suffix = "map" if metric == "map50_95" else metric
+    out_path = FIGURES / f"synthetic-volume-vs-{suffix}.svg"
     fig.savefig(out_path, facecolor=SURFACE, metadata={"Date": None})
     plt.close(fig)
     out_path.write_text(
@@ -252,11 +259,15 @@ def main() -> None:
     tables = "\n".join(
         markdown_table(name, summary) for name, summary in results.items()
     )
-    chart_path = build_trend_chart(results, rounded=args.results_dir is None)
+    chart_paths = [
+        build_trend_chart(results, rounded=args.results_dir is None, metric=metric)
+        for metric in ("map50_95", "precision", "recall", "f1")
+    ]
     heatmaps = copy_heatmaps(args.results_dir) if args.results_dir else []
     examples = copy_detection_examples()
     print(f"tabelas geradas para: {list(results)}")
-    print(f"gráfico salvo em: {chart_path.relative_to(ROOT)}")
+    for chart_path in chart_paths:
+        print(f"gráfico salvo em: {chart_path.relative_to(ROOT)}")
     print(f"heatmaps copiados: {heatmaps}")
     print(
         f"exemplos de detecção presentes: {examples or '(rode scripts/render_detection_examples.py antes)'}"

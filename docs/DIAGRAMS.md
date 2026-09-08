@@ -139,13 +139,15 @@ os arquivos. A licença do código não substitui os termos desses recursos.
 
 Esse comando usa [`results-summary.json`](results-summary.json), que preserva
 as médias arredondadas publicadas, e não exige checkpoints. Para usar os JSONs
-originais, passe `--results-dir artifacts/confirmatory`. O comando gera o SVG
+originais, passe `--results-dir artifacts/confirmatory`. O comando gera quatro SVGs
 e tabelas intermediárias, mas não reescreve a interpretação em `RESULTS.md`.
 O snapshot não contém valores por semente; não derive barras de erro dele.
 
 Os exemplos de detecção usam `scripts/render_detection_examples.py`, que
-requer checkpoints, CitDet preparado e GPU. Imagem, modelo e semente ficam no
-topo do script. Preserve a mesma imagem e limiar entre condições e informe
+requer checkpoints e o conjunto escolhido preparado. Use `--dataset`,
+`--model`, `--image-stem` e `--seed`; `--device cpu` permite executar sem GPU.
+Os comandos e exemplos sintéticos estão em [RESULTS.md](RESULTS.md).
+Preserve a mesma imagem e limiar entre condições e informe
 esses valores na legenda. Uma imagem escolhida para ilustração não demonstra
 desempenho médio.
 
