@@ -25,7 +25,7 @@ configuração; as caixas sintéticas totais são as publicadas em
 as mesmas augmentações de cor e geometria. Nenhum hiperparâmetro varia por
 condição ou por detector, inclusive nas condições de dados reais. O motivo da
 escolha do congelamento, e seu custo medido para a linha de base real, estão
-em [GENERATOR_STUDIO.md](GENERATOR_STUDIO.md#congelamento-uniforme-do-backbone).
+em [Congelamento uniforme do backbone](#congelamento-uniforme-do-backbone).
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
 de cada execução é escolhido sem consultar o CitDet; somente após a seleção ser
@@ -286,6 +286,72 @@ imagem também torna a métrica sensível a resolução de entrada, `max_det` e
 oclusão. Por isso, o resultado deve ser lido como robustez fora do domínio, não
 como substituto da validação local nem como estimativa direta de desempenho em
 qualquer pomar brasileiro.
+
+## Receita de síntese e protocolo de treino
+
+A receita é [`configs/synthesis/confirmatory_pool.yaml`](../configs/synthesis/confirmatory_pool.yaml),
+única fonte dos conjuntos sintéticos.
+
+### Por que 25% de cenas densas
+
+A proporção vem da distribuição de caixas por imagem das coletas reais:
+
+| conjunto | imagens | média | p25 | mediana | p75 | p95 | máximo |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| CitDet (teste) | 119 | 84,7 | 43 | 78 | 121 | 174 | 233 |
+| `manual-full` (treino) | 104 | 15,8 | 9 | 14 | 22 | 31 | 40 |
+| `manual-full` (validação) | 26 | 17,3 | 11 | 18 | 24 | 28 | 31 |
+| pool sintético (25%) | 312 | 33,1 | 10 | 21 | 61 | 97 | 109 |
+
+As duas coletas reais são regimes opostos: mediana 14 e máximo 40 no
+`manual-full`, mediana 78 e máximo 233 no CitDet. Nenhuma distribuição
+sintética única é verossímil para as duas ao mesmo tempo. Com poucas cenas
+densas o gerador replica o `manual-full` e ignora o CitDet; a 25% ele cobre os
+dois, com a metade inferior no regime do `manual-full` e o quartil superior
+entrando na faixa central do CitDet. As cenas densas permanecem abaixo do
+máximo real observado, de 233 caixas.
+
+### Congelamento uniforme do backbone
+
+A grade usa `freeze: 5` em **todas** as condições e todos os modelos, inclusive
+nos treinos com dados reais. É uma decisão de projeto tomada com o custo já
+medido, e o custo fica registrado aqui em vez de omitido.
+
+Congelar os blocos iniciais prejudica o treino com dados reais. Medido com o
+mesmo protocolo e as mesmas sementes, `manual-full` sem congelamento obtém
+0,5459 no conjunto local e com `freeze: 5` obtém 0,5062, uma perda de 0,0346,
+com as duas sementes abaixo das do controle. No CitDet a diferença é nula, de
+0,2126 para 0,2130. No treino sintético o mesmo corte rende entre +0,0088 e
++0,0161 no CitDet sem custo local, replicado em três conjuntos e duas
+arquiteturas.
+
+O motivo de aplicá-lo mesmo assim é a uniformidade: comparar condições exige
+que treino, épocas, augmentação e congelamento sejam os mesmos para todas
+elas. Um protocolo escolhido por condição, ainda que cada escolha fosse ótima
+isoladamente, tornaria as diferenças entre condições ininterpretáveis.
+
+Ao ler a grade, considere que a escolha do congelamento foi feita depois de
+medir que ele favorece o treino sintético e desfavorece o real, e que portanto
+a linha de base real aparece abaixo do seu próprio melhor desempenho possível.
+Os números do treino real sem congelamento estão no parágrafo acima
+justamente para que essa distância seja verificável.
+
+A interpretação causal é que congelar remove a capacidade de adaptar filtros
+de baixo nível à estatística do domínio de treino. Isso penaliza quem treina
+no mesmo domínio em que testa e beneficia quem treina em cena composta: o
+modelo congelado ajusta pior a validação sintética e transfere melhor, o que
+é remoção de sobreajuste aos artefatos de composição, não ganho de capacidade.
+
+### Reprodutibilidade verificada
+
+O gerador foi regerado a partir da receita oficial em diretório separado:
+390 imagens idênticas byte a byte, nenhum rótulo divergente, e `config_hash`,
+`asset_catalog_fingerprint`, `generator_sha256` e `generator_schema_version`
+coincidentes. O marcador de geração recusa retomar um diretório produzido por
+outra configuração, código, catálogo ou split, o que impede que uma pasta seja
+sobrescrita depois de as corridas a referenciarem. Reprodução byte a byte
+também depende das mesmas versões de Python, NumPy e Pillow; treino
+determinístico de GPU tem limites próprios de hardware e bibliotecas.
 
 ## Rastreabilidade
 
