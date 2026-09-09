@@ -38,17 +38,22 @@ MAX_OFF = 16
 # por carta — a borda comeria a foto e o baralho viraria uma mancha. Abaixo de
 # ~3,5 px a carta deixa de ler como carta, e é isso que fixa o teto do treino.
 TRAIN_MAX_DECK, VAL_MAX_DECK = 520, 288
-# A seta tem comprimento fixo e cada linha flui da esquerda para a direita a partir
-# das larguras reais dos baralhos. Colunas fixas obrigariam a seta do manual-full a
-# esticar 304 px para alcançar a validação; assim a própria extensão da linha fica
-# proporcional ao volume da condição.
-ARROW = 40
+# As setas dividem o espaço livre. A largura total acomoda as maiores pilhas.
+ARROW = 40  # comprimento mínimo no maior volume
 GUTTER = 14  # folga entre baralho e seta
 TEST_CARDS_WIDTH = 140  # o teste não escala: são sempre as mesmas 119 imagens
 
 DECK_Y, LABEL_Y = 18, 102
 HEIGHT = 120
 TRAIN_X = 16
+WIDTH = (
+    2 * TRAIN_X
+    + TRAIN_MAX_DECK
+    + VAL_MAX_DECK
+    + TEST_CARDS_WIDTH
+    + 4 * GUTTER
+    + 2 * ARROW
+)
 
 
 def row_extent(train: int, val: int) -> tuple[float, float, float, float]:
@@ -59,9 +64,10 @@ def row_extent(train: int, val: int) -> tuple[float, float, float, float]:
     val_w = CARD_W + (deck_size(val) - 1) * card_offset(
         deck_size(val), deck_width(deck_size(val), VAL_MAX_DECK)
     )
-    val_x = TRAIN_X + train_w + GUTTER + ARROW + GUTTER
-    test_x = val_x + val_w + GUTTER + ARROW + GUTTER
-    return train_w, val_x, test_x, test_x + TEST_CARDS_WIDTH + 16
+    arrow = (WIDTH - 2 * TRAIN_X - train_w - val_w - TEST_CARDS_WIDTH - 4 * GUTTER) / 2
+    val_x = TRAIN_X + train_w + 2 * GUTTER + arrow
+    test_x = val_x + val_w + 2 * GUTTER + arrow
+    return train_w, val_x, test_x, WIDTH
 
 
 def deck_width(cards: int, ceiling: int) -> int:
@@ -123,9 +129,6 @@ UNIT_IMAGES, UNIT_CARDS = 26, 3
 def deck_size(count: int) -> int:
     """Cartas proporcionais ao volume, na mesma escala para treino e validação."""
     return max(1, round(UNIT_CARDS * count / UNIT_IMAGES))
-
-
-WIDTH = max(row_extent(train, val)[3] for _, train, val, _ in CONDITIONS)
 
 
 def thousands(value: int) -> str:

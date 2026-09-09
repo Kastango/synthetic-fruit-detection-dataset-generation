@@ -83,16 +83,17 @@ o número de imagens, e cada conjunto sintético contém o menor nas duas parti�
 
 | Condição | Treino, validação e teste |
 |---|---|
-| `manual-full` | Fotografias de campo<br><br><img src="docs/figures/condicoes/condicao-manual-full.svg" alt="Conjuntos de manual-full, com pilhas proporcionais ao volume" width="644"> |
-| `controlled` | Frutas isoladas e fundos negativos<br><br><img src="docs/figures/condicoes/condicao-controlled.svg" alt="Conjuntos de controlled, com pilhas proporcionais ao volume" width="1004"> |
-| `synthetic-1x` | Cenas sintéticas<br><br><img src="docs/figures/condicoes/condicao-synthetic-1x.svg" alt="Conjuntos de synthetic-1x, com pilhas proporcionais ao volume" width="644"> |
-| `synthetic-2x` | Contém synthetic-1x<br><br><img src="docs/figures/condicoes/condicao-synthetic-2x.svg" alt="Conjuntos de synthetic-2x, com pilhas proporcionais ao volume" width="884"> |
-| `synthetic-3x` | Contém synthetic-2x<br><br><img src="docs/figures/condicoes/condicao-synthetic-3x.svg" alt="Conjuntos de synthetic-3x, com pilhas proporcionais ao volume" width="1020"> |
+| `manual-full` | Fotografias de campo<br><br><img src="docs/figures/condicoes/condicao-manual-full.svg" alt="Conjuntos de manual-full, com pilhas proporcionais ao volume" width="1116"> |
+| `controlled` | Frutas isoladas e fundos negativos<br><br><img src="docs/figures/condicoes/condicao-controlled.svg" alt="Conjuntos de controlled, com pilhas proporcionais ao volume" width="1116"> |
+| `synthetic-1x` | Cenas sintéticas<br><br><img src="docs/figures/condicoes/condicao-synthetic-1x.svg" alt="Conjuntos de synthetic-1x, com pilhas proporcionais ao volume" width="1116"> |
+| `synthetic-2x` | Contém synthetic-1x<br><br><img src="docs/figures/condicoes/condicao-synthetic-2x.svg" alt="Conjuntos de synthetic-2x, com pilhas proporcionais ao volume" width="1116"> |
+| `synthetic-3x` | Contém synthetic-2x<br><br><img src="docs/figures/condicoes/condicao-synthetic-3x.svg" alt="Conjuntos de synthetic-3x, com pilhas proporcionais ao volume" width="1116"> |
 | `synthetic-5x` | Contém synthetic-3x<br><br><img src="docs/figures/condicoes/condicao-synthetic-5x.svg" alt="Conjuntos de synthetic-5x, com pilhas proporcionais ao volume" width="1116"> |
 | `synthetic-10x` | Contém synthetic-5x<br><br><img src="docs/figures/condicoes/condicao-synthetic-10x.svg" alt="Conjuntos de synthetic-10x, com pilhas proporcionais ao volume" width="1116"> |
 
 Treino e validação usam três cartas por 26 imagens, com arredondamento.
-As pilhas ficam mais compactas nos volumes maiores. As três cartas de teste
+Todos os diagramas têm a mesma largura. As setas ocupam o espaço livre
+nos volumes menores, e as pilhas ficam mais compactas nos maiores. As três cartas de teste
 representam sempre as mesmas 119 imagens do CitDet. As miniaturas ilustram
 o tipo de dado; os rótulos informam as contagens exatas.
 

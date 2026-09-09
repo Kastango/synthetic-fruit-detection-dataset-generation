@@ -45,7 +45,9 @@ Saídas:
 O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
 Treino e validação usam três cartas por 26 imagens. O espaçamento diminui
 nas pilhas maiores; a largura não é uma escala linear. O teste usa três
-cartas fixas. Cada SVG termina após a última pilha, sem faixa vazia à direita.
+cartas fixas. Todos os SVGs têm 1.116 px de largura. As duas ligações dividem
+o espaço livre, com setas maiores nas condições com menos imagens.
+A pilha do CitDet fica alinhada à direita em todas as condições.
 As setas entre treino e validação representam a avaliação entre épocas.
 A validação não atualiza os pesos.
 
