@@ -91,12 +91,7 @@ o número de imagens, e cada conjunto sintético contém o menor nas duas parti�
 | `synthetic-5x` | Contém synthetic-3x<br><br><img src="docs/figures/condicoes/condicao-synthetic-5x.svg" alt="Conjuntos de synthetic-5x, com pilhas proporcionais ao volume" width="1116"> |
 | `synthetic-10x` | Contém synthetic-5x<br><br><img src="docs/figures/condicoes/condicao-synthetic-10x.svg" alt="Conjuntos de synthetic-10x, com pilhas proporcionais ao volume" width="1116"> |
 
-Cada grupo usa duas cartas por 26 imagens, com arredondamento. Assim, 104
-imagens aparecem como oito cartas, e as 119 imagens do CitDet como nove.
-Todos os diagramas têm a mesma largura. Treino, validação e teste começam
-nas mesmas posições horizontais, e as setas preenchem os intervalos.
-As pilhas ficam mais compactas nos volumes maiores. As miniaturas ilustram
-o tipo de dado; os rótulos informam as contagens exatas.
+As pilhas ilustram o volume de dados; os rótulos mostram a quantidade de imagens.
 
 A avaliação local também usa as 26 imagens de `manual-full.val`.
 As setas entre treino e validação representam a avaliação entre épocas,
