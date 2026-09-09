@@ -222,18 +222,28 @@ em ciano. As coordenadas das anotações permanecem as originais.
 
 ### CitDet
 
-Mesma imagem do teste CitDet (`ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07`,
-49 caixas de gabarito), avaliada com o checkpoint `yolo26s` (seed 41) de cada
-condição, `conf ≥ 0.25`. É uma imagem ilustrativa, sem amostragem aleatória
-documentada; não representa a distribuição de erros do conjunto. A imagem
-completa abre ao clicar na miniatura.
+Duas cenas do split de teste do CitDet, cada uma avaliada com o checkpoint
+`yolo26s` (semente 41) de todas as sete condições, `conf ≥ 0.25`. As duas
+cobrem regimes de densidade opostos, e a segunda foi escolhida por regra
+explícita: a imagem cuja contagem de caixas é a mais próxima da mediana do
+conjunto (78), com desempate lexicográfico. A escolha não usou predições de
+detector. Cada folha abre em tamanho cheio ao clicar.
 
-| | |
-|---|---|
-| **Gabarito**<br><a href="figures/results/examples/ground-truth.jpg"><img src="figures/results/examples/ground-truth.jpg" width="360" alt="Detecções ou gabarito: ground-truth"></a> | **manual-full**<br><a href="figures/results/examples/manual-full.jpg"><img src="figures/results/examples/manual-full.jpg" width="360" alt="Detecções ou gabarito: manual-full"></a> |
-| **controlled**<br><a href="figures/results/examples/controlled.jpg"><img src="figures/results/examples/controlled.jpg" width="360" alt="Detecções ou gabarito: controlled"></a> | **synthetic-1x**<br><a href="figures/results/examples/synthetic-1x.jpg"><img src="figures/results/examples/synthetic-1x.jpg" width="360" alt="Detecções ou gabarito: synthetic-1x"></a> |
-| **synthetic-2x**<br><a href="figures/results/examples/synthetic-2x.jpg"><img src="figures/results/examples/synthetic-2x.jpg" width="360" alt="Detecções ou gabarito: synthetic-2x"></a> | **synthetic-3x**<br><a href="figures/results/examples/synthetic-3x.jpg"><img src="figures/results/examples/synthetic-3x.jpg" width="360" alt="Detecções ou gabarito: synthetic-3x"></a> |
-| **synthetic-5x**<br><a href="figures/results/examples/synthetic-5x.jpg"><img src="figures/results/examples/synthetic-5x.jpg" width="360" alt="Detecções ou gabarito: synthetic-5x"></a> | **synthetic-10x**<br><a href="figures/results/examples/synthetic-10x.jpg"><img src="figures/results/examples/synthetic-10x.jpg" width="360" alt="Detecções ou gabarito: synthetic-10x"></a> |
+**Cena esparsa** — `ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07`,
+49 caixas de gabarito, abaixo do primeiro quartil do CitDet.
+
+[![Comparação das sete condições na cena esparsa do CitDet](figures/results/sheets/citdet-cena-esparsa.jpg)](figures/results/sheets/citdet-cena-esparsa.jpg)
+
+**Cena na mediana** — `bingo_plot23_plant1_treefront`, 78 caixas de gabarito,
+exatamente a mediana do conjunto, e de outra subcoleção do CitDet.
+
+[![Comparação das sete condições na cena mediana do CitDet](figures/results/sheets/citdet-cena-mediana.jpg)](figures/results/sheets/citdet-cena-mediana.jpg)
+
+Na cena mediana, o gabarito tem 78 caixas; `manual-full` prevê 61,
+`synthetic-3x` prevê 77 e `synthetic-10x` prevê 91. `controlled` não produz
+nenhuma detecção em nenhuma das duas cenas, coerente com seu mAP de 0,001.
+São duas imagens ilustrativas, não uma amostra aleatória: elas mostram o tipo
+de erro cometido, não a distribuição de erros do conjunto.
 
 ### manual-full.val
 
@@ -243,26 +253,37 @@ Os três detectores usam os checkpoints da semente 41, `conf=0.25`,
 `imgsz=960` e `max_det=1000`. Esta cena ilustra diferenças de detecção;
 contagens iguais não significam caixas corretas nem desempenho equivalente.
 
-![Gabarito manual-full.val com 25 caixas amarelas](figures/results/examples/manual-full-val/yolov8s/ground-truth.jpg)
+As três folhas abaixo mostram, para cada detector, o gabarito e as sete
+condições na mesma cena.
 
-| Detector | manual-full | controlled | synthetic-3x |
-|---|---|---|---|
-| YOLOv8s | ![YOLOv8s manual-full, 27 detecções](figures/results/examples/manual-full-val/yolov8s/manual-full.jpg) | ![YOLOv8s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolov8s/controlled.jpg) | ![YOLOv8s synthetic-3x, 22 detecções](figures/results/examples/manual-full-val/yolov8s/synthetic-3x.jpg) |
-| YOLO26s | ![YOLO26s manual-full, 23 detecções](figures/results/examples/manual-full-val/yolo26s/manual-full.jpg) | ![YOLO26s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolo26s/controlled.jpg) | ![YOLO26s synthetic-3x, 19 detecções](figures/results/examples/manual-full-val/yolo26s/synthetic-3x.jpg) |
-| RT-DETR-L | ![RT-DETR-L manual-full, 36 detecções](figures/results/examples/manual-full-val/rtdetr-l/manual-full.jpg) | ![RT-DETR-L controlled, nenhuma detecção](figures/results/examples/manual-full-val/rtdetr-l/controlled.jpg) | ![RT-DETR-L synthetic-3x, 53 detecções](figures/results/examples/manual-full-val/rtdetr-l/synthetic-3x.jpg) |
+**YOLOv8s**
+
+[![YOLOv8s: gabarito e condições em img_2021](figures/results/sheets/manual-full-val-yolov8s.jpg)](figures/results/sheets/manual-full-val-yolov8s.jpg)
+
+**YOLO26s**
+
+[![YOLO26s: gabarito e condições em img_2021](figures/results/sheets/manual-full-val-yolo26s.jpg)](figures/results/sheets/manual-full-val-yolo26s.jpg)
+
+**RT-DETR-L**
+
+[![RT-DETR-L: gabarito e condições em img_2021](figures/results/sheets/manual-full-val-rtdetr-l.jpg)](figures/results/sheets/manual-full-val-rtdetr-l.jpg)
 
 Reprodução, sem novos treinos:
 
 ```bash
 .venv/bin/python scripts/render_detection_examples.py
+.venv/bin/python scripts/render_detection_examples.py \
+  --image-stem bingo_plot23_plant1_treefront_jpeg --output-name cena-mediana
 for model in yolov8s yolo26s rtdetr-l; do
   .venv/bin/python scripts/render_detection_examples.py \
-    --dataset manual_full_val --model "$model" \
-    --condition manual-full --condition controlled --condition synthetic-3x
+    --dataset manual_full_val --model "$model"
 done
+.venv/bin/python scripts/build_example_sheets.py
 ```
 
-Use `--image-stem` e `--seed` para escolher outra imagem e semente.
+O último comando monta as folhas de contato publicadas nesta página a partir
+das imagens individuais. Use `--image-stem`, `--output-name` e `--seed` para
+render­izar outra cena ou semente.
 Os arquivos `provenance.json` junto das imagens registram hashes dos dados,
 checkpoints, condições e contagens. O script verifica o hash de cada peso
 contra a seleção congelada antes da inferência.
@@ -272,16 +293,14 @@ contra a seleção congelada antes da inferência.
 Cenas de `synthetic-3x`, o mesmo subconjunto usado nos treinamentos acima,
 geradas com semente raiz 42 e amostragem pareada. A seleção usa os quantis
 25%, 50%, 75% e 97% da contagem de caixas nas 390 cenas, com desempate pelo
-índice de geração; não usa resultados de detector nem seleção estética. À direita, os rótulos
-automáticos da mesma cena. As imagens sem caixas permitem inspecionar
-problemas de inserção, escala e iluminação que as métricas não resumem.
+índice de geração; não usa resultados de detector nem seleção estética.
+As cenas sem caixas permitem inspecionar problemas de inserção, escala e
+iluminação que as métricas não resumem.
 
-| Cena composta | Gabarito automático |
-|---|---|
-| ![Cena 180, 11 frutas](figures/results/synthetic-examples/scene-1.jpg) | ![Cena 180, 11 caixas](figures/results/synthetic-examples/scene-1-boxes.jpg) |
-| ![Cena 183, 20 frutas](figures/results/synthetic-examples/scene-2.jpg) | ![Cena 183, 20 caixas](figures/results/synthetic-examples/scene-2-boxes.jpg) |
-| ![Cena 355, 30 frutas](figures/results/synthetic-examples/scene-3.jpg) | ![Cena 355, 30 caixas](figures/results/synthetic-examples/scene-3-boxes.jpg) |
-| ![Cena 92, 104 frutas](figures/results/synthetic-examples/scene-4.jpg) | ![Cena 92, 104 caixas](figures/results/synthetic-examples/scene-4-boxes.jpg) |
+[![Quatro cenas sintéticas com seus gabaritos automáticos](figures/results/sheets/cenas-sinteticas.jpg)](figures/results/sheets/cenas-sinteticas.jpg)
+
+A folha alterna cena composta e gabarito automático, nos quantis 25%, 50%,
+75% e 97% da contagem de caixas (11, 20, 30 e 104 frutas).
 
 Reproduza a exportação com `.venv/bin/python scripts/render_synthetic_examples.py`.
 O dataset deve estar gerado conforme o [guia do estúdio](GENERATOR_STUDIO.md).
@@ -294,11 +313,7 @@ preserva sementes por cena, hashes, índices e a regra de seleção.
 branco = ausência, azul→amarelo = densidade crescente. Escala de cor
 compartilhada entre todos os conjuntos.
 
-| | | |
-|---|---|---|
-| **manual-full** (130 img / 2.093 caixas)<br><a href="figures/results/heatmaps/manual-full.png"><img src="figures/results/heatmaps/manual-full.png" width="240" alt="Cobertura média das caixas: manual-full"></a> | **controlled** (355 img / 127 caixas)<br><a href="figures/results/heatmaps/controlled.png"><img src="figures/results/heatmaps/controlled.png" width="240" alt="Cobertura média das caixas: controlled"></a> | **synthetic-1x** (130 img / 3.981 caixas)<br><a href="figures/results/heatmaps/synthetic-1x.png"><img src="figures/results/heatmaps/synthetic-1x.png" width="240" alt="Cobertura média das caixas: synthetic-1x"></a> |
-| **synthetic-2x** (260 img / 8.242 caixas)<br><a href="figures/results/heatmaps/synthetic-2x.png"><img src="figures/results/heatmaps/synthetic-2x.png" width="240" alt="Cobertura média das caixas: synthetic-2x"></a> | **synthetic-3x** (390 img / 12.526 caixas)<br><a href="figures/results/heatmaps/synthetic-3x.png"><img src="figures/results/heatmaps/synthetic-3x.png" width="240" alt="Cobertura média das caixas: synthetic-3x"></a> | **synthetic-5x** (650 img / 21.242 caixas)<br><a href="figures/results/heatmaps/synthetic-5x.png"><img src="figures/results/heatmaps/synthetic-5x.png" width="240" alt="Cobertura média das caixas: synthetic-5x"></a> |
-| **synthetic-10x** (1.300 img / 41.583 caixas)<br><a href="figures/results/heatmaps/synthetic-10x.png"><img src="figures/results/heatmaps/synthetic-10x.png" width="240" alt="Cobertura média das caixas: synthetic-10x"></a> | **CitDet**, teste (119 img / 10.082 caixas)<br><a href="figures/results/heatmaps/citdet.png"><img src="figures/results/heatmaps/citdet.png" width="240" alt="Cobertura média das caixas: citdet"></a> | **manual-full · val**, validação (26 img / 451 caixas)<br><a href="figures/results/heatmaps/manual_full_val.png"><img src="figures/results/heatmaps/manual_full_val.png" width="240" alt="Cobertura média das caixas: manual_full_val"></a> |
+[![Mapas de cobertura média das caixas de todos os conjuntos](figures/results/sheets/mapas-de-anotacoes.jpg)](figures/results/sheets/mapas-de-anotacoes.jpg)
 
 Os mapas somam a cobertura das caixas e dividem pelo número de imagens;
 portanto, combinam posição, tamanho e quantidade de caixas. Não são mapas de

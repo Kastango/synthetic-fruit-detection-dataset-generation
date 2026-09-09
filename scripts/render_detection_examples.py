@@ -60,6 +60,10 @@ def main():
     )
     p.add_argument("--seed", type=int, default=41)
     p.add_argument("--image-stem")
+    p.add_argument(
+        "--output-name",
+        help="Subpasta de saída para o CitDet; permite mais de uma cena.",
+    )
     p.add_argument("--condition", action="append", choices=CONDITION_ORDER)
     p.add_argument("--device", default="0")
     args = p.parse_args()
@@ -70,6 +74,8 @@ def main():
         split = "test"
         stem = args.image_stem or CITDET_STEM
         output = ROOT / "docs/figures/results/examples"
+        if args.output_name:
+            output = output / args.output_name
     else:
         root = ROOT / "data/real_yolo_confirmatory"
         split = "val"

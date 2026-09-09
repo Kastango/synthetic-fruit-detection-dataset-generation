@@ -22,10 +22,34 @@
       "run_id": "controlled__yolov8s__s41__3733e0caf4"
     },
     {
+      "checkpoint_sha256": "b4df0edea3b5a8c5bd1ff07a762ff7931c2c81db52b3802a09ae764e1a5f0071",
+      "condition": "synthetic-1x",
+      "detections": 36,
+      "run_id": "synthetic-1x__yolov8s__s41__64f41088ed"
+    },
+    {
+      "checkpoint_sha256": "ab6d2e8b943f59795c7f1cd7ac75f29d6fed0f6c7028ee5c4951c877c7ac93e1",
+      "condition": "synthetic-2x",
+      "detections": 22,
+      "run_id": "synthetic-2x__yolov8s__s41__a747c36aa8"
+    },
+    {
       "checkpoint_sha256": "917b2ddd3c0421d2ea4f8bce4b6b6fbde272f4c281ba0abbaecc7401567c2b30",
       "condition": "synthetic-3x",
       "detections": 22,
       "run_id": "synthetic-3x__yolov8s__s41__aa6fbab7a3"
+    },
+    {
+      "checkpoint_sha256": "fe4600df4e0dc44b018b2165a794cb8f317f10ed79f8e67811200dda69dad5a2",
+      "condition": "synthetic-5x",
+      "detections": 27,
+      "run_id": "synthetic-5x__yolov8s__s41__ad92767e61"
+    },
+    {
+      "checkpoint_sha256": "1118f99481567b2c977a23a1b71cfa856a9e98d700642f6f581a1ccf8ce2a4ac",
+      "condition": "synthetic-10x",
+      "detections": 29,
+      "run_id": "synthetic-10x__yolov8s__s41__5ec8cc263c"
     }
   ],
   "seed": 41,

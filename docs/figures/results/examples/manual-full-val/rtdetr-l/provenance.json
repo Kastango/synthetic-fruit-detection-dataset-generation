@@ -22,10 +22,34 @@
       "run_id": "controlled__rtdetr-l__s41__9ae2d0d443"
     },
     {
+      "checkpoint_sha256": "aee3d23a005a720e96a1c50ca1de18966217a7e3d345bc1dd3770c431f3ab1f4",
+      "condition": "synthetic-1x",
+      "detections": 24,
+      "run_id": "synthetic-1x__rtdetr-l__s41__1a3bc1c703"
+    },
+    {
+      "checkpoint_sha256": "240ce879fe8b86b57367c40d0cac2ee96f05b34782419128debb42a12f5115e6",
+      "condition": "synthetic-2x",
+      "detections": 45,
+      "run_id": "synthetic-2x__rtdetr-l__s41__a9d3fd0064"
+    },
+    {
       "checkpoint_sha256": "ff52ca019ec0b14d6be9e876220e2964c17b503e6bed4e19e5f5ad67cdd620e4",
       "condition": "synthetic-3x",
       "detections": 53,
       "run_id": "synthetic-3x__rtdetr-l__s41__74d0c22dac"
+    },
+    {
+      "checkpoint_sha256": "a2320b3bcfc4271f12331ee682a7c3508aa836207dccd12e2c53becc3ca57f4d",
+      "condition": "synthetic-5x",
+      "detections": 34,
+      "run_id": "synthetic-5x__rtdetr-l__s41__886b279d48"
+    },
+    {
+      "checkpoint_sha256": "2eb4b9844d9d295d32dfce38be0b76f6819237219b01d5b1aa4032028c291ce5",
+      "condition": "synthetic-10x",
+      "detections": 48,
+      "run_id": "synthetic-10x__rtdetr-l__s41__1ef901d439"
     }
   ],
   "seed": 41,
