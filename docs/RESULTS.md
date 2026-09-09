@@ -230,7 +230,7 @@ conjunto (78), com desempate lexicográfico. A escolha não usou predições de
 detector. Cada folha abre em tamanho cheio ao clicar.
 
 **Cena esparsa** — `ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07`,
-49 caixas de gabarito, abaixo do primeiro quartil do CitDet.
+49 caixas de gabarito, no percentil 33 do CitDet.
 
 [![Comparação das sete condições na cena esparsa do CitDet](figures/results/sheets/citdet-cena-esparsa.jpg)](figures/results/sheets/citdet-cena-esparsa.jpg)
 
