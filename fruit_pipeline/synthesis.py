@@ -33,8 +33,8 @@ from .common import (
     stable_hash,
 )
 
-GENERATOR_SCHEMA_VERSION = 6
-ASSET_CATALOG_SCHEMA_VERSION = 1
+GENERATOR_SCHEMA_VERSION = 7
+ASSET_CATALOG_SCHEMA_VERSION = 2
 SCENE_SPLIT_SCHEMA_VERSION = 1
 
 
@@ -70,17 +70,21 @@ def create_asset_catalog(asset_root: Path, *, force: bool = False) -> dict:
     def rel(path: Path) -> str:
         return path.relative_to(asset_root).as_posix()
 
+    # Conteúdo, não apenas tamanho: dois arquivos diferentes com o mesmo
+    # comprimento precisam invalidar a identidade da geração.
+    hashes = {path: sha256_file(path) for path in
+              set(pair_lookup) | set(pair_lookup.values()) | set(cutouts)}
     source_fingerprint = stable_hash(
         [
             (
                 rel(path),
-                path.stat().st_size,
+                hashes[path],
                 rel(pair_lookup[path]),
-                pair_lookup[path].stat().st_size,
+                hashes[pair_lookup[path]],
             )
             for path in sorted(pair_lookup)
         ]
-        + [(rel(path), path.stat().st_size) for path in sorted(cutouts)],
+        + [(rel(path), hashes[path]) for path in sorted(cutouts)],
         24,
     )
     if target.exists() and not force:
@@ -95,6 +99,7 @@ def create_asset_catalog(asset_root: Path, *, force: bool = False) -> dict:
         "version": ASSET_CATALOG_SCHEMA_VERSION,
         "asset_root": relative_or_absolute(asset_root),
         "source_fingerprint": source_fingerprint,
+        "sha256": {rel(path): digest for path, digest in sorted(hashes.items())},
         "assets": {
             "backgrounds": [
                 {"image": rel(path), "depth": rel(pair_lookup[path])}
@@ -140,6 +145,8 @@ def create_scene_split(total: int, train_ratio: float, seed: int) -> dict:
 
 
 def validate_synthesis_config(config: dict) -> None:
+    if config.get("sampling", {}).get("mode", "legacy") not in {"legacy", "paired-v1"}:
+        raise ValueError("sampling.mode deve ser legacy ou paired-v1")
     required = {
         "name",
         "seed",
@@ -172,6 +179,10 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("objects.dense.probability deve estar entre 0 e 1")
         if not 0 <= int(dense["min"]) <= int(dense["max"]):
             raise ValueError("objects.dense: intervalo inválido")
+        if not isinstance(dense.get("scale_with_count", False), bool):
+            raise ValueError("objects.dense.scale_with_count deve ser booleano")
+        if dense.get("scale_with_count", False) and int(objects["max"]) <= 0:
+            raise ValueError("scale_with_count requer objects.max positivo")
     if not 0 < float(objects["min_scale"]) <= float(objects["max_scale"]):
         raise ValueError("intervalo de escala inválido")
     depth_scale = objects.get("depth_scale")
@@ -189,6 +200,8 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
+    if not isinstance(config["placement"].get("require_vegetation", False), bool):
+        raise ValueError("placement.require_vegetation deve ser booleano")
     patch_fraction = float(config["placement"].get("z_patch_fraction", 0.2))
     if not 0 < patch_fraction <= 1:
         raise ValueError(
@@ -258,6 +271,13 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("contrast", "saturation", "brightness"):
             if key in grading and float(grading[key]) <= 0:
                 raise ValueError(f"output.scene_grading.{key} deve ser positivo")
+        jitter = grading.get("brightness_jitter")
+        if jitter is not None and not (
+            len(jitter) == 2 and 0 < float(jitter[0]) <= float(jitter[1])
+        ):
+            raise ValueError(
+                "output.scene_grading.brightness_jitter deve ser [min, max] positivo e crescente"
+            )
     depth_smooth_radius = config["occlusion"].get("depth_smooth_radius", 0.0)
     if float(depth_smooth_radius) < 0:
         raise ValueError("occlusion.depth_smooth_radius não pode ser negativo")
@@ -362,6 +382,24 @@ def _trim_alpha(image: Image.Image, threshold: int = 1) -> Image.Image:
     return image.crop(
         (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
     )
+
+
+def _count_adjusted_scale(objects: dict, requested: int) -> dict:
+    """Limita o crescimento da área projetada em cenas acima do regime esparso.
+
+    Não é uma lei física: é uma hipótese de câmera mais distante, ativada
+    explicitamente. Não altera a contagem nem consome aleatoriedade.
+    """
+    if not objects.get("dense", {}).get("scale_with_count", False):
+        return objects
+    if requested <= int(objects["max"]):
+        return objects
+    factor = math.sqrt(float(objects["max"]) / requested)
+    return {
+        **objects,
+        "min_scale": float(objects["min_scale"]) * factor,
+        "max_scale": float(objects["max_scale"]) * factor,
+    }
 
 
 def _scale_cutout(
@@ -544,12 +582,19 @@ def _apply_exposure_jitter(
     alpha = fruit.getchannel("A")
     h, s, v = fruit.convert("RGB").convert("HSV").split()
     v_array = np.asarray(v, dtype=np.float32) * factor
-    # Sombra profunda dessatura junto; sol direto tambem lava a cor. Nos dois
-    # extremos a saturacao cai, so que por motivos opostos.
+    # Nas fotos reais a fruta do quartil escuro e menos saturada que a do
+    # quartil claro (razao 0,80 no treino manual, 0,98 no CitDet). Dessaturar
+    # os dois extremos inverte isso: mede-se 1,12 no sintetico, ou seja, sol
+    # lavado e sombra vivida. Com desaturate_shade_only a perda vale so para
+    # fator abaixo de 1, deixando a fruta de sol intacta.
     saturation_pull = float(exposure.get("saturation_pull", 0.0))
     s_array = np.asarray(s, dtype=np.float32)
     if saturation_pull > 0:
-        s_array = s_array * (1.0 - saturation_pull * min(abs(factor - 1.0), 1.0))
+        if exposure.get("desaturate_shade_only", False):
+            deviation = max(0.0, 1.0 - factor)
+        else:
+            deviation = min(abs(factor - 1.0), 1.0)
+        s_array = s_array * (1.0 - saturation_pull * deviation)
     blended = Image.merge(
         "HSV",
         [
@@ -836,12 +881,18 @@ def _finish_placement(
     if visible_pixels / original_pixels < float(placement["min_visibility"]):
         return None
     region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
-    fruit = _apply_appearance(fruit, region, config["appearance"], rng=rng)
+    appearance_rng = rng
+    if rng is not None and config.get("sampling", {}).get("mode") == "paired-v1":
+        # A aparência não deve consumir os sorteios da geometria. Assim,
+        # desligar uma transformação conserva as posições e as caixas.
+        appearance_rng = random.Random()
+        appearance_rng.setstate(rng.getstate())
+    fruit = _apply_appearance(fruit, region, config["appearance"], rng=appearance_rng)
     fruit = _apply_occlusion_contact_shadow(
         fruit, visibility, opaque, config["occlusion"]
     )
     if rng is not None:
-        fruit = _apply_cast_shadow(fruit, opaque, config["occlusion"], rng)
+        fruit = _apply_cast_shadow(fruit, opaque, config["occlusion"], appearance_rng)
     fruit.putalpha(Image.fromarray(new_alpha))
     return {
         "x": x,
@@ -855,12 +906,32 @@ def _finish_placement(
     }
 
 
+def _vegetation_support(canvas: Image.Image) -> np.ndarray:
+    """Indício cromático de vegetação, sem rótulos nem limiar ajustável.
+
+    Excesso de verde normalizado e separação por variância entre classes
+    (Otsu). Não distingue grama de copa nem certifica suporte em um galho.
+    """
+    rgb = np.asarray(canvas.convert("RGB"), dtype=np.float32)
+    red, green, blue = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    excess = (2 * green - red - blue) / np.maximum(rgb.sum(axis=2), 1)
+    signal = np.rint(np.clip(excess, 0, 1) * 255).astype(np.uint8)
+    histogram = np.bincount(signal.ravel(), minlength=256).astype(np.float64)
+    probabilities = histogram / histogram.sum()
+    mass = np.cumsum(probabilities)
+    moment = np.cumsum(probabilities * np.arange(256))
+    variance = (moment[-1] * mass - moment) ** 2 / np.maximum(mass * (1 - mass), 1e-12)
+    threshold = int(np.argmax(variance))
+    return signal > threshold
+
+
 def _placement(
     canvas: Image.Image,
     depth: np.ndarray,
     fruit: Image.Image,
     config: dict,
     rng: random.Random,
+    support: np.ndarray | None = None,
 ) -> dict | None:
     width, height = canvas.size
     if fruit.width > width or fruit.height > height:
@@ -876,6 +947,8 @@ def _placement(
     for _ in range(int(placement["max_attempts_per_object"])):
         x = rng.randint(0, width - fruit.width)
         y = rng.randint(0, height - fruit.height)
+        if support is not None and not support[y + fruit.height // 2, x + fruit.width // 2]:
+            continue
         if exclude_bottom > 0 and (y + fruit.height / 2) > height * (
             1 - exclude_bottom
         ):
@@ -912,6 +985,7 @@ def _placement_with_depth_scale(
     config: dict,
     rng: random.Random,
     depth_scale: dict,
+    support: np.ndarray | None = None,
 ) -> dict | None:
     # A escala de referência (`_scale_cutout`) já fixou uma fração
     # aleatória; aqui essa fração é modulada pela profundidade local do
@@ -924,6 +998,8 @@ def _placement_with_depth_scale(
     for _ in range(int(placement["max_attempts_per_object"])):
         cx = rng.randint(0, width - 1)
         cy = rng.randint(0, height - 1)
+        if support is not None and not support[cy, cx]:
+            continue
         if exclude_bottom > 0 and cy > height * (1 - exclude_bottom):
             continue
         proximity = float(depth[cy, cx]) / 255.0
@@ -1003,7 +1079,9 @@ def _label_for(
     return f"0 {center_x:.8f} {center_y:.8f} {box_width:.8f} {box_height:.8f}"
 
 
-def _apply_scene_grading(canvas: Image.Image, grading: dict) -> Image.Image:
+def _apply_scene_grading(
+    canvas: Image.Image, grading: dict, rng: random.Random | None = None
+) -> Image.Image:
     # Os 228 fundos foram fotografados sob luz difusa/nublada, num ângulo à
     # altura dos olhos; as fotos reais anotadas são ensolaradas, céu azul
     # saturado, vistas de baixo para cima na copa. Não há como reproduzir a
@@ -1012,14 +1090,40 @@ def _apply_scene_grading(canvas: Image.Image, grading: dict) -> Image.Image:
     # o "punch" visual da cena composta do observado nas fotos reais.
     graded = canvas
     contrast = float(grading.get("contrast", 1.0))
-    if contrast != 1.0:
-        graded = ImageEnhance.Contrast(graded).enhance(contrast)
     saturation = float(grading.get("saturation", 1.0))
-    if saturation != 1.0:
-        graded = ImageEnhance.Color(graded).enhance(saturation)
     brightness = float(grading.get("brightness", 1.0))
-    if brightness != 1.0:
-        graded = ImageEnhance.Brightness(graded).enhance(brightness)
+    # As fotos reais variam bem mais de exposição do que os 228 fundos, todos
+    # nublados: a amplitude p5-p95 do brilho médio é 32,6 no treino manual e
+    # 34,5 no CitDet, contra 16,8 no sintético. Um fator por cena espalha o
+    # conjunto na mesma faixa da coleta manual sem tocar em geometria.
+    jitter = grading.get("brightness_jitter")
+    if jitter and rng is not None:
+        brightness *= rng.uniform(float(jitter[0]), float(jitter[1]))
+
+    def apply_contrast(image):
+        return ImageEnhance.Contrast(image).enhance(contrast) if contrast != 1.0 else image
+
+    def apply_saturation(image):
+        return ImageEnhance.Color(image).enhance(saturation) if saturation != 1.0 else image
+
+    def apply_brightness(image):
+        return (
+            ImageEnhance.Brightness(image).enhance(brightness)
+            if brightness != 1.0
+            else image
+        )
+
+    # Contraste antes de brilho satura os claros em 255 e só depois multiplica o
+    # resultado já ceifado: com contrast=1.2 e brightness=0.82 nenhum pixel da
+    # cena passa de 209, enquanto as duas coletas reais chegam a 243-255. A
+    # ordem fotográfica normal é exposição primeiro, contraste depois, e nessa
+    # ordem a cauda de destaques sobrevive sem alterar a luminância média.
+    if grading.get("exposure_first", False):
+        order = (apply_brightness, apply_contrast, apply_saturation)
+    else:
+        order = (apply_contrast, apply_saturation, apply_brightness)
+    for step in order:
+        graded = step(graded)
     sharpen_percent = int(grading.get("sharpen_percent", 0))
     if sharpen_percent > 0:
         graded = graded.filter(
@@ -1111,7 +1215,18 @@ def _render_one(task: dict) -> dict:
         # ficarem artificiais (achado de revisão visual). O objetivo é só
         # aproximar o "punch" do fundo nublado do observado nas fotos reais,
         # não realçar a fruta de novo.
-        canvas = _apply_scene_grading(canvas, grading)
+        canvas = _apply_scene_grading(
+            canvas,
+            grading,
+            random.Random(
+                int(stable_hash([task["sample_seed"], "scene_exposure"], 16), 16)
+            ),
+        )
+    support = (
+        _vegetation_support(canvas)
+        if config["placement"].get("require_vegetation", False)
+        else None
+    )
     depth_smooth_radius = float(config["occlusion"].get("depth_smooth_radius", 0.0))
     if depth_smooth_radius > 0:
         # Estimadores de profundidade de alta resolução (ex. DepthPro)
@@ -1142,9 +1257,12 @@ def _render_one(task: dict) -> dict:
         ]
     instances = []
     rejected = Counter()
-    for cutout_path in chosen:
+    scale_config = _count_adjusted_scale(config["objects"], requested)
+    for object_index, cutout_path in enumerate(chosen):
+        if config.get("sampling", {}).get("mode") == "paired-v1":
+            rng = random.Random(int(stable_hash([task["sample_seed"], "object", object_index], 16), 16))
         fruit = _open_cutout_cached(cutout_path)
-        fruit = _scale_cutout(fruit, config["objects"], rng, canvas_size)
+        fruit = _scale_cutout(fruit, scale_config, rng, canvas_size)
         rotation = float(config["objects"]["rotation_degrees"])
         if rotation:
             fruit = fruit.rotate(
@@ -1159,10 +1277,10 @@ def _render_one(task: dict) -> dict:
         depth_scale = config["objects"].get("depth_scale")
         if depth_scale:
             instance = _placement_with_depth_scale(
-                canvas, depth, fruit, config, rng, depth_scale
+                canvas, depth, fruit, config, rng, depth_scale, support=support
             )
         else:
-            instance = _placement(canvas, depth, fruit, config, rng)
+            instance = _placement(canvas, depth, fruit, config, rng, support=support)
         if instance is None:
             rejected["placement_or_visibility"] += 1
             continue
@@ -1194,6 +1312,8 @@ def _render_one(task: dict) -> dict:
         panel = _build_debug_panel(canvas, depth_image, instances)
         _save_jpeg_atomic(panel, debug_path, int(config["output"]["jpeg_quality"]))
     record = {
+        "config_hash": stable_hash(config, 24),
+        "generator_sha256": sha256_file(Path(__file__)),
         "id": name,
         "split": split_name,
         "generation_index": generation_index,
@@ -1252,6 +1372,16 @@ def _background_sort_key(
     return pair["image"], split_name, generation_index
 
 
+def scene_seed(config: dict, asset_fingerprint: str, generation_index: int) -> int:
+    """Separa identidade da cena e parâmetros nos experimentos pareados."""
+    identity = (
+        "paired-v1" if config.get("sampling", {}).get("mode") == "paired-v1"
+        else stable_hash(config, 24)
+    )
+    return int(stable_hash([int(config["seed"]), identity, asset_fingerprint,
+                           "scene", generation_index], 16), 16)
+
+
 def generate_dataset(
     asset_root: Path,
     output_root: Path,
@@ -1269,10 +1399,12 @@ def generate_dataset(
         int(config["images"]["total"]), train_ratio, split_seed
     )
     config_hash = stable_hash(config, 24)
+    generator_sha256 = sha256_file(Path(__file__))
     config_marker = output_root / "generation_config.json"
     if config_marker.exists() and not force:
         previous = json.loads(config_marker.read_text(encoding="utf-8"))
         expected_marker = {
+            "generator_sha256": generator_sha256,
             "config_hash": config_hash,
             "asset_catalog_fingerprint": asset_catalog["source_fingerprint"],
             "scene_split": {
@@ -1297,6 +1429,7 @@ def generate_dataset(
         config_marker,
         {
             "generator_schema_version": GENERATOR_SCHEMA_VERSION,
+            "generator_sha256": generator_sha256,
             "config_hash": config_hash,
             "config": config,
             "asset_catalog_fingerprint": asset_catalog["source_fingerprint"],
@@ -1326,19 +1459,7 @@ def generate_dataset(
     tasks: list[tuple[str, int, int, int]] = []
     for split_name in ("train", "val"):
         for index, generation_index in enumerate(scene_split["splits"][split_name]):
-            sample_seed = int(
-                stable_hash(
-                    [
-                        int(config["seed"]),
-                        config_hash,
-                        asset_catalog["source_fingerprint"],
-                        "scene",
-                        generation_index,
-                    ],
-                    16,
-                ),
-                16,
-            )
+            sample_seed = scene_seed(config, asset_catalog["source_fingerprint"], generation_index)
             tasks.append((split_name, index, generation_index, sample_seed))
     # Agrupar fundos aumenta o reaproveitamento do cache sem alterar a semente ou
     # a composição de nenhuma cena. O manifesto é ordenado novamente ao final.

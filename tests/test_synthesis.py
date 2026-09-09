@@ -10,6 +10,8 @@ from PIL import Image
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
     _apply_appearance_hsv_cast,
+    _count_adjusted_scale,
+    _vegetation_support,
     _finish_placement,
     create_asset_catalog,
     create_scene_split,
@@ -77,6 +79,74 @@ def test_exclude_bottom_fraction_validates_bounds() -> None:
         validate_synthesis_config(config)
 
 
+def test_count_scale_preserves_sparse_scenes_and_projected_area():
+    objects = {
+        "max": 30,
+        "min_scale": 0.01,
+        "max_scale": 0.065,
+        "dense": {"scale_with_count": True},
+    }
+    assert _count_adjusted_scale(objects, 0) == objects
+    assert _count_adjusted_scale(objects, 30) == objects
+    for count in (60, 90, 110):
+        adjusted = _count_adjusted_scale(objects, count)
+        for key in ("min_scale", "max_scale"):
+            assert count * adjusted[key] ** 2 == pytest.approx(30 * objects[key] ** 2)
+    assert objects["max_scale"] == 0.065
+    disabled = {**objects, "dense": {"scale_with_count": False}}
+    assert _count_adjusted_scale(disabled, 110) == disabled
+
+
+def test_vegetation_support_rejects_sky_and_wood_without_rejecting_dark_leaves():
+    colors = [
+        (30, 100, 35),
+        (3, 10, 4),
+        (100, 160, 240),
+        (220, 220, 220),
+        (110, 65, 30),
+    ]
+    canvas = Image.fromarray(np.array([colors] * 4, dtype=np.uint8))
+    support = _vegetation_support(canvas)
+    assert support[0].tolist() == [True, True, False, False, False]
+    assert not _vegetation_support(Image.new("RGB", (8, 8), "white")).any()
+    assert _vegetation_support(Image.new("RGB", (8, 8), (20, 100, 30))).all()
+
+
+@pytest.mark.parametrize("depth_scale", [False, True])
+def test_vegetation_placement_does_not_insert_fruit_into_empty_sky(
+    tmp_path, depth_scale
+):
+    assets = tmp_path / "assets"
+    build_assets(assets)
+    for path in (assets / "backgrounds").glob("*.jpg"):
+        Image.new("RGB", (64, 64), "white").save(path)
+    config = tiny_config()
+    config["sampling"] = {"mode": "paired-v1"}
+    if depth_scale:
+        config["objects"]["depth_scale"] = {"near_scale": 1.0, "far_scale": 1.0}
+    for required in (False, True):
+        config["placement"]["require_vegetation"] = required
+        output = tmp_path / str(required)
+        generate_dataset(
+            assets, output, config, train_ratio=0.5, split_seed=42, workers=1
+        )
+        rows = [
+            json.loads(line)
+            for line in (output / "manifest.jsonl").read_text().splitlines()
+        ]
+        assert sum(row["annotations"] for row in rows) == (0 if required else 3)
+
+
+@pytest.mark.parametrize("value,max_count", [("false", 1), (True, 0)])
+def test_count_scale_rejects_ambiguous_configuration(value, max_count):
+    config = tiny_config()
+    config["objects"].update(
+        min=0, max=max_count, dense={"min": 4, "max": 4, "scale_with_count": value}
+    )
+    with pytest.raises(ValueError, match="scale_with_count"):
+        validate_synthesis_config(config)
+
+
 def test_exclude_bottom_fraction_keeps_instances_out_of_bottom_band(
     tmp_path: Path,
 ) -> None:
@@ -106,7 +176,7 @@ def test_asset_catalog_contains_every_pair_and_cutout(tmp_path: Path) -> None:
     build_assets(assets)
     catalog = create_asset_catalog(assets)
 
-    assert catalog["version"] == 1
+    assert catalog["version"] == 2
     assert len(catalog["assets"]["backgrounds"]) == 4
     assert len(catalog["assets"]["cutouts"]) == 4
     assert "splits" not in catalog
@@ -151,7 +221,7 @@ def test_generation_is_deterministic_and_labels_are_valid(tmp_path: Path) -> Non
     assert all(record["annotations"] == 1 for record in records)
     catalog = json.loads((assets / "asset_catalog.json").read_text())
     assert set(catalog["assets"]) == {"backgrounds", "cutouts"}
-    assert catalog["version"] == 1
+    assert catalog["version"] == 2
     scene_split = json.loads((output / "scene_split.json").read_text())
     assert len(scene_split["splits"]["train"]) == 2
     assert len(scene_split["splits"]["val"]) == 1
@@ -808,15 +878,28 @@ def test_debug_panel_is_generated_without_changing_main_output(
         assert panel.width == config["canvas"][0] * 2 + 4
 
 
-def test_parallel_generation_matches_single_worker(tmp_path: Path) -> None:
+@pytest.mark.parametrize("count_scale", [False, True])
+def test_parallel_generation_matches_single_worker(
+    tmp_path: Path, count_scale: bool
+) -> None:
     assets = tmp_path / "assets"
     single = tmp_path / "single"
     parallel = tmp_path / "parallel"
     build_assets(assets)
+    config = tiny_config()
+    if count_scale:
+        config["sampling"] = {"mode": "paired-v1"}
+        config["placement"]["require_vegetation"] = True
+        config["objects"]["dense"] = {
+            "probability": 1.0,
+            "min": 4,
+            "max": 4,
+            "scale_with_count": True,
+        }
     generate_dataset(
         assets,
         single,
-        tiny_config(),
+        config,
         train_ratio=0.5,
         split_seed=42,
         workers=1,
@@ -824,7 +907,7 @@ def test_parallel_generation_matches_single_worker(tmp_path: Path) -> None:
     generate_dataset(
         assets,
         parallel,
-        tiny_config(),
+        config,
         train_ratio=0.5,
         split_seed=42,
         workers=2,

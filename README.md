@@ -146,13 +146,22 @@ uvx ruff check .
 
 ## Visualizar e criar dados
 
-Com o ambiente e os ativos preparados, inicie a ferramenta:
+Na raiz do clone, use Python 3.11 ou 3.12:
 
 ```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
 .venv/bin/python scripts/studio.py
 ```
 
-Abra [127.0.0.1:8765](http://127.0.0.1:8765).
+Abra [127.0.0.1:8765](http://127.0.0.1:8765). Se faltarem os ativos,
+clique em "Baixar dados de demonstração". O kit inclui seis fundos com
+profundidade e 32 recortes de frutas, sem precisar de GPU ou dados anotados.
+O pacote acompanha o clone; se estiver ausente, o Studio tenta baixá-lo.
+
+Esse kit serve para experimentar a ferramenta. A grade de pesquisa usa o
+catálogo completo. O Studio usa `data/assets/regenerated` quando disponível.
+Para indicar outro catálogo, acrescente `--asset-root /caminho/dos/ativos`.
 
 1. Ajuste os sliders e confira as quatro árvores preenchidas com poncãs.
 2. Ative as caixas ou amplie os detalhes para conferir inserções e oclusões.
