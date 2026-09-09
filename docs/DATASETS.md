@@ -4,7 +4,7 @@ Este documento descreve somente os dados que participam do protocolo atual:
 a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e o
 CitDet como avaliação em coleta externa. As contagens de imagens vêm da
 configuração; as caixas sintéticas totais são as publicadas em
-[RESULTS.md](RESULTS.md). A auditoria histórica da base manual é preservada abaixo.
+[RESULTS.md](RESULTS.md).
 
 ## Visão geral
 
@@ -12,12 +12,20 @@ configuração; as caixas sintéticas totais são as publicadas em
 |---|---|---:|---:|---:|---:|
 | `manual-full` | referência com anotação humana | 104 | 26 | — | 2.093 |
 | `controlled` | controle sem composição | 284 | 71 | — | 127 |
-| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 8.302 |
-| `synthetic-2x` | síntese | 208 | 52 | — | 18.084 |
-| `synthetic-3x` | síntese | 312 | 78 | — | 26.853 |
-| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 44.284 |
-| `synthetic-10x` | maior volume sintético avaliado | 1.040 | 260 | — | 91.623 |
+| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 3.981 |
+| `synthetic-2x` | síntese | 208 | 52 | — | 8.242 |
+| `synthetic-3x` | síntese | 312 | 78 | — | 12.526 |
+| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 21.242 |
+| `synthetic-10x` | maior volume sintético avaliado | 1.040 | 260 | — | 41.583 |
 | CitDet | teste externo comum | — | — | 119 | 10.082 |
+
+**Protocolo de treino.** As 42 execuções — 7 condições × 3 detectores ×
+2 sementes — compartilham exatamente o mesmo protocolo: 50 épocas, `imgsz` 960,
+`batch` 8, SGD com `lr0` 0,01, `freeze: 5`, `mosaic` 1.0 com `close_mosaic` 5 e
+as mesmas augmentações de cor e geometria. Nenhum hiperparâmetro varia por
+condição ou por detector, inclusive nas condições de dados reais. O motivo da
+escolha do congelamento, e seu custo medido para a linha de base real, estão
+em [GENERATOR_STUDIO.md](GENERATOR_STUDIO.md#congelamento-uniforme-do-backbone).
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
 de cada execução é escolhido sem consultar o CitDet; somente após a seleção ser
@@ -141,7 +149,7 @@ O gerador cria primeiro um pool único de 1.300 identidades de cena em resoluç�
 
 1. escolhe um par fundo/mapa de profundidade do catálogo;
 2. corrige contraste, brilho e nitidez do fundo antes de inserir frutas;
-3. solicita 1–30 frutas ou, com probabilidade de 50%, 60–200 frutas;
+3. solicita 1–30 frutas ou, com probabilidade de 25%, 60–110 frutas;
 4. sorteia escala-base e rotação do recorte;
 5. tenta posições, usa a proximidade local para ajustar escala e oclusão e
    verifica a visibilidade mínima na inserção;
@@ -155,7 +163,7 @@ Parâmetros que definem o pool confirmatório:
 | Propriedade | Valor atual |
 |---|---|
 | resolução gerada | 720×960, retrato |
-| objetos solicitados por cena | 1–30 ou 60–200, com 50% de probabilidade para cada faixa |
+| objetos solicitados por cena | 1–30 em 75% das cenas, 60–110 em 25% |
 | escala-base | maior lado do recorte = 0,01–0,065 do menor lado do canvas |
 | rotação | até ±180° |
 | escala guiada por profundidade | 0,6× (longe) a 1,3× (perto) |
@@ -166,12 +174,10 @@ Parâmetros que definem o pool confirmatório:
 | qualidade JPEG | 95, sem subamostragem de croma |
 
 A configuração integral e versionável está em
-`configs/synthesis/confirmatory_pool.yaml`. As contagens abaixo são as publicadas
-em [`RESULTS.md`](RESULTS.md), agregando
-treino e validação. O pool avaliado contém 91.623 caixas; as contagens da versão
-anterior, de 19.934 caixas, não descrevem o gerador atual. A divisão de caixas
-por split e a cobertura dos ativos precisam ser consultadas nos manifestos da
-execução, não inferidas da proporção de imagens.
+`configs/synthesis/confirmatory_pool.yaml`. As contagens abaixo agregam treino e validação e correspondem às publicadas
+em [`RESULTS.md`](RESULTS.md). O pool avaliado contém 41.583 caixas. A divisão
+de caixas por split e a cobertura dos ativos precisam ser consultadas nos
+manifestos da execução, não inferidas da proporção de imagens.
 
 ### Formação de `synthetic-1x` a `synthetic-10x`
 
@@ -180,11 +186,11 @@ Depois disso, cada condição toma prefixos crescentes de ambas as partições:
 
 | Condição | Imagens treino | Imagens validação | Caixas totais publicadas |
 |---|---:|---:|---:|
-| `synthetic-1x` | 104 | 26 | 8.302 |
-| `synthetic-2x` | 208 | 52 | 18.084 |
-| `synthetic-3x` | 312 | 78 | 26.853 |
-| `synthetic-5x` | 520 | 130 | 44.284 |
-| `synthetic-10x` | 1.040 | 260 | 91.623 |
+| `synthetic-1x` | 104 | 26 | 3.981 |
+| `synthetic-2x` | 208 | 52 | 8.242 |
+| `synthetic-3x` | 312 | 78 | 12.526 |
+| `synthetic-5x` | 520 | 130 | 21.242 |
+| `synthetic-10x` | 1.040 | 260 | 41.583 |
 
 Os conjuntos são estritamente aninhados: `2x` contém todas as cenas de `1x`,
 `3x` contém todas as de `2x` e assim por diante, tanto no treino quanto na

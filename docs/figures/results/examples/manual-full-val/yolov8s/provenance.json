@@ -10,24 +10,24 @@
   "model": "yolov8s",
   "runs": [
     {
-      "checkpoint_sha256": "e5cf864cc56d99d67c33f419a3929e78d6c5e24c1af0b9d1edffdfd4482abb40",
+      "checkpoint_sha256": "9510645552c0d6d3724fe14b4dbbc6c8502439dc1fd67d14a5f9298ebc58d86e",
       "condition": "manual-full",
-      "detections": 25,
-      "run_id": "manual-full__yolov8s__s41__a53729b645"
+      "detections": 27,
+      "run_id": "manual-full__yolov8s__s41__f5bca552d7"
     },
     {
-      "checkpoint_sha256": "dc3e25308dfe6f037fe80a9f9a10d85b97267192885f1a5e821f49e6e426cc09",
+      "checkpoint_sha256": "d99ba90da7a04008ab5e9a917c455b4a3dd8355385b271d4d5d0ce547eb6fea7",
       "condition": "controlled",
       "detections": 0,
-      "run_id": "controlled__yolov8s__s41__8af5986160"
+      "run_id": "controlled__yolov8s__s41__3733e0caf4"
     },
     {
-      "checkpoint_sha256": "04572664ddce7800e34de56297e1b75fbebcada456338bcbb04a9a8c5ddb13a6",
+      "checkpoint_sha256": "917b2ddd3c0421d2ea4f8bce4b6b6fbde272f4c281ba0abbaecc7401567c2b30",
       "condition": "synthetic-3x",
-      "detections": 25,
-      "run_id": "synthetic-3x__yolov8s__s41__726f918e93"
+      "detections": 22,
+      "run_id": "synthetic-3x__yolov8s__s41__aa6fbab7a3"
     }
   ],
   "seed": 41,
-  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+  "selection_sha256": "7709908f7ec327466623f1082952a585d6cdee83bc040e7a9f0931d845bb0c51"
 }

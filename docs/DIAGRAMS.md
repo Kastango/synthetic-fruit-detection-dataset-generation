@@ -25,7 +25,7 @@ da pasta em que o script é chamado.
 | Arquivo | O que editar |
 |---|---|
 | [`build_flowchart.py`](../scripts/diagrams/build_flowchart.py) | `panel_acquisition`, `panel_generation` e `combined_svg` definem nós, rótulos, setas e zonas. As constantes iniciais definem cores, fontes e espaçamento. |
-| [`build_conditions.py`](../scripts/diagrams/build_conditions.py) | `deck_size`, `row_extent`, `MAX_OFF`, `TRAIN_MAX_DECK` e `VAL_MAX_DECK` controlam a escala e a largura das pilhas. |
+| [`build_conditions.py`](../scripts/diagrams/build_conditions.py) | `row_extent`, `CARD_W`, `CARD_H` e `GUTTER` controlam o tamanho das miniaturas e os espaços entre conjuntos. |
 | [`fontkit.py`](../scripts/diagrams/fontkit.py) | Incorpora somente os glifos usados, a partir das fontes locais. Falha se faltar um glifo. |
 | [`diagram-assets/`](figures/diagram-assets/) | Miniaturas e registros de origem usados nas figuras. |
 | [`fonts/`](figures/fonts/) | Geist, Geist Mono e Instrument Serif, com as respectivas licenças SIL OFL. |
@@ -39,16 +39,18 @@ precisam ser conferidas contra `fruit_pipeline/synthesis.py`.
 Saídas:
 
 - `docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg`;
-- `docs/figures/condicoes/condicao-*.svg`, um arquivo por linha da tabela;
+- `docs/figures/condicoes/condicao-*.svg`, um arquivo por condição;
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
-O estilo preserva as decisões da thread `3b553545-c7fb-4c56-92f4-9d8286cbb5fd`:
-roxo e laranja, conectores ortogonais, zonas com vãos iguais, miniaturas
-quadradas e pilhas horizontais nas condições. Treino e validação usam 3 cartas
-por 26 imagens, com arredondamento. O espaçamento encolhe quando a pilha atinge
-seu limite; sua largura não é uma escala linear. O teste tem 3 cartas fixas e
-não segue essa proporção. As setas entre treino e validação indicam a avaliação
-entre épocas, sem uso da validação para atualizar pesos.
+O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
+Todos os grupos usam duas cartas por 26 imagens, com arredondamento.
+O teste tem nove cartas para 119 imagens. O espaçamento diminui nas pilhas
+maiores; a largura não é uma escala linear. Os SVGs têm 1.116 px de largura.
+Treino, validação e teste começam no mesmo X em todas as condições.
+As setas ocupam o intervalo entre o fim de cada pilha e o grupo seguinte.
+Os rótulos dos diagramas estão em inglês.
+As setas entre treino e validação representam a avaliação entre épocas.
+A validação não atualiza os pesos.
 
 ## Atualizar as miniaturas
 

@@ -25,6 +25,7 @@ from .synthesis import (
     generate_dataset,
     _open_background_pair,
 )
+from .studio_assets import install_demo_assets
 from .similarity import read_boxes, image_features, merge_features, FEATURES
 import numpy as np
 
@@ -48,8 +49,8 @@ CONTROLS = [
         0,
         30,
         1,
-        6,
-        "Mistura entre os dois regimes. Referência atual: 6%.",
+        25,
+        "Mistura entre os dois regimes. Referência atual: 25%.",
     ),
     (
         "dense_max",
@@ -509,10 +510,18 @@ class Studio:
 
 
 def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
-    studio = Studio(
-        asset_root or ROOT / "data/assets/regenerated",
-        output or ROOT / "artifacts/studio/preview",
+    full_assets = ROOT / "data/assets/regenerated"
+    asset_root = (
+        Path(asset_root)
+        if asset_root
+        else (full_assets if full_assets.exists() else ROOT / "data/studio-demo")
     )
+    output = output or ROOT / "artifacts/studio/preview"
+    try:
+        studio = Studio(asset_root, output)
+    except FileNotFoundError:
+        studio = None
+    installation_lock = threading.Lock()
     static = Path(__file__).with_name("studio_static")
 
     class Handler(BaseHTTPRequestHandler):
@@ -530,6 +539,10 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
 
         def do_GET(self):
             path = urlparse(self.path).path
+            if path.startswith("/api/") and studio is None:
+                return self.send(
+                    409, b'{"error":"Prepare os dados primeiro."}', "application/json"
+                )
             if path == "/api/controls":
                 value = dict(
                     controls=[
@@ -593,7 +606,9 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
             }
             if path not in names:
                 return self.send(404, b"Not found", "text/plain")
-            p = static / names[path]
+            p = static / (
+                "setup.html" if path == "/" and studio is None else names[path]
+            )
             mime = {
                 ".html": "text/html; charset=utf-8",
                 ".js": "text/javascript; charset=utf-8",
@@ -603,7 +618,8 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
             self.send(200, p.read_bytes(), mime)
 
         def do_POST(self):
-            if self.path not in {"/api/preview", "/api/generate"}:
+            nonlocal studio
+            if self.path not in {"/api/preview", "/api/generate", "/api/assets"}:
                 return self.send(404, b"Not found", "text/plain")
             if self.headers.get("Sec-Fetch-Site") == "cross-site":
                 return self.send(403, b"Forbidden", "text/plain")
@@ -618,6 +634,14 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
                     raise ValueError("Requisição deve ser um objeto")
+                if self.path == "/api/assets":
+                    with installation_lock:
+                        if studio is None:
+                            install_demo_assets(asset_root)
+                            studio = Studio(asset_root, output)
+                    return self.send(200, b'{"ready":true}', "application/json")
+                if studio is None:
+                    raise ValueError("Prepare os dados primeiro.")
                 result = (
                     studio.start_job(body)
                     if self.path == "/api/generate"
@@ -628,7 +652,7 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
                     json.dumps(result, allow_nan=False).encode(),
                     "application/json",
                 )
-            except (ValueError, TypeError, KeyError, FileNotFoundError) as error:
+            except (ValueError, TypeError, KeyError, OSError) as error:
                 self.send(
                     400, json.dumps({"error": str(error)}).encode(), "application/json"
                 )

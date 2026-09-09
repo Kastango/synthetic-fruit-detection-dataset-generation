@@ -22,7 +22,6 @@ if __name__ == "__main__":
         if not path.exists():
             raise SystemExit(f'Treino ainda não concluído: {spec["run_id"]}')
         result = json.loads(path.read_text())
-        assert result["model_name"] == "yolov8s"
         selected.append(result)
     atomic_write_json(artifacts / "paired_selection.json", selected)
     results = []

@@ -1,17 +1,14 @@
 # Resultados dos detectores e exemplos de dados
 
-Grade histórica, gráficos e exemplos abaixo. A rodada atual está em
-[Primeira comparação pareada com YOLOv8s](#primeira-comparação-pareada-com-yolov8s).
+Consolida 7 condições × 3 detectores × 2 sementes, num total de 42
+treinamentos, com o protocolo de
+[`configs/confirmatory.yaml`](../configs/confirmatory.yaml). Todas as 42
+execuções compartilham o mesmo protocolo: 50 épocas, `imgsz` 960, `batch` 8,
+`freeze: 5`, `mosaic` 1.0 com `close_mosaic` 5 e as mesmas augmentações de cor.
+Nenhum hiperparâmetro varia por condição ou por detector.
 
-**Rastreabilidade:** estas tabelas pertencem ao pool anterior mais denso.
-A configuração atual usa 6% de cenas densas entre 60 e 110 objetos e não
-reproduz estes números. A nova rodada de desenvolvimento usa somente YOLOv8s,
-conforme [o protocolo do estúdio](GENERATOR_STUDIO.md).
-
-Consolida 7 condições × 3 detectores × 2 sementes, com o protocolo de
-[`configs/confirmatory.yaml`](../configs/confirmatory.yaml). Os nomes de pastas
-`confirmatory` são mantidos para rastreabilidade. A análise atual é exploratória,
-pois o desenvolvimento do gerador usou estatísticas dos conjuntos avaliados.
+A análise é exploratória: o desenvolvimento do gerador usou estatísticas dos
+conjuntos avaliados, de modo que o CitDet não é um teste intocado.
 
 | Conjunto de avaliação | Composição | Papel e limite |
 |---|---|---|
@@ -41,8 +38,8 @@ README, e `manual_full_val`, que aponta para o próprio split de validação do
 
 Por padrão, o último comando reproduz o gráfico a partir das médias
 arredondadas versionadas em [`results-summary.json`](results-summary.json),
-transcritas das tabelas publicadas no commit `9fc162f`. Para usar os resultados
-locais com precisão completa, execute:
+transcritas das tabelas desta página. Para usar os resultados locais com
+precisão completa, execute:
 
 ```bash
 .venv/bin/python scripts/plot_confirmatory_results.py --results-dir artifacts/confirmatory
@@ -79,7 +76,7 @@ teste externo novo, sem rodar `train`/`select`:
 ./run_pipeline.sh report --external-name <nome>
 ```
 
-Release: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/tag/confirmatory-checkpoints-v3
+Release: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/tag/confirmatory-checkpoints
 
 ## Como mais dados sintéticos afetam o mAP
 
@@ -90,18 +87,34 @@ linhas contínuas mostram médias dos volumes sintéticos; tracejados mostram
 `manual-full` e pontilhados, `controlled`, para o mesmo detector. As linhas
 conectam condições discretas e não constituem um ajuste de curva.*
 
-`controlled` apresenta mAP entre 0,000 e 0,009 no CitDet, indicando baixa
-transferência nas condições avaliadas. Os maiores valores sintéticos dos YOLOs
-ocorrem em `2x`, mas os volumes seguintes oscilam. O RT-DETR chega a 0,212 em
-`10x`, com queda de 0,184 em `2x` para 0,181 em `3x`; o crescimento não é
-monotônico e estes pontos não estabelecem uma curva de saturação.
+`controlled` apresenta mAP entre 0,000 e 0,004 no CitDet, indicando ausência
+de transferência nas condições avaliadas. Esses mesmos treinos alcançam entre
+0,93 e 0,99 de mAP@.50:.95 na sua própria validação, então o valor externo
+mede distância de domínio, não falha de otimização.
 
-Os máximos sintéticos no CitDet excedem as médias de `manual-full` em 0,026,
-0,007 e 0,051 para YOLOv8s, YOLO26s e RT-DETR-L. A escolha desses máximos entre
-cinco volumes é posterior à avaliação. Não demonstra que toda condição
-sintética supere a referência, nem que as diferenças sejam estatisticamente
-sustentadas. Em `manual_full_val`, `manual-full` tem as maiores médias nos três
-detectores, mas também usou esse conjunto na seleção dos checkpoints.
+A resposta ao volume difere por detector. No RT-DETR-L o crescimento é quase
+monotônico e é o maior de todos: 0,152, 0,196, 0,188, 0,209 e 0,217 de `1x` a
+`10x`. No YOLOv8s a subida é suave e o máximo fica em `10x` (0,228). No YOLO26s
+o máximo ocorre em `3x` (0,243) e os volumes seguintes recuam para 0,236 e
+0,239. Cinco pontos não estabelecem uma curva de saturação, e a oscilação do
+YOLO26s tem a mesma ordem de grandeza da dispersão entre sementes.
+
+No CitDet, o melhor volume sintético supera a média de `manual-full` em 0,013
+no YOLOv8s, 0,069 no RT-DETR-L e 0,002 no YOLO26s. Os dois primeiros são
+maiores que a dispersão observada entre sementes; o terceiro não é, e a
+leitura honesta para o YOLO26s é paridade, não ganho. A escolha do máximo
+entre cinco volumes é posterior à avaliação e não demonstra que toda condição
+sintética supere a referência. Vale notar que no YOLOv8s e no RT-DETR-L todos
+os cinco volumes sintéticos ficam acima de `manual-full`, o que não depende
+dessa escolha posterior.
+
+Em `manual_full_val` a ordem se inverte e `manual-full` tem as maiores médias
+nos três detectores, com folga de 0,11 a 0,12 nos YOLOs. Esse conjunto também
+foi usado na seleção dos checkpoints, então parte da vantagem é viés de
+seleção — mas a direção do resultado é consistente com a expectativa de que
+treino no domínio vença dentro do domínio. A afirmação que estes dados
+sustentam é sobre transferência para coleta externa, não sobre superioridade
+geral do dado sintético.
 
 ## Precision, recall e F1 por volume sintético
 
@@ -119,6 +132,19 @@ harmônica calculada a partir de precision e recall já arredondados.
 
 ## Tabela completa
 
+**Congelamento uniforme.** As 42 execuções usam `freeze: 5`, que congela os
+blocos 0–4 do backbone — do stem até a saída de stride 8 — e coloca suas
+estatísticas de BatchNorm em modo de avaliação. São 320.160 parâmetros em
+YOLOv8s (2,9% do detector) e 296.640 em YOLO26s (3,0%), o mesmo trecho
+arquitetural nos dois. A decisão foi tomada depois de medir que o
+congelamento favorece o treino sintético e prejudica o treino real: em
+YOLOv8s com quatro sementes, `manual-full` cai de 0,5459 para 0,5062 no
+conjunto local, enquanto no CitDet fica estável (0,2126 para 0,2130). Mantê-lo
+uniforme custa cerca de 0,04 de mAP local à linha de base real. A alternativa
+— congelar só o sintético — tornaria as colunas incomparáveis, trocando um
+custo declarado por um viés silencioso. O custo fica registrado aqui para que
+a leitura das linhas `manual-full` já o incorpore.
+
 `[val]` identifica checkpoints selecionados nas mesmas 26 imagens em que a
 linha é avaliada. O destaque em negrito marca apenas a maior média observada
 por detector e conjunto, sem teste de significância. P, R e F1 vêm do avaliador;
@@ -126,32 +152,37 @@ o limiar `conf=0.25` indicado nos exemplos abaixo não define o cálculo de AP.
 MAE é o erro absoluto médio de contagem por imagem, não uma medida de safra.
 A contagem usa o limiar de maior F1 da validação de origem de cada execução,
 registrado na seleção, com fallback de 0,25 se o valor não estiver disponível.
+O traço na coluna MAE de `controlled`/yolov8s marca uma célula sem medida
+interpretável: as duas sementes colapsam de formas opostas — uma tem F1 máximo
+zero, o que leva o limiar a 0,0 e faz cada imagem emitir as 1000 caixas de
+`max_det`, e a outra recebe limiar 0,95 e não emite nenhuma. A média das duas
+seria um número sem significado. O mAP dessa célula continua medido e é 0,000.
 
 ### CitDet, coleta externa usada na calibração
 
 | Detector | Condição | P | R | F1 | mAP@.50 | mAP@.75 | mAP@.50:.95 | Count MAE |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| yolov8s | manual-full | 0.710 | 0.488 | 0.578 | 0.529 | 0.123 | 0.214 | 45.1 |
-| yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 84.7 |
-| yolov8s | synthetic-1x | 0.732 | 0.514 | 0.603 | 0.572 | 0.144 | 0.236 | 35.2 |
-| yolov8s | **synthetic-2x** | 0.730 | 0.523 | 0.609 | 0.576 | 0.150 | **0.240** | 33.8 |
-| yolov8s | synthetic-3x | 0.722 | 0.507 | 0.596 | 0.556 | 0.123 | 0.221 | 32.4 |
-| yolov8s | synthetic-5x | 0.745 | 0.504 | 0.601 | 0.568 | 0.142 | 0.235 | 36.7 |
-| yolov8s | synthetic-10x | 0.743 | 0.502 | 0.599 | 0.564 | 0.141 | 0.233 | 35.0 |
-| rtdetr-l | manual-full | 0.578 | 0.414 | 0.479 | 0.423 | 0.078 | 0.161 | 54.8 |
-| rtdetr-l | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 84.7 |
-| rtdetr-l | synthetic-1x | 0.613 | 0.419 | 0.498 | 0.429 | 0.099 | 0.172 | 45.3 |
-| rtdetr-l | synthetic-2x | 0.634 | 0.480 | 0.547 | 0.494 | 0.091 | 0.184 | 27.2 |
-| rtdetr-l | synthetic-3x | 0.628 | 0.468 | 0.536 | 0.476 | 0.093 | 0.181 | 42.0 |
-| rtdetr-l | synthetic-5x | 0.677 | 0.499 | 0.574 | 0.524 | 0.118 | 0.207 | 33.6 |
-| rtdetr-l | **synthetic-10x** | 0.706 | 0.515 | 0.595 | 0.544 | 0.116 | **0.212** | 26.9 |
-| yolo26s | manual-full | 0.718 | 0.523 | 0.606 | 0.576 | 0.130 | 0.236 | 42.3 |
-| yolo26s | controlled | 0.279 | 0.035 | 0.062 | 0.030 | 0.002 | 0.009 | 84.7 |
-| yolo26s | synthetic-1x | 0.720 | 0.511 | 0.598 | 0.570 | 0.136 | 0.232 | 40.6 |
-| yolo26s | **synthetic-2x** | 0.739 | 0.525 | 0.614 | 0.588 | 0.151 | **0.243** | 30.5 |
-| yolo26s | synthetic-3x | 0.727 | 0.520 | 0.606 | 0.573 | 0.145 | 0.236 | 33.6 |
-| yolo26s | synthetic-5x | 0.737 | 0.503 | 0.598 | 0.559 | 0.139 | 0.230 | 32.3 |
-| yolo26s | synthetic-10x | 0.717 | 0.507 | 0.594 | 0.557 | 0.142 | 0.232 | 34.4 |
+| yolov8s | manual-full | 0.715 | 0.464 | 0.563 | 0.511 | 0.135 | 0.215 | 48.1 |
+| yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | — |
+| yolov8s | synthetic-1x | 0.728 | 0.480 | 0.578 | 0.536 | 0.137 | 0.222 | 27.4 |
+| yolov8s | synthetic-2x | 0.704 | 0.512 | 0.593 | 0.553 | 0.125 | 0.223 | 27.5 |
+| yolov8s | synthetic-3x | 0.719 | 0.488 | 0.581 | 0.542 | 0.135 | 0.223 | 27.6 |
+| yolov8s | synthetic-5x | 0.729 | 0.495 | 0.589 | 0.552 | 0.131 | 0.225 | 27.7 |
+| yolov8s | **synthetic-10x** | 0.697 | 0.498 | 0.581 | 0.546 | 0.143 | **0.228** | 23.1 |
+| rtdetr-l | manual-full | 0.505 | 0.494 | 0.495 | 0.373 | 0.074 | 0.147 | 41.2 |
+| rtdetr-l | controlled | 0.009 | 0.020 | 0.012 | 0.005 | 0.005 | 0.004 | 84.7 |
+| rtdetr-l | synthetic-1x | 0.469 | 0.432 | 0.449 | 0.397 | 0.079 | 0.152 | 51.9 |
+| rtdetr-l | synthetic-2x | 0.632 | 0.504 | 0.560 | 0.517 | 0.095 | 0.196 | 35.1 |
+| rtdetr-l | synthetic-3x | 0.646 | 0.483 | 0.552 | 0.502 | 0.090 | 0.188 | 38.8 |
+| rtdetr-l | synthetic-5x | 0.671 | 0.522 | 0.587 | 0.536 | 0.107 | 0.209 | 27.9 |
+| rtdetr-l | **synthetic-10x** | 0.701 | 0.523 | 0.599 | 0.554 | 0.113 | **0.217** | 25.3 |
+| yolo26s | manual-full | 0.755 | 0.522 | 0.617 | 0.578 | 0.141 | 0.241 | 42.4 |
+| yolo26s | controlled | 0.500 | 0.000 | 0.000 | 0.003 | 0.000 | 0.001 | 84.7 |
+| yolo26s | synthetic-1x | 0.714 | 0.514 | 0.598 | 0.568 | 0.134 | 0.230 | 24.9 |
+| yolo26s | synthetic-2x | 0.725 | 0.530 | 0.612 | 0.584 | 0.138 | 0.237 | 24.6 |
+| yolo26s | **synthetic-3x** | 0.726 | 0.534 | 0.615 | 0.587 | 0.148 | **0.243** | 24.8 |
+| yolo26s | synthetic-5x | 0.725 | 0.532 | 0.613 | 0.582 | 0.140 | 0.236 | 22.1 |
+| yolo26s | synthetic-10x | 0.700 | 0.536 | 0.607 | 0.577 | 0.142 | 0.239 | 20.9 |
 
 Negrito = maior média de mAP@.50:.95 entre as condições desse detector.
 
@@ -159,27 +190,27 @@ Negrito = maior média de mAP@.50:.95 entre as condições desse detector.
 
 | Detector | Condição | P | R | F1 | mAP@.50 | mAP@.75 | mAP@.50:.95 | Count MAE |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| yolov8s | **manual-full** [val] | 0.925 | 0.814 | 0.866 | 0.896 | 0.602 | **0.549** | 2.3 |
-| yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 17.3 |
-| yolov8s | synthetic-1x | 0.782 | 0.595 | 0.674 | 0.681 | 0.433 | 0.400 | 4.6 |
-| yolov8s | synthetic-2x | 0.778 | 0.618 | 0.689 | 0.693 | 0.417 | 0.400 | 4.7 |
-| yolov8s | synthetic-3x | 0.769 | 0.595 | 0.671 | 0.676 | 0.396 | 0.390 | 4.5 |
-| yolov8s | synthetic-5x | 0.810 | 0.594 | 0.685 | 0.693 | 0.391 | 0.394 | 4.2 |
-| yolov8s | synthetic-10x | 0.781 | 0.606 | 0.682 | 0.681 | 0.421 | 0.396 | 4.9 |
-| rtdetr-l | **manual-full** [val] | 0.823 | 0.775 | 0.798 | 0.797 | 0.518 | **0.469** | 2.2 |
-| rtdetr-l | controlled | 0.004 | 0.032 | 0.006 | 0.001 | 0.000 | 0.000 | 17.3 |
-| rtdetr-l | synthetic-1x | 0.715 | 0.507 | 0.591 | 0.550 | 0.333 | 0.313 | 5.0 |
-| rtdetr-l | synthetic-2x | 0.695 | 0.476 | 0.560 | 0.533 | 0.299 | 0.287 | 5.6 |
-| rtdetr-l | synthetic-3x | 0.771 | 0.500 | 0.607 | 0.573 | 0.345 | 0.327 | 6.9 |
-| rtdetr-l | synthetic-5x | 0.707 | 0.527 | 0.603 | 0.576 | 0.342 | 0.330 | 6.8 |
-| rtdetr-l | synthetic-10x | 0.784 | 0.499 | 0.610 | 0.570 | 0.347 | 0.330 | 6.5 |
-| yolo26s | **manual-full** [val] | 0.911 | 0.815 | 0.860 | 0.894 | 0.618 | **0.552** | 2.4 |
-| yolo26s | controlled | 0.139 | 0.041 | 0.063 | 0.021 | 0.001 | 0.007 | 17.3 |
-| yolo26s | synthetic-1x | 0.734 | 0.635 | 0.680 | 0.679 | 0.419 | 0.397 | 4.9 |
-| yolo26s | synthetic-2x | 0.807 | 0.640 | 0.714 | 0.706 | 0.434 | 0.412 | 4.8 |
-| yolo26s | synthetic-3x | 0.823 | 0.614 | 0.703 | 0.696 | 0.437 | 0.412 | 4.5 |
-| yolo26s | synthetic-5x | 0.765 | 0.650 | 0.703 | 0.699 | 0.425 | 0.409 | 4.3 |
-| yolo26s | synthetic-10x | 0.783 | 0.642 | 0.705 | 0.701 | 0.443 | 0.413 | 4.0 |
+| yolov8s | **manual-full** [val] | 0.923 | 0.768 | 0.838 | 0.855 | 0.562 | **0.511** | 3.1 |
+| yolov8s | controlled | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | — |
+| yolov8s | synthetic-1x | 0.814 | 0.572 | 0.672 | 0.653 | 0.422 | 0.380 | 3.6 |
+| yolov8s | synthetic-2x | 0.801 | 0.577 | 0.671 | 0.642 | 0.424 | 0.375 | 3.2 |
+| yolov8s | synthetic-3x | 0.808 | 0.569 | 0.667 | 0.650 | 0.418 | 0.380 | 2.8 |
+| yolov8s | synthetic-5x | 0.831 | 0.587 | 0.688 | 0.667 | 0.427 | 0.390 | 3.6 |
+| yolov8s | synthetic-10x | 0.817 | 0.613 | 0.700 | 0.682 | 0.438 | 0.397 | 3.8 |
+| rtdetr-l | **manual-full** [val] | 0.630 | 0.711 | 0.658 | 0.655 | 0.423 | **0.388** | 5.0 |
+| rtdetr-l | controlled | 0.002 | 0.022 | 0.004 | 0.000 | 0.000 | 0.000 | 17.3 |
+| rtdetr-l | synthetic-1x | 0.740 | 0.488 | 0.584 | 0.527 | 0.321 | 0.302 | 5.2 |
+| rtdetr-l | synthetic-2x | 0.735 | 0.561 | 0.636 | 0.618 | 0.368 | 0.346 | 4.1 |
+| rtdetr-l | synthetic-3x | 0.708 | 0.570 | 0.631 | 0.612 | 0.354 | 0.341 | 3.9 |
+| rtdetr-l | synthetic-5x | 0.711 | 0.534 | 0.609 | 0.593 | 0.352 | 0.336 | 4.4 |
+| rtdetr-l | synthetic-10x | 0.759 | 0.523 | 0.618 | 0.599 | 0.358 | 0.342 | 4.9 |
+| yolo26s | **manual-full** [val] | 0.885 | 0.770 | 0.822 | 0.855 | 0.567 | **0.511** | 3.2 |
+| yolo26s | controlled | 0.333 | 0.002 | 0.004 | 0.003 | 0.003 | 0.002 | 17.3 |
+| yolo26s | synthetic-1x | 0.802 | 0.598 | 0.684 | 0.661 | 0.409 | 0.375 | 3.0 |
+| yolo26s | synthetic-2x | 0.805 | 0.606 | 0.691 | 0.658 | 0.408 | 0.376 | 3.2 |
+| yolo26s | synthetic-3x | 0.774 | 0.604 | 0.679 | 0.656 | 0.415 | 0.382 | 2.9 |
+| yolo26s | synthetic-5x | 0.790 | 0.588 | 0.674 | 0.659 | 0.420 | 0.380 | 3.3 |
+| yolo26s | synthetic-10x | 0.799 | 0.594 | 0.682 | 0.665 | 0.428 | 0.388 | 3.1 |
 
 Negrito = maior média de mAP@.50:.95 entre as condições desse detector.
 
@@ -208,7 +239,7 @@ completa abre ao clicar na miniatura.
 
 Imagem `img_2021.jpg`, com **25 caixas de gabarito**, primeira em ordem
 lexicográfica no split de validação. A seleção independe das predições.
-Os três detectores usam os checkpoints históricos da semente 41, `conf=0.25`,
+Os três detectores usam os checkpoints da semente 41, `conf=0.25`,
 `imgsz=960` e `max_det=1000`. Esta cena ilustra diferenças de detecção;
 contagens iguais não significam caixas corretas nem desempenho equivalente.
 
@@ -216,9 +247,9 @@ contagens iguais não significam caixas corretas nem desempenho equivalente.
 
 | Detector | manual-full | controlled | synthetic-3x |
 |---|---|---|---|
-| YOLOv8s | ![YOLOv8s manual-full, 25 detecções](figures/results/examples/manual-full-val/yolov8s/manual-full.jpg) | ![YOLOv8s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolov8s/controlled.jpg) | ![YOLOv8s synthetic-3x, 25 detecções](figures/results/examples/manual-full-val/yolov8s/synthetic-3x.jpg) |
-| YOLO26s | ![YOLO26s manual-full, 26 detecções](figures/results/examples/manual-full-val/yolo26s/manual-full.jpg) | ![YOLO26s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolo26s/controlled.jpg) | ![YOLO26s synthetic-3x, 21 detecções](figures/results/examples/manual-full-val/yolo26s/synthetic-3x.jpg) |
-| RT-DETR-L | ![RT-DETR-L manual-full, 41 detecções](figures/results/examples/manual-full-val/rtdetr-l/manual-full.jpg) | ![RT-DETR-L controlled, nenhuma detecção](figures/results/examples/manual-full-val/rtdetr-l/controlled.jpg) | ![RT-DETR-L synthetic-3x, 33 detecções](figures/results/examples/manual-full-val/rtdetr-l/synthetic-3x.jpg) |
+| YOLOv8s | ![YOLOv8s manual-full, 27 detecções](figures/results/examples/manual-full-val/yolov8s/manual-full.jpg) | ![YOLOv8s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolov8s/controlled.jpg) | ![YOLOv8s synthetic-3x, 22 detecções](figures/results/examples/manual-full-val/yolov8s/synthetic-3x.jpg) |
+| YOLO26s | ![YOLO26s manual-full, 23 detecções](figures/results/examples/manual-full-val/yolo26s/manual-full.jpg) | ![YOLO26s controlled, nenhuma detecção](figures/results/examples/manual-full-val/yolo26s/controlled.jpg) | ![YOLO26s synthetic-3x, 19 detecções](figures/results/examples/manual-full-val/yolo26s/synthetic-3x.jpg) |
+| RT-DETR-L | ![RT-DETR-L manual-full, 36 detecções](figures/results/examples/manual-full-val/rtdetr-l/manual-full.jpg) | ![RT-DETR-L controlled, nenhuma detecção](figures/results/examples/manual-full-val/rtdetr-l/controlled.jpg) | ![RT-DETR-L synthetic-3x, 53 detecções](figures/results/examples/manual-full-val/rtdetr-l/synthetic-3x.jpg) |
 
 Reprodução, sem novos treinos:
 
@@ -234,24 +265,23 @@ done
 Use `--image-stem` e `--seed` para escolher outra imagem e semente.
 Os arquivos `provenance.json` junto das imagens registram hashes dos dados,
 checkpoints, condições e contagens. O script verifica o hash de cada peso
-contra a seleção histórica antes da inferência.
+contra a seleção congelada antes da inferência.
 
 ## Exemplos de dados sintéticos
 
-Cenas existentes de `paired_reference`, geradas com semente raiz 42 e
-`paired-v1`. São exemplos do gerador atual, separados do pool histórico dos
-42 treinamentos acima. A seleção usa os quantis 25%, 50%, 75% e 97% da
-contagem de caixas nas 390 cenas, com desempate pelo índice de geração;
-não usa resultados de detector nem seleção estética. À direita, os rótulos
+Cenas de `synthetic-3x`, o mesmo subconjunto usado nos treinamentos acima,
+geradas com semente raiz 42 e amostragem pareada. A seleção usa os quantis
+25%, 50%, 75% e 97% da contagem de caixas nas 390 cenas, com desempate pelo
+índice de geração; não usa resultados de detector nem seleção estética. À direita, os rótulos
 automáticos da mesma cena. As imagens sem caixas permitem inspecionar
 problemas de inserção, escala e iluminação que as métricas não resumem.
 
 | Cena composta | Gabarito automático |
 |---|---|
-| ![Cena 188, 7 frutas](figures/results/synthetic-examples/scene-1.jpg) | ![Cena 188, 7 caixas](figures/results/synthetic-examples/scene-1-boxes.jpg) |
-| ![Cena 1, 16 frutas](figures/results/synthetic-examples/scene-2.jpg) | ![Cena 1, 16 caixas](figures/results/synthetic-examples/scene-2-boxes.jpg) |
-| ![Cena 7, 25 frutas](figures/results/synthetic-examples/scene-3.jpg) | ![Cena 7, 25 caixas](figures/results/synthetic-examples/scene-3-boxes.jpg) |
-| ![Cena 360, 73 frutas](figures/results/synthetic-examples/scene-4.jpg) | ![Cena 360, 73 caixas](figures/results/synthetic-examples/scene-4-boxes.jpg) |
+| ![Cena 180, 11 frutas](figures/results/synthetic-examples/scene-1.jpg) | ![Cena 180, 11 caixas](figures/results/synthetic-examples/scene-1-boxes.jpg) |
+| ![Cena 183, 20 frutas](figures/results/synthetic-examples/scene-2.jpg) | ![Cena 183, 20 caixas](figures/results/synthetic-examples/scene-2-boxes.jpg) |
+| ![Cena 355, 30 frutas](figures/results/synthetic-examples/scene-3.jpg) | ![Cena 355, 30 caixas](figures/results/synthetic-examples/scene-3-boxes.jpg) |
+| ![Cena 92, 104 frutas](figures/results/synthetic-examples/scene-4.jpg) | ![Cena 92, 104 caixas](figures/results/synthetic-examples/scene-4-boxes.jpg) |
 
 Reproduza a exportação com `.venv/bin/python scripts/render_synthetic_examples.py`.
 O dataset deve estar gerado conforme o [guia do estúdio](GENERATOR_STUDIO.md).
@@ -266,9 +296,9 @@ compartilhada entre todos os conjuntos.
 
 | | | |
 |---|---|---|
-| **manual-full** (130 img / 2.093 caixas)<br><a href="figures/results/heatmaps/manual-full.png"><img src="figures/results/heatmaps/manual-full.png" width="240" alt="Cobertura média das caixas: manual-full"></a> | **controlled** (355 img / 127 caixas)<br><a href="figures/results/heatmaps/controlled.png"><img src="figures/results/heatmaps/controlled.png" width="240" alt="Cobertura média das caixas: controlled"></a> | **synthetic-1x** (130 img / 8.302 caixas)<br><a href="figures/results/heatmaps/synthetic-1x.png"><img src="figures/results/heatmaps/synthetic-1x.png" width="240" alt="Cobertura média das caixas: synthetic-1x"></a> |
-| **synthetic-2x** (260 img / 18.084 caixas)<br><a href="figures/results/heatmaps/synthetic-2x.png"><img src="figures/results/heatmaps/synthetic-2x.png" width="240" alt="Cobertura média das caixas: synthetic-2x"></a> | **synthetic-3x** (390 img / 26.853 caixas)<br><a href="figures/results/heatmaps/synthetic-3x.png"><img src="figures/results/heatmaps/synthetic-3x.png" width="240" alt="Cobertura média das caixas: synthetic-3x"></a> | **synthetic-5x** (650 img / 44.284 caixas)<br><a href="figures/results/heatmaps/synthetic-5x.png"><img src="figures/results/heatmaps/synthetic-5x.png" width="240" alt="Cobertura média das caixas: synthetic-5x"></a> |
-| **synthetic-10x** (1.300 img / 91.623 caixas)<br><a href="figures/results/heatmaps/synthetic-10x.png"><img src="figures/results/heatmaps/synthetic-10x.png" width="240" alt="Cobertura média das caixas: synthetic-10x"></a> | **CitDet**, teste (119 img / 10.082 caixas)<br><a href="figures/results/heatmaps/citdet.png"><img src="figures/results/heatmaps/citdet.png" width="240" alt="Cobertura média das caixas: citdet"></a> | **manual-full · val**, validação (26 img / 451 caixas)<br><a href="figures/results/heatmaps/manual_full_val.png"><img src="figures/results/heatmaps/manual_full_val.png" width="240" alt="Cobertura média das caixas: manual_full_val"></a> |
+| **manual-full** (130 img / 2.093 caixas)<br><a href="figures/results/heatmaps/manual-full.png"><img src="figures/results/heatmaps/manual-full.png" width="240" alt="Cobertura média das caixas: manual-full"></a> | **controlled** (355 img / 127 caixas)<br><a href="figures/results/heatmaps/controlled.png"><img src="figures/results/heatmaps/controlled.png" width="240" alt="Cobertura média das caixas: controlled"></a> | **synthetic-1x** (130 img / 3.981 caixas)<br><a href="figures/results/heatmaps/synthetic-1x.png"><img src="figures/results/heatmaps/synthetic-1x.png" width="240" alt="Cobertura média das caixas: synthetic-1x"></a> |
+| **synthetic-2x** (260 img / 8.242 caixas)<br><a href="figures/results/heatmaps/synthetic-2x.png"><img src="figures/results/heatmaps/synthetic-2x.png" width="240" alt="Cobertura média das caixas: synthetic-2x"></a> | **synthetic-3x** (390 img / 12.526 caixas)<br><a href="figures/results/heatmaps/synthetic-3x.png"><img src="figures/results/heatmaps/synthetic-3x.png" width="240" alt="Cobertura média das caixas: synthetic-3x"></a> | **synthetic-5x** (650 img / 21.242 caixas)<br><a href="figures/results/heatmaps/synthetic-5x.png"><img src="figures/results/heatmaps/synthetic-5x.png" width="240" alt="Cobertura média das caixas: synthetic-5x"></a> |
+| **synthetic-10x** (1.300 img / 41.583 caixas)<br><a href="figures/results/heatmaps/synthetic-10x.png"><img src="figures/results/heatmaps/synthetic-10x.png" width="240" alt="Cobertura média das caixas: synthetic-10x"></a> | **CitDet**, teste (119 img / 10.082 caixas)<br><a href="figures/results/heatmaps/citdet.png"><img src="figures/results/heatmaps/citdet.png" width="240" alt="Cobertura média das caixas: citdet"></a> | **manual-full · val**, validação (26 img / 451 caixas)<br><a href="figures/results/heatmaps/manual_full_val.png"><img src="figures/results/heatmaps/manual_full_val.png" width="240" alt="Cobertura média das caixas: manual_full_val"></a> |
 
 Os mapas somam a cobertura das caixas e dividem pelo número de imagens;
 portanto, combinam posição, tamanho e quantidade de caixas. Não são mapas de
@@ -283,17 +313,24 @@ nas condições de treinamento, conforme as contagens indicadas.
    nas condições avaliadas. Essa comparação altera contexto, escala, densidade
    e quantidade de caixas ao mesmo tempo; não isola o efeito de DepthPro,
    sombras ou qualquer outra transformação.
-2. Há volumes sintéticos com médias maiores que `manual-full` no CitDet para
-   os três detectores. Essa observação precisa de confirmação em dados não
-   usados no desenvolvimento e com a condição escolhida previamente.
-3. A resposta ao volume depende do detector e dos hiperparâmetros usados.
+2. No CitDet, o treino exclusivamente sintético igualou ou superou o treino
+   com fotos reais anotadas à mão nos três detectores, sob protocolo idêntico.
+   A margem é de 0,013 no YOLOv8s e 0,069 no RT-DETR-L; no YOLO26s é de 0,002,
+   compatível com empate. A observação ainda precisa de confirmação em dados
+   não usados no desenvolvimento e com a condição escolhida previamente.
+3. A vantagem não se estende ao conjunto local, onde `manual-full` lidera nos
+   três detectores. As duas leituras juntas descrevem um efeito de domínio:
+   o dado sintético cobre melhor a distribuição da coleta externa, e o dado
+   real cobre melhor a sua própria.
+4. A resposta ao volume depende do detector e dos hiperparâmetros usados.
    Mais imagens implicam mais passos por época e maior validação. Não se pode
    atribuir as diferenças apenas à arquitetura ou à diversidade sintética.
-4. As menores médias de MAE no CitDet foram 30,5 para YOLO26s em `2x`, 32,4
-   para YOLOv8s em `3x` e 26,9 para RT-DETR-L em `10x`. Os valores de
-   `manual-full` foram 42,3, 45,1 e 54,8. São mínimos escolhidos após comparar
-   condições; contagem por imagem não mede produção por árvore ou pomar, nem
-   corrige frutos ocultos ou repetidos em diferentes vistas.
+5. As menores médias de MAE de contagem no CitDet foram 20,9 para YOLO26s em
+   `10x`, 23,1 para YOLOv8s em `10x` e 25,3 para RT-DETR-L em `10x`. Os
+   valores de `manual-full` foram 42,4, 48,1 e 41,2. Todas as condições
+   sintéticas de YOLOv8s e YOLO26s ficam abaixo da respectiva referência real.
+   Contagem por imagem não mede produção por árvore ou pomar, nem corrige
+   frutos ocultos ou repetidos em diferentes vistas.
 
 Para uma etapa confirmatória, é necessário congelar gerador, condições e
 critério de seleção antes de acessar um novo conjunto reservado. A análise
@@ -304,151 +341,10 @@ coleta, preparação e revisão dos rótulos automáticos.
 
 ## Rastreabilidade
 
-- SHA-256 da seleção de checkpoints: `99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f`
+- SHA-256 da seleção de checkpoints: `7709908f7ec327466623f1082952a585d6cdee83bc040e7a9f0931d845bb0c51`
 - Checkpoints avaliados por teste: 42 (todos os treinamentos confirmatórios)
 - O bloqueio da avaliação após `model_selection.json` não desfaz o uso prévio
   de estatísticas no gerador nem o reuso da validação manual para seleção.
 - As médias versionadas registram a precisão das tabelas publicadas; auditoria
   por execução depende dos JSONs originais e dos manifestos do pool utilizado.
 
-## Primeira comparação pareada com YOLOv8s
-
-A candidata sem exposição independente e sem sombras projetadas foi
-**rejeitada como melhoria**. O mAP@.50:.95 caiu nos dois cenários, nas duas
-sementes. A distância de saturação também aumentou em ambas as coletas.
-A interface mantém a receita atual como ponto de partida.
-
-| Cenário | Receita atual, média | Candidata, média | Diferença |
-|---|---:|---:|---:|
-| Validação manual | 0,3787 | 0,3588 | −0,0199 |
-| CitDet | 0,2101 | 0,1943 | −0,0158 |
-
-| Receita | Semente de treino | Validação manual | CitDet |
-|---|---:|---:|---:|
-| Atual | 41 | 0,379996 | 0,214497 |
-| Atual | 42 | 0,377453 | 0,205714 |
-| Candidata | 41 | 0,367916 | 0,206601 |
-| Candidata | 42 | 0,349688 | 0,181912 |
-
-Cada braço usa 312 imagens de treino e 78 de validação, com 5.582 e 1.484
-caixas respectivamente. As 390 imagens têm a mesma geometria e rótulos
-entre os braços; apenas a aparência muda. Geração com semente 42,
-`sampling.mode: paired-v1`, catálogo de 228 fundos e 127 recortes. Dois
-mecanismos foram removidos em conjunto, reduzindo as folhas do YAML de 62
-para 50; este resultado não isola a contribuição individual de cada um.
-
-Treino com YOLOv8s, 50 épocas, tamanho 960, batch 8, SGD e pesos pré-treinados,
-conforme [a configuração](../configs/similarity_yolov8.yaml). Os checkpoints
-foram selecionados na validação sintética; os quatro foram congelados em
-`artifacts/similarity_yolov8/paired_selection.json` antes da avaliação real.
-
-Na comparação de aparência sobre o treino sintético inteiro, a distância
-entre quantis de saturação subiu de 7,90 para 12,36 na coleta local e de 16,61
-para 21,14 no CitDet (pontos percentuais da escala de saturação). A distância
-de luminância caiu de 3,88 para 2,80 no local, mas subiu de 11,03 para 12,11
-no CitDet. Logo, também não houve melhora conjunta das distribuições.
-Essas medidas incluem o conteúdo das caixas, não apenas a casca das frutas.
-
-Os dois conjuntos reais já participaram do desenvolvimento anterior. São
-resultados exploratórios, não confirmação de generalização nem teste de
-significância. Os números publicados da grade antiga pertencem a outro pool
-e não substituem o controle pareado desta comparação.
-
-O [snapshot com resultados, hashes e medidas de similaridade](studio-results.json)
-permite consultar os números sem os pesos locais. Os artefatos completos
-ficam em `artifacts/similarity_yolov8` e os checkpoints em
-`runs/similarity_yolov8/training`.
-
-A meta de melhorar o detector com menos parâmetros continua aberta. A
-amostragem pareada, a rastreabilidade e a interface foram implementadas e
-validadas; esta simplificação específica não foi adotada. A próxima hipótese
-deve tratar um mecanismo por vez e partir de um problema visível nas cenas,
-como contexto, posicionamento ou aparência local, preservando a densidade
-escolhida no projeto.
-
-## Ciclo de verossimilhança com YOLOv8s
-
-<!-- realism-metrics:start -->
-![YOLOv8s por receita e semente nos dois cenários](figures/results/realism/map.svg)
-
-| Receita | CitDet 41 | CitDet 42 | Média | Local 41 | Local 42 | Média |
-|---|---:|---:|---:|---:|---:|---:|
-| manual-full | 0.223432 | 0.204814 | 0.214123 | 0.543716 | 0.554439 | 0.549077 |
-| paired_essential | 0.206601 | 0.181912 | 0.194256 | 0.367916 | 0.349688 | 0.358802 |
-| paired_reference | 0.214497 | 0.205714 | 0.210106 | 0.379996 | 0.377453 | 0.378725 |
-| paired_canopy | 0.186433 | 0.216165 | 0.201299 | 0.304351 | 0.378800 | 0.341576 |
-| paired_count_scale | 0.203593 | 0.213430 | 0.208512 | 0.351961 | 0.363115 | 0.357538 |
-| paired_exposure | 0.208765 | 0.198986 | 0.203875 | 0.381753 | 0.360261 | 0.371007 |
-| paired_highlights | 0.213855 | 0.201245 | 0.207550 | 0.399793 | 0.358221 | 0.379007 |
-| paired_mixture | 0.214855 | 0.206220 | 0.210537 | 0.367772 | 0.365536 | 0.366654 |
-| paired_occlusion | 0.203283 | 0.194845 | 0.199064 | 0.363503 | 0.376851 | 0.370177 |
-| paired_relief | 0.196127 | 0.196459 | 0.196293 | 0.382208 | 0.389005 | 0.385606 |
-| paired_ripeness | 0.204331 | 0.203052 | 0.203692 | 0.382022 | 0.372954 | 0.377488 |
-| paired_saturation | 0.213395 | 0.198733 | 0.206064 | 0.380718 | 0.382966 | 0.381842 |
-| paired_shade | 0.186947 | 0.192797 | 0.189872 | 0.360671 | 0.373438 | 0.367055 |
-| paired_sharpness | 0.196401 | 0.204688 | 0.200545 | 0.368514 | 0.360088 | 0.364301 |
-| paired_visibility | 0.194827 | 0.198841 | 0.196834 | 0.357615 | 0.378263 | 0.367939 |
-
-Valores de mAP@.50:.95. Os pontos mostram as duas sementes de treino,
-não intervalos de confiança. Todos os ciclos são exploratórios; ambos
-os conjuntos reais já participaram do desenvolvimento. Os checkpoints
-sintéticos foram selecionados somente na validação sintética.
-
-O [snapshot completo](realism-results.json) registra métricas, similaridade
-e hashes das fontes. Reproduza este bloco com
-`.venv/bin/python scripts/report_realism.py` após a avaliação dos dois cenários.
-<!-- realism-metrics:end -->
-
-As três novas hipóteses mantêm 390 imagens, os 127 recortes, os mesmos fundos,
-as sementes de treino 41/42 e 50 épocas. A geração usa semente 42, modo
-pareado e a mistura original: 1–30 frutas, com probabilidade de 6% para
-60–110. Foram realizadas 18 cenas densas neste pool; não se aumentou essa
-probabilidade para perseguir mAP. O protocolo e a motivação anteriores aos
-treinos estão no [guia do gerador](GENERATOR_STUDIO.md#experimento-reduzido).
-
-| Receita | Mudança e referência | Inspeção das mesmas cenas |
-|---|---|---|
-| `paired_saturation` | Sobre `paired_reference`, perda de saturação ligada à exposição de 0,35 para 0,70. Mesmos 390 rótulos, byte a byte. | [Cenas 1 e 188](figures/results/realism/saturation.jpg) |
-| `paired_relief` | Sobre `paired_saturation`, remove `bright_flatten_strength`. Mesmos rótulos; uma folha a menos no YAML. | [Cenas 1 e 188](figures/results/realism/relief.jpg) |
-| `paired_count_scale` | Sobre `paired_reference`, escala proporcional a `sqrt(30 / contagem)` somente acima de 30 frutas. Nenhum novo ajuste numérico. | [Cenas densas 36 e 360](figures/results/realism/count-scale.jpg) |
-
-As cenas 1 e 188 já integravam a inspeção anterior por quantis de contagem.
-A cena 36 é a primeira cena densa em ordem de geração e a 360 já era o
-exemplo denso publicado. Os índices foram definidos antes dos resultados
-dos respectivos detectores; cada figura tem um JSON de proveniência junto.
-As comparações mantêm a proporção e não retocam os resultados do compositor.
-
-Na ablação de escala, 372 imagens esparsas e seus rótulos permaneceram
-idênticos. As 18 cenas densas mantiveram fundos, recortes, sementes e contagens
-sorteadas, com mudanças de tamanho e possíveis mudanças de inserção/oclusão.
-São as mesmas 7.086 frutas solicitadas; as caixas finais passaram de 7.066
-para 7.074, por menor perda na composição. A mediana do tamanho nas cenas de
-treino com mais de 60 caixas caiu de 2,826% para 1,804%; no CitDet é 1,668%.
-Isso aproxima a escala desse domínio, mas piora a distância global de tamanho
-no domínio local: de 0,814 para 1,040 ponto percentual. No CitDet, essa
-distância cai de 1,279 para 1,078. Não há melhora uniforme em todos os descritores.
-
-A candidata de saturação não foi promovida: aproximou a distribuição de cor,
-mas reduziu o mAP do CitDet nas duas sementes contra a receita de referência.
-As cenas ainda revelam problemas de contexto, frutas sem ligação aparente
-com galhos e oclusões fragmentadas. Uma distância menor de cor ou escala
-não certifica que todo o dataset seja verossímil.
-
-Para reproduzir o ciclo com os ativos preparados:
-
-```bash
-for recipe in paired_saturation paired_relief paired_count_scale; do
-  .venv/bin/python scripts/generate_synthetic.py \
-    --synthesis-config "configs/synthesis/$recipe.yaml" --workers 6
-done
-.venv/bin/python scripts/train_grid.py --config configs/realism_yolov8.yaml --device 0 --workers 4
-.venv/bin/python scripts/evaluate_similarity.py --config configs/realism_yolov8.yaml --device 0
-.venv/bin/python scripts/report_realism.py
-.venv/bin/python scripts/render_realism_examples.py \
-  --candidate paired_count_scale --scene 36 --scene 360 --output count-scale
-```
-
-O gerador recusa reutilizar diretórios de outra versão do código; use um
-diretório novo para reconstruir dados antigos. Alterações somente no código
-de proveniência podem preservar os pixels e ainda mudar o identificador do
-experimento. Os hashes publicados registram a versão efetivamente avaliada.

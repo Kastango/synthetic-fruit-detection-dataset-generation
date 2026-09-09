@@ -1,252 +1,89 @@
 # Detecção de poncãs com dados sintéticos
 
-Pipeline para gerar imagens sintéticas com caixas automáticas e comparar
-seu uso no treinamento de detectores de poncãs. A avaliação no CitDet mede
-transferência para detecção de cítricos, com todas as categorias reunidas em
-uma classe.
-
-A interface local permite ajustar o gerador por sliders, inspecionar quatro
-cenas de árvores preenchidas com poncãs e gerar um dataset YOLO em ZIP. Ela
-usa somente fundos, mapas de profundidade e recortes de frutas, sem exigir
-um dataset real anotado.
-
-```bash
-.venv/bin/python scripts/studio.py
-```
-
-Abra http://127.0.0.1:8765. Consulte [interface e sementes](docs/GENERATOR_STUDIO.md)
-e os [resultados](docs/RESULTS.md). Os novos experimentos usam
-somente YOLOv8s; a grade completa fica para uma etapa posterior.
-
-Os resultados dos 42 treinamentos anteriores estão em
-[`docs/RESULTS.md`](docs/RESULTS.md). Eles correspondem ao pool mais denso
-usado naquela rodada, não à receita atual. São resultados exploratórios:
-o gerador foi ajustado com estatísticas dos conjuntos de avaliação.
-
-## Problema e pergunta de pesquisa
-
-O treinamento supervisionado de um detector de frutas pode depender de
-imagens da época de frutificação e caixas desenhadas à mão. A base real usada
-aqui tem 130 imagens e 2.093 caixas. Cobrir
-diferentes condições de iluminação e oclusão exige novas coletas e mais
-rotulagem.
-
 > Imagens sintéticas anotadas automaticamente podem reduzir o esforço de
 > rotulagem e manter desempenho próximo ao obtido com imagens reais?
 
-A pipeline combina fotos de árvores sem frutas, feitas fora do período
-produtivo, com frutas fotografadas sobre fundo uniforme. O
-[DepthPro](https://github.com/apple/ml-depth-pro) estima a
-profundidade, e o compositor usa o mapa para posicionar as frutas, simular
-oclusões, ajustar sua aparência e gerar as caixas. O processo usa imagens RGB
-comuns, sem sensores de profundidade ou modelagem 3D, e gera os rótulos junto
-com cada cena. Isso dispensa desenhar cada caixa sintética à mão; ainda exige
-coleta, pré-processamento e auditoria das imagens. O esforço total de trabalho
-humano não foi medido.
+O projeto combina fotos de árvores sem frutas com recortes de poncãs para
+criar cenas de pomares e suas caixas automaticamente. O experimento compara
+detectores treinados com esses dados aos treinados com fotografias de campo,
+buscando desempenho próximo ao real e cenas verossímeis.
 
-Os dados reais são a referência. Os conjuntos sintéticos variam de `1x` a
-`10x` para comparar volumes sob o protocolo descrito abaixo. A quantidade de
-caixas, o tamanho da validação e os passos de otimização também variam.
+## Como as cenas são geradas
 
-## Fluxo de geração
+O DepthPro estima a profundidade das árvores. O compositor usa esses mapas
+para ajustar o tamanho das frutas e esconder parte delas atrás da vegetação.
+Depois de todas as inserções, calcula as caixas das partes visíveis.
 
-O fluxograma resume a preparação dos ativos, a composição das cenas, os arquivos
-salvos em JPG, TXT e JSON, o split do pool gerado e a materialização de
-`synthetic-1x` a `synthetic-10x`.
+[![Processo de preparação dos ativos, composição e divisão dos dados](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)
 
-![Fluxograma da geração dos conjuntos synthetic-1x a synthetic-10x](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)
-
-*Figura 1. Preparação dos ativos, composição e formação dos conjuntos sintéticos.
-As faixas do laço mostram a mesma fruta, fundo e posição em uma inserção
-ilustrativa. O split separa cenas, mas permite reutilizar os mesmos ativos em
-treino e validação. [Abrir o SVG em tamanho completo](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg).*
-
-Os scripts, fontes e miniaturas estão versionados. Veja
-[como editar e regenerar os fluxogramas](docs/DIAGRAMS.md).
-
-## Parâmetros do gerador
-
-<details>
-<summary>Consultar os parâmetros e seu significado no código</summary>
-
-Todos ficam em [`configs/synthesis/confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml)
-e são consumidos por [`fruit_pipeline/synthesis.py`](fruit_pipeline/synthesis.py).
-A geração usa sementes por cena e registra hashes da configuração, do compositor
-e do conteúdo dos ativos. A reprodução depende também das mesmas fontes, versão do código e
-bibliotecas. Mudanças no gerador exigem regenerar os dados e conferir os
-manifestos antes de reutilizar treinamentos. O marcador de geração verifica
-também o SHA-256 do compositor.
-
-### Cena
-
-| Parâmetro | O que faz |
-|---|---|
-| `seed` | Semente raiz da geração. No modo legado inclui o hash da configuração; em `sampling.mode: paired-v1`, usa o conteúdo dos ativos e o índice da cena, preservando a geometria ao mudar a aparência. |
-| `sampling.mode` | Opcional: `paired-v1` mantém a identidade das cenas ao alterar aparência, nome ou total do pool; a ausência usa a derivação legada. |
-| `images.total` | Tamanho do pool antes do split. As frações `1x`–`10x` são prefixos aninhados desse pool. |
-| `canvas` | Resolução `[largura, altura]`, como em Pillow. O valor atual `[720, 960]` produz imagens em retrato. |
-
-### Quantidade e tamanho dos objetos (`objects`)
-
-| Parâmetro | O que faz |
-|---|---|
-| `min` / `max` | Faixa esparsa de frutas solicitadas, sorteada uniformemente entre 1 e 30. Inserções podem ser rejeitadas. |
-| `dense.probability` | Probabilidade de a cena sortear da faixa densa em vez da esparsa, atualmente 6%. A distribuição final depende das rejeições e oclusões. |
-| `dense.min` / `dense.max` | Faixa densa de frutas solicitadas, de 60 a 110. Junto com a faixa esparsa (`min`/`max`), produz uma mistura de dois modos: a maioria das cenas fica perto das 14,5 caixas por imagem medianas do `manual-full` e uma minoria perto das 78 do CitDet. O total resultante varia com a semente e as rejeições. As 2.093 caixas reais pertencem às 130 imagens; o split de treino de 104 imagens tem 1.642 caixas. |
-| `min_scale` / `max_scale` | Fração do menor lado do canvas que define o maior lado do recorte antes da rotação e do ajuste por profundidade. Faixa atual 0,01–0,065, calibrada com estatísticas de caixas do CitDet e da base manual. |
-| `rotation_degrees` | Rotação no plano da imagem, sorteada em `[-x, +x]` por instância. Gira também o brilho registrado na foto; não recalcula a iluminação em 3D. |
-| `depth_scale.near_scale` / `far_scale` | Multiplicadores do tamanho para fruta no primeiro plano e no fundo. Interpolados linearmente pela proximidade estimada. |
-
-Quando a quantidade solicitada supera os 127 recortes disponíveis, o gerador
-usa o catálogo completo e sorteia os recortes adicionais com repetição. Uma
-foto-fonte pode, portanto, originar várias instâncias na mesma cena.
-
-### Colocação (`placement`)
-
-O pré-processamento converte a distância estimada pelo DepthPro em proximidade
-normalizada por imagem, de 0 a 255, com valores maiores indicando regiões mais
-próximas. O compositor deriva um `z` local para a fruta; pixels do fundo com
-proximidade maior que esse valor ocluem sua silhueta. `z` e os limiares abaixo
-não representam metros.
-
-| Parâmetro | O que faz |
-|---|---|
-| `z_patch_fraction` | Lado do patch central, como fração do menor lado da fruta. Sua mediana define uma referência local de proximidade. |
-| `z_offset` | Deslocamento fixo do `z`. Negativo empurra a fruta para trás, aumentando a oclusão. |
-| `z_offset_jitter` | Amplitude da perturbação uniforme somada ao offset por tentativa, em unidades do mapa de 8 bits. |
-| `min_depth` | Proximidade mínima aceita no ponto de inserção, na escala 0–255. Não é uma segmentação semântica do céu. |
-| `min_visibility` | Fração mínima de pixels da silhueta visível na inserção. Frutas posteriores podem reduzir essa fração; o limiar de 15% não é reaplicado às caixas finais. |
-| `max_attempts_per_object` | Tentativas de posição por fruta antes de desistir dela. |
-| `exclude_bottom_fraction` | Fração inferior excluída da amostragem de posições, usada como aproximação para evitar o chão. |
-
-### Aparência (`appearance`)
-
-Aplicada nesta ordem: variação de matiz → HSV cast ambiental → exposição por
-instância. São transformações de aparência, sem simulação física da maturação
-ou da iluminação.
-
-| Parâmetro | O que faz |
-|---|---|
-| `ripeness.enabled` | Liga o deslocamento de matiz que simula fruta em maturação. Os 127 recortes-fonte são todos de fruta madura. |
-| `ripeness.fraction_affected` | Fração das instâncias que recebe o deslocamento. |
-| `ripeness.green_hue_degrees` | Matiz alvo em graus. Um verde-amarelado, deliberadamente distinto do verde da folhagem para não colidir cromaticamente com ela. |
-| `ripeness.strength_range` | Intensidade do deslocamento por instância, de 0 (sem efeito) a 1 (matiz alvo puro). |
-| `ripeness.saturation_scale` | Multiplicador da saturação. Controla a saturação da transformação; não garante separação cromática da folhagem. |
-| `ripeness.gloss_reduction` | Reduz valores altos de luminância do recorte. É uma heurística visual, sem calibração de propriedades físicas da casca. |
-| `hsv_cast.use_hardlight_target` | Usa o hard-light da fruta contra a cor média do fundo como alvo por pixel, em vez de uma cor única e plana. |
-| `hsv_cast.hue_power` / `saturation_power` / `value_power` | Quanto cada canal HSV adota o alvo ambiental, de 0 a 1. |
-| `hsv_cast.value_power_jitter` | Sorteio do `value_power` por instância, alargando a variação de luz e sombra entre frutas. |
-| `hsv_cast.min_value_ratio` | Piso de luminância relativo ao valor original, impedindo que a fruta colapse num borrão indistinguível do fundo. |
-| `hsv_cast.bright_flatten_strength` | Perto de regiões estouradas de luz, aumenta a adoção do alvo, achatando o relevo como acontece na superexposição real. |
-| `exposure_jitter.enabled` | Liga o fator de exposição por instância, aplicado depois do casting e independente do fundo. |
-| `exposure_jitter.probability` | Fração das instâncias afetadas. |
-| `exposure_jitter.range` | Faixa do multiplicador de intensidade, atualmente 0,40–1,90. Escurece ou clareia a fruta independentemente do fundo; não demonstra, por si só, equivalência à distribuição real de iluminação. |
-| `exposure_jitter.saturation_pull` | Dessaturação proporcional ao afastamento do fator de exposição em relação a 1. |
-
-### Oclusão e sombras (`occlusion`)
-
-| Parâmetro | O que faz |
-|---|---|
-| `edge_blur` | Suaviza a máscara de visibilidade derivada da profundidade, evitando bordas de oclusão em degrau. |
-| `depth_smooth_radius` | Suaviza o mapa de profundidade antes de compará-lo ao `z`, reduzindo ruído do DepthPro. |
-| `mask_threshold` | Limiar que converte a máscara suavizada em oclusão efetiva. |
-| `edge_feather_radius` | Segundo desfoque, mais curto, no contorno do recorte, para não sobrar franja semitransparente. |
-| `contact_shadow.strength` | Intensidade do escurecimento. |
-| `contact_shadow.radius_fraction` | Alcance da penumbra como fração do menor lado da fruta. |
-| `cast_shadow.probability` | Fração das instâncias que recebe sombra projetada. |
-| `cast_shadow.strength` | Intensidade do escurecimento. |
-| `cast_shadow.min_coverage` / `max_coverage` | Fração da fruta coberta pela sombra, sorteada na faixa. |
-| `cast_shadow.offset_fraction` | Deslocamento da sombra em relação ao centro da fruta. |
-| `cast_shadow.light_angle_degrees` | Direção da luz em graus, que define de que lado a sombra cai. |
-| `cast_shadow.light_angle_jitter_degrees` | Variação do ângulo por instância. |
-| `cast_shadow.blur_radius` | Suavidade da borda da sombra. |
-
-### Anotação e saída
-
-| Parâmetro | O que faz |
-|---|---|
-| `annotation.mode` | `visible` anota apenas a parte visível da fruta; `amodal`, a extensão completa incluindo o que está oculto; `rect`, o retângulo do recorte. |
-| `annotation.min_box_pixels` | Comprimento mínimo de cada lado da caixa, em pixels. Com valor 2, largura e altura precisam ser pelo menos 2 px. |
-| `output.jpeg_quality` | Qualidade JPEG da cena final. |
-| `output.scene_grading.contrast` / `saturation` / `brightness` | Multiplicadores de contraste, saturação e brilho aplicados somente ao fundo. |
-| `output.scene_grading.sharpen_radius` / `sharpen_percent` / `sharpen_threshold` | Máscara de nitidez aplicada ao fundo antes da composição. |
-
-
-</details>
+Abra a figura para ler os detalhes. As miniaturas ilustram o processo.
+O gerador usa fotos RGB, sem exigir sensor de profundidade ou modelagem 3D.
 
 ## Experimento
 
-O experimento compara sete condições de treinamento:
+O experimento compara sete condições de treinamento. As pilhas crescem com
+o número de imagens, e cada conjunto sintético contém o menor nas duas partições.
 
-| Condição | Conjuntos |
+<table>
+<thead><tr><th width="180">Condição</th><th>Treino, validação e teste</th></tr></thead>
+<tbody>
+<tr><td width="180"><code>manual-full</code></td><td>Fotografias de campo<br><br><img src="docs/figures/condicoes/condicao-manual-full.svg" alt="Conjuntos de manual-full, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>controlled</code></td><td>Frutas isoladas e fundos negativos<br><br><img src="docs/figures/condicoes/condicao-controlled.svg" alt="Conjuntos de controlled, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>synthetic-1x</code></td><td>Cenas sintéticas<br><br><img src="docs/figures/condicoes/condicao-synthetic-1x.svg" alt="Conjuntos de synthetic-1x, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>synthetic-2x</code></td><td>Contém synthetic-1x<br><br><img src="docs/figures/condicoes/condicao-synthetic-2x.svg" alt="Conjuntos de synthetic-2x, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>synthetic-3x</code></td><td>Contém synthetic-2x<br><br><img src="docs/figures/condicoes/condicao-synthetic-3x.svg" alt="Conjuntos de synthetic-3x, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>synthetic-5x</code></td><td>Contém synthetic-3x<br><br><img src="docs/figures/condicoes/condicao-synthetic-5x.svg" alt="Conjuntos de synthetic-5x, com pilhas proporcionais ao volume" width="1116"></td></tr>
+<tr><td width="180"><code>synthetic-10x</code></td><td>Contém synthetic-5x<br><br><img src="docs/figures/condicoes/condicao-synthetic-10x.svg" alt="Conjuntos de synthetic-10x, com pilhas proporcionais ao volume" width="1116"></td></tr>
+</tbody>
+</table>
+
+As pilhas ilustram o volume de dados; os rótulos mostram a quantidade de imagens.
+
+A avaliação local também usa as 26 imagens de `manual-full.val`.
+As setas entre treino e validação representam a avaliação entre épocas,
+sem atualização de pesos pela validação.
+
+### Treino e avaliação
+
+A grade contém **42 treinos**, sete condições, três detectores e duas sementes.
+A configuração completa está em
+[`confirmatory.yaml`](configs/confirmatory.yaml).
+
+| Ajuste | Valor |
 |---|---|
-| <code>manual&#8209;full</code> | fotografias de campo<br><a href="docs/figures/condicoes/condicao-manual-full.svg"><img src="docs/figures/condicoes/condicao-manual-full.svg" width="1092" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"></a> |
-| <code>controlled</code> | frutas isoladas + fundos negativos<br><a href="docs/figures/condicoes/condicao-controlled.svg"><img src="docs/figures/condicoes/condicao-controlled.svg" width="1092" alt="284 imagens de treino, 71 de validação e 119 do teste externo CitDet"></a> |
-| <code>synthetic&#8209;1x</code> | cenas sintéticas<br><a href="docs/figures/condicoes/condicao-synthetic-1x.svg"><img src="docs/figures/condicoes/condicao-synthetic-1x.svg" width="1092" alt="104 imagens de treino, 26 de validação e 119 do teste externo CitDet"></a> |
-| <code>synthetic&#8209;2x</code> | contém synthetic-1x<br><a href="docs/figures/condicoes/condicao-synthetic-2x.svg"><img src="docs/figures/condicoes/condicao-synthetic-2x.svg" width="1092" alt="208 imagens de treino, 52 de validação e 119 do teste externo CitDet"></a> |
-| <code>synthetic&#8209;3x</code> | contém synthetic-2x<br><a href="docs/figures/condicoes/condicao-synthetic-3x.svg"><img src="docs/figures/condicoes/condicao-synthetic-3x.svg" width="1092" alt="312 imagens de treino, 78 de validação e 119 do teste externo CitDet"></a> |
-| <code>synthetic&#8209;5x</code> | volume intermediário<br><a href="docs/figures/condicoes/condicao-synthetic-5x.svg"><img src="docs/figures/condicoes/condicao-synthetic-5x.svg" width="1092" alt="520 imagens de treino, 130 de validação e 119 do teste externo CitDet"></a> |
-| <code>synthetic&#8209;10x</code> | maior volume avaliado<br><a href="docs/figures/condicoes/condicao-synthetic-10x.svg"><img src="docs/figures/condicoes/condicao-synthetic-10x.svg" width="1092" alt="1.040 imagens de treino, 260 de validação e 119 do teste externo CitDet"></a> |
+| Detectores | YOLOv8s, YOLO26s e RT-DETR-L |
+| Sementes de treino | 41 e 42 |
+| Duração | Até 50 épocas, com `patience: 30` |
+| Entrada | `imgsz: 960` |
+| Congelamento | `freeze: 5`, os cinco primeiros módulos de cada modelo |
+| YOLOs | SGD, taxa inicial 0,01, batch 8 |
+| RT-DETR | AdamW, taxa inicial 0,0001, batch 2 |
 
-As fotos nas pilhas ilustram os tipos de dados. As miniaturas sintéticas vêm de
-um preview do gerador atual e não identificam as cenas dos treinamentos
-publicados. Treino e validação usam a mesma escala visual, 3 cartas por 26
-imagens, com arredondamento; o teste usa 3 cartas fixas. As setas de ida e volta
-representam avaliação entre épocas, sem atualização de pesos pela validação.
+Todos partem de pesos pré-treinados. O congelamento reduz os parâmetros
+ajustados, mas não o tamanho do detector. Os cinco módulos não representam
+a mesma estrutura nas três arquiteturas.
 
-Todos os fundos, mapas de profundidade e recortes ficam disponíveis durante a
-composição. O gerador cria um pool único de 1.300 cenas e só depois aplica o
-split determinístico 80/20: 1.040 imagens de treino e 260 de validação. Os
-conjuntos são aninhados nas duas partições: `2x` contém o treino e a validação
-de `1x`, `3x` contém os de `2x` e assim por diante. Cada multiplicador usa apenas
-o prefixo de validação correspondente ao seu tamanho.
-
-Cada condição é treinada com três detectores:
-
-| Família | Checkpoint |
-|---|---|
-| YOLO26 | `yolo26s.pt` |
-| YOLOv8 | `yolov8s.pt` |
-| RT-DETR | `rtdetr-l.pt` |
-
-Cada treinamento executa no máximo 50 épocas, com `patience=30`, entrada
-`960` e sementes 41 e 42. Os parâmetros de augmentation são compartilhados na
-configuração; sua aplicação depende da implementação de cada detector. YOLOs
-usam SGD, `lr0=0.01`, batch 8 e `deterministic=true`; RT-DETR usa AdamW,
-`lr0=0.0001`, batch 2 e `deterministic=false`. As comparações de volume devem
-ser feitas dentro de cada detector. Todos partem de pesos pré-treinados, não de
-inicialização aleatória. A matriz completa contém:
-
-```text
-7 condições × 3 detectores × 2 sementes = 42 treinamentos
-```
-
-## Avaliação
-
-A avaliação no CitDet usa as 119 imagens e 10.082 caixas do split oficial de teste do
-[CitDet](https://mavmatrix.uta.edu/cse_datasets/1/). O split de treino do CitDet
-não é utilizado.
-
-Os checkpoints são selecionados pela validação correspondente a cada condição.
-O fluxo padrão libera a avaliação externa depois que a seleção é congelada em
-`model_selection.json`. Esse bloqueio protege a seleção de checkpoints, mas não
-impede que estatísticas do conjunto de avaliação orientem o desenvolvimento
-do gerador, como ocorreu nesta versão.
-
-A métrica principal é mAP@0.5:0.95. O relatório também inclui precisão,
-revocação, F1, mAP@0.5, mAP@0.75, AP por IoU, tempo de inferência e erros de
-contagem, curvas de treinamento e um mapa de calor das anotações de cada
-conjunto. Os dados completos da análise também são exportados em CSV e reunidos
-em `analysis_csv.zip`. Resultados sintéticos superiores a `manual-full` são
-destacados no relatório final.
+Cada treino escolhe seu checkpoint pela validação da própria condição.
+Depois, o relatório mede mAP, precision, recall e F1 nos dois conjuntos reais.
+`manual-full.val` também participa da seleção de `manual-full`. O CitDet
+orientou ajustes do gerador, portanto uma confirmação independente exige
+outra coleta reservada.
 
 ## Resultados e limites da interpretação
 
-As maiores médias de mAP@0.5:0.95 entre os volumes sintéticos no CitDet foram
-0,240 para YOLOv8s, 0,243 para YOLO26s e 0,212 para RT-DETR-L. As referências
-`manual-full` correspondentes foram 0,214, 0,236 e 0,161. Esses máximos foram
-identificados após comparar cinco volumes no próprio CitDet; não equivalem a
-uma escolha prévia de condição nem demonstram superioridade estatística.
+No CitDet, as maiores médias de mAP@0.5:0.95 entre os volumes sintéticos foram
+0,228 para YOLOv8s, 0,243 para YOLO26s e 0,217 para RT-DETR-L. As referências
+`manual-full` correspondentes foram 0,215, 0,241 e 0,147. O treino
+exclusivamente sintético igualou ou superou o treino com fotos reais anotadas
+à mão nos três detectores, com margem de 0,013 no YOLOv8s e 0,069 no
+RT-DETR-L; no YOLO26s a diferença de 0,002 é compatível com empate.
+
+Esses máximos foram identificados após comparar cinco volumes no próprio
+CitDet; não equivalem a uma escolha prévia de condição nem demonstram
+superioridade estatística. Na validação local a ordem se inverte e
+`manual-full` lidera nos três detectores, com 0,511, 0,511 e 0,388 contra
+0,397, 0,388 e 0,346 do melhor sintético. A afirmação sustentada pelos dados
+é sobre transferência para coleta externa, não sobre superioridade geral.
 
 ![Médias de mAP em função do volume sintético no CitDet e na validação manual](docs/figures/results/synthetic-volume-vs-map.svg)
 
@@ -275,96 +112,108 @@ estão em [`docs/RESULTS.md`](docs/RESULTS.md). A economia de trabalho humano e
 uma margem aceitável de perda de desempenho ainda precisam ser medidas para
 responder à pergunta de pesquisa.
 
-## Dados
+## Preparar e executar
 
-| Fonte | Uso | Conteúdo |
-|---|---|---|
-| `datanotation.zip` | treino e validação manual | 130 imagens, 2.093 caixas YOLO, sendo 82 fotos do iPhone 13 mini e 48 do Pixel 6a |
-| ativos sintéticos | condição controlada e geração de cenas | 127 fotos de frutas, 228 fundos e seus mapas de profundidade |
-| `UTA_CSE_Dataset.zip` | teste externo | split oficial do CitDet com 119 imagens e 10.082 caixas |
+Use Python 3.11 ou 3.12. O treino requer GPU compatível com CUDA.
+O script cria o ambiente virtual e instala as dependências.
 
-Os arquivos necessários são baixados automaticamente e validados por tamanho e
-SHA-256. Os endereços e hashes estão em
-[`configs/pipeline.yaml`](configs/pipeline.yaml). A auditoria completa está em
-[`docs/DATASETS.md`](docs/DATASETS.md).
+Para preparar os dados e os ativos usados pela ferramenta:
 
-## Execução
+```bash
+./run_pipeline.sh prepare --device 0 --accept-data-terms
+```
 
-Requer Python 3.11 ou 3.12 e uma GPU compatível com CUDA. O script abaixo cria o
-ambiente virtual, instala as dependências e executa a pipeline.
-
-Confira a configuração sem baixar dados ou iniciar treinos:
+Para conferir a configuração sem iniciar os treinos:
 
 ```bash
 ./run_pipeline.sh all --dry-run --device 0 --accept-data-terms
 ```
 
-Execute o experimento completo:
+Para executar a grade e liberar a avaliação após a seleção dos checkpoints:
 
 ```bash
-./run_pipeline.sh all \
-  --device 0 \
-  --accept-data-terms \
-  --unlock-test
+./run_pipeline.sh all --device 0 --accept-data-terms --unlock-test
 ```
 
-`--unlock-test` autoriza a avaliação externa depois que os checkpoints forem
-selecionados. Sem essa opção, a pipeline termina após a seleção.
+Repita o comando para retomar uma execução interrompida. A pipeline reutiliza
+arquivos compatíveis e retoma treinos pelo último checkpoint.
+Os resultados ficam em `artifacts/confirmatory/`.
 
-O número de processos auxiliares é escolhido automaticamente a partir dos CPUs
-disponíveis.
+As fontes, licenças, contagens e hashes estão em [DATASETS.md](docs/DATASETS.md).
+Os caminhos de download ficam em [pipeline.yaml](configs/pipeline.yaml).
 
-## Etapas da pipeline
-
-1. Baixar e validar as fontes.
-2. Gerar os recortes e mapas DepthPro e preparar os conjuntos.
-3. Treinar os 42 modelos e registrar tempo, configuração e métricas.
-4. Selecionar os checkpoints pela validação de origem.
-5. Preparar o teste externo e avaliar todos os modelos.
-6. Gerar o relatório consolidado.
-
-A execução pode ser retomada repetindo o mesmo comando. Downloads parciais
-continuam de onde pararam; arquivos e datasets completos são validados e
-reutilizados; treinamentos interrompidos retomam do último checkpoint.
-
-A pipeline informa a etapa atual a cada cinco minutos. O ETA usa o tempo da
-mesma etapa em execuções anteriores no servidor e fica disponível depois do
-primeiro registro completo.
-
-## Outros conjuntos de teste
-
-Novos testes podem ser registrados em `external_datasets`, dentro de
-[`configs/pipeline.yaml`](configs/pipeline.yaml), e avaliados sem retreinar os
-modelos:
-
-```bash
-./run_pipeline.sh prepare-test \
-  --external-name oranges_mendeley \
-  --external-source /datasets/oranges-in-the-field.zip
-
-./run_pipeline.sh test --device 0 --unlock-test \
-  --external-name oranges_mendeley
-
-./run_pipeline.sh report --external-name oranges_mendeley
-```
-
-## Principais arquivos
-
-| Arquivo | Finalidade |
-|---|---|
-| `configs/pipeline.yaml` | fontes, caminhos e validações dos dados |
-| `configs/confirmatory.yaml` | condições, modelos e parâmetros de treino |
-| `configs/synthesis/confirmatory_pool.yaml` | configuração do gerador sintético |
-| `scripts/reproduce.py` | orquestração das etapas |
-| `scripts/diagrams/` | geração e exportação dos fluxogramas |
-| `docs/DIAGRAMS.md` | instruções, origem das miniaturas e revisão visual |
-
-Os resultados são salvos em `artifacts/confirmatory/`. O relatório final fica
-em `artifacts/confirmatory/RESULTS_citdet.md`.
-
-## Verificação local
+Para conferir o código localmente:
 
 ```bash
 .venv/bin/python -m pytest -q
 uvx ruff check .
 ```
+
+## Visualizar e criar dados
+
+Na raiz do clone, use Python 3.11 ou 3.12:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python scripts/studio.py
+```
+
+Abra [127.0.0.1:8765](http://127.0.0.1:8765). Se faltarem os ativos,
+clique em "Baixar dados de demonstração". O kit inclui seis fundos com
+profundidade e 32 recortes de frutas, sem precisar de GPU ou dados anotados.
+O pacote acompanha o clone; se estiver ausente, o Studio tenta baixá-lo.
+
+Esse kit serve para experimentar a ferramenta. A grade de pesquisa usa o
+catálogo completo. O Studio usa `data/assets/regenerated` quando disponível.
+Para indicar outro catálogo, acrescente `--asset-root /caminho/dos/ativos`.
+
+1. Ajuste os sliders e confira as quatro árvores preenchidas com poncãs.
+2. Ative as caixas ou amplie os detalhes para conferir inserções e oclusões.
+3. Mantenha a semente para comparar ajustes nas mesmas cenas.
+4. Use "Salvar receita" para baixar o YAML.
+5. Use "Gerar dataset", escolha o total de imagens e a proporção de treino e baixe o ZIP.
+
+O ZIP inclui imagens, caixas YOLO, receita e registros de reprodução. A
+ferramenta usa CPU e precisa apenas dos fundos, mapas de profundidade e
+recortes preparados. O usuário não precisa de um dataset real anotado.
+
+Para abrir em outra máquina da rede, inicie com `--host 0.0.0.0` e acesse
+`http://IP-DO-SERVIDOR:8765`. Veja os detalhes de
+[sementes e exportação](docs/GENERATOR_STUDIO.md#sementes-e-reprodução).
+
+<details>
+<summary>Ajustar o gerador</summary>
+
+Comece pela quantidade e pelo tamanho das frutas. Depois ajuste a oclusão e
+a aparência. Confira se as frutas cabem na copa, se a luz combina com o fundo
+e se as bordas dos recortes continuam visíveis.
+
+A receita oficial fica em
+[`confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml).
+Os caminhos abaixo identificam os campos do YAML.
+
+| O que você quer mudar | Parâmetro | Efeito na cena |
+|---|---|---|
+| Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. A receita oficial usa `42`. |
+| Gerar mais imagens | `images.total` | Define o tamanho do pool. A receita oficial gera 1.300 cenas. |
+| Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
+| Colocar mais frutas | `objects.min`, `objects.max` | Sorteia entre 1 e 30 frutas nas cenas esparsas. Inserções rejeitadas podem reduzir o total. |
+| Incluir copas carregadas | `objects.dense` | Sorteia entre 60 e 110 frutas em 25% das cenas. É uma probabilidade, não uma cota exata. |
+| Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.depth_scale` | Controla o tamanho inicial do recorte e sua correção pela profundidade. |
+| Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
+| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige uma fração visível na inserção. O valor oficial é 0,15. Outras frutas ainda podem cobri-la depois. |
+| Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | Exclui os 15% inferiores do sorteio de posições. Não identifica o chão por segmentação. |
+| Variar a maturação | `appearance.ripeness` | Altera o matiz de parte dos recortes maduros para verde-amarelado. |
+| Combinar a fruta com a luz local | `appearance.hsv_cast` | Aproxima cor e luminosidade da fruta das do fundo. |
+| Variar sol e sombra entre frutas | `appearance.exposure_jitter` | Multiplica a intensidade por um fator entre 0,40 e 1,90 nas instâncias afetadas. |
+| Suavizar o encontro com as folhas | `occlusion.edge_blur`, `occlusion.edge_feather_radius` | Suaviza a máscara de oclusão e o contorno do recorte. |
+| Escolher o que a caixa cobre | `annotation.mode` | `visible` cobre a parte visível. `amodal` inclui a parte oculta. A receita usa `visible`. |
+
+A interface exporta `sampling.mode: paired-v1`. Nesse modo, mudar a aparência
+preserva os sorteios de geometria. A receita oficial usa a derivação legada,
+na qual mudanças de configuração também alteram os sorteios.
+Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
+Os manifestos registram sementes e hashes para identificar cada geração.
+
+</details>

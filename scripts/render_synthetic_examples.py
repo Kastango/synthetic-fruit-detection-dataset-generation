@@ -12,7 +12,7 @@ from render_detection_examples import draw_boxes, read_boxes, resize
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", default="data/generated/paired_reference")
+    parser.add_argument("--dataset", default="data/generated/synthetic-3x")
     args = parser.parse_args()
     dataset = ROOT / args.dataset
     manifest = dataset / "manifest.jsonl"

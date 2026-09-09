@@ -10,24 +10,24 @@
   "model": "rtdetr-l",
   "runs": [
     {
-      "checkpoint_sha256": "eb420e8f73f48b7b679467e608ec8659f03d8e321292fb9cf2656ff54f8c84e4",
+      "checkpoint_sha256": "b9bd37c3b16ed86d2f31b17086d35ad4606c870bedff1551dfdce6c48be31b15",
       "condition": "manual-full",
-      "detections": 41,
-      "run_id": "manual-full__rtdetr-l__s41__d7bce45d70"
+      "detections": 36,
+      "run_id": "manual-full__rtdetr-l__s41__84402574b6"
     },
     {
-      "checkpoint_sha256": "68e6d229c95a0e4e9ce28b2a490fc2dcb7be665fb6d7f2400a0c8c93b2f01c31",
+      "checkpoint_sha256": "aab430a879ac0a329ae958b33d42fbe31db641f1e5bd1bfcc2c383a1aedf9912",
       "condition": "controlled",
       "detections": 0,
-      "run_id": "controlled__rtdetr-l__s41__8ff45da659"
+      "run_id": "controlled__rtdetr-l__s41__9ae2d0d443"
     },
     {
-      "checkpoint_sha256": "a6268563667b29af224005910930fdefb172c84bb934664e16c1d6d9d7a6dbfe",
+      "checkpoint_sha256": "ff52ca019ec0b14d6be9e876220e2964c17b503e6bed4e19e5f5ad67cdd620e4",
       "condition": "synthetic-3x",
-      "detections": 33,
-      "run_id": "synthetic-3x__rtdetr-l__s41__6010b4dc1d"
+      "detections": 53,
+      "run_id": "synthetic-3x__rtdetr-l__s41__74d0c22dac"
     }
   ],
   "seed": 41,
-  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+  "selection_sha256": "7709908f7ec327466623f1082952a585d6cdee83bc040e7a9f0931d845bb0c51"
 }

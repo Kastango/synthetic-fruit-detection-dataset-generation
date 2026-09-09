@@ -10,24 +10,24 @@
   "model": "yolo26s",
   "runs": [
     {
-      "checkpoint_sha256": "ed780dca65259feac8e573ec6a5ec1dcd22d0ffa94b19c427573758347c20bd1",
+      "checkpoint_sha256": "970b7ee37e1028cf153ce641e3a6ab9db42798b82b8e95af9a9b0f3d457c4d42",
       "condition": "manual-full",
-      "detections": 26,
-      "run_id": "manual-full__yolo26s__s41__8fe92922b8"
+      "detections": 23,
+      "run_id": "manual-full__yolo26s__s41__aec8316958"
     },
     {
-      "checkpoint_sha256": "c1126e003f8057cdd94e8b489a557304b4dc1e2f5f3ec509eab3143caff774e0",
+      "checkpoint_sha256": "55b31b5d6698fe00fbe3586901167533d1a34791959dca675166bb5a7b57145b",
       "condition": "controlled",
       "detections": 0,
-      "run_id": "controlled__yolo26s__s41__dfead72217"
+      "run_id": "controlled__yolo26s__s41__038a360b81"
     },
     {
-      "checkpoint_sha256": "fcf7c653ff732154dce1a89358901ed172873f177b1ad47029b7f52bc7928f18",
+      "checkpoint_sha256": "80486e86ddf427d74623419bb2c685ac49676df62bb64b9bc6a4d17335f7ef77",
       "condition": "synthetic-3x",
-      "detections": 21,
-      "run_id": "synthetic-3x__yolo26s__s41__25c04e2dde"
+      "detections": 19,
+      "run_id": "synthetic-3x__yolo26s__s41__50b915a604"
     }
   ],
   "seed": 41,
-  "selection_sha256": "99c19ee9733dc63914789c962d12e84b95f142e866355815ec95dca9b997023f"
+  "selection_sha256": "7709908f7ec327466623f1082952a585d6cdee83bc040e7a9f0931d845bb0c51"
 }
