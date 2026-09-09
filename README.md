@@ -1,36 +1,12 @@
 # Detecção de poncãs com dados sintéticos
 
-Gere cenas de pomares com caixas automáticas a partir de fotos de árvores sem
-frutas e recortes de poncãs. Ajuste a composição no navegador e exporte um
-dataset YOLO sem desenhar as caixas à mão.
+> Imagens sintéticas anotadas automaticamente podem reduzir o esforço de
+> rotulagem e manter desempenho próximo ao obtido com imagens reais?
 
-O experimento compara detectores treinados com esses dados aos treinados com
-fotografias de campo. A pergunta é se o treino sintético consegue se aproximar
-do treino real mantendo cenas plausíveis de pomar.
-
-## Visualizar e criar dados
-
-Com o ambiente e os ativos preparados, inicie a ferramenta:
-
-```bash
-.venv/bin/python scripts/studio.py
-```
-
-Abra [127.0.0.1:8765](http://127.0.0.1:8765).
-
-1. Ajuste os sliders e confira as quatro árvores preenchidas com poncãs.
-2. Ative as caixas ou amplie os detalhes para conferir inserções e oclusões.
-3. Mantenha a semente para comparar ajustes nas mesmas cenas.
-4. Use "Salvar receita" para baixar o YAML.
-5. Use "Gerar dataset", escolha o total de imagens e a proporção de treino e baixe o ZIP.
-
-O ZIP inclui imagens, caixas YOLO, receita e registros de reprodução. A
-ferramenta usa CPU e precisa apenas dos fundos, mapas de profundidade e
-recortes preparados. O usuário não precisa de um dataset real anotado.
-
-Para abrir em outra máquina da rede, inicie com `--host 0.0.0.0` e acesse
-`http://IP-DO-SERVIDOR:8765`. Veja os detalhes de
-[sementes e exportação](docs/GENERATOR_STUDIO.md#sementes-e-reprodução).
+O projeto combina fotos de árvores sem frutas com recortes de poncãs para
+criar cenas de pomares e suas caixas automaticamente. O experimento compara
+detectores treinados com esses dados aos treinados com fotografias de campo,
+buscando desempenho próximo ao real e cenas verossímeis.
 
 ## Como as cenas são geradas
 
@@ -42,39 +18,6 @@ Depois de todas as inserções, calcula as caixas das partes visíveis.
 
 Abra a figura para ler os detalhes. As miniaturas ilustram o processo.
 O gerador usa fotos RGB, sem exigir sensor de profundidade ou modelagem 3D.
-
-## Ajustar o gerador
-
-Comece pela quantidade e pelo tamanho das frutas. Depois ajuste a oclusão e
-a aparência. Confira se as frutas cabem na copa, se a luz combina com o fundo
-e se as bordas dos recortes continuam visíveis.
-
-A receita oficial fica em
-[`confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml).
-Os caminhos abaixo identificam os campos do YAML.
-
-| O que você quer mudar | Parâmetro | Efeito na cena |
-|---|---|---|
-| Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. A receita oficial usa `42`. |
-| Gerar mais imagens | `images.total` | Define o tamanho do pool. A receita oficial gera 1.300 cenas. |
-| Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
-| Colocar mais frutas | `objects.min`, `objects.max` | Sorteia entre 1 e 30 frutas nas cenas esparsas. Inserções rejeitadas podem reduzir o total. |
-| Incluir copas carregadas | `objects.dense` | Sorteia entre 60 e 110 frutas em 25% das cenas. É uma probabilidade, não uma cota exata. |
-| Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.depth_scale` | Controla o tamanho inicial do recorte e sua correção pela profundidade. |
-| Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
-| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige uma fração visível na inserção. O valor oficial é 0,15. Outras frutas ainda podem cobri-la depois. |
-| Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | Exclui os 15% inferiores do sorteio de posições. Não identifica o chão por segmentação. |
-| Variar a maturação | `appearance.ripeness` | Altera o matiz de parte dos recortes maduros para verde-amarelado. |
-| Combinar a fruta com a luz local | `appearance.hsv_cast` | Aproxima cor e luminosidade da fruta das do fundo. |
-| Variar sol e sombra entre frutas | `appearance.exposure_jitter` | Multiplica a intensidade por um fator entre 0,40 e 1,90 nas instâncias afetadas. |
-| Suavizar o encontro com as folhas | `occlusion.edge_blur`, `occlusion.edge_feather_radius` | Suaviza a máscara de oclusão e o contorno do recorte. |
-| Escolher o que a caixa cobre | `annotation.mode` | `visible` cobre a parte visível. `amodal` inclui a parte oculta. A receita usa `visible`. |
-
-A interface exporta `sampling.mode: paired-v1`. Nesse modo, mudar a aparência
-preserva os sorteios de geometria. A receita oficial usa a derivação legada,
-na qual mudanças de configuração também alteram os sorteios.
-Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
-Os manifestos registram sementes e hashes para identificar cada geração.
 
 ## Experimento
 
@@ -200,3 +143,63 @@ Para conferir o código localmente:
 .venv/bin/python -m pytest -q
 uvx ruff check .
 ```
+
+## Visualizar e criar dados
+
+Com o ambiente e os ativos preparados, inicie a ferramenta:
+
+```bash
+.venv/bin/python scripts/studio.py
+```
+
+Abra [127.0.0.1:8765](http://127.0.0.1:8765).
+
+1. Ajuste os sliders e confira as quatro árvores preenchidas com poncãs.
+2. Ative as caixas ou amplie os detalhes para conferir inserções e oclusões.
+3. Mantenha a semente para comparar ajustes nas mesmas cenas.
+4. Use "Salvar receita" para baixar o YAML.
+5. Use "Gerar dataset", escolha o total de imagens e a proporção de treino e baixe o ZIP.
+
+O ZIP inclui imagens, caixas YOLO, receita e registros de reprodução. A
+ferramenta usa CPU e precisa apenas dos fundos, mapas de profundidade e
+recortes preparados. O usuário não precisa de um dataset real anotado.
+
+Para abrir em outra máquina da rede, inicie com `--host 0.0.0.0` e acesse
+`http://IP-DO-SERVIDOR:8765`. Veja os detalhes de
+[sementes e exportação](docs/GENERATOR_STUDIO.md#sementes-e-reprodução).
+
+<details>
+<summary>Ajustar o gerador</summary>
+
+Comece pela quantidade e pelo tamanho das frutas. Depois ajuste a oclusão e
+a aparência. Confira se as frutas cabem na copa, se a luz combina com o fundo
+e se as bordas dos recortes continuam visíveis.
+
+A receita oficial fica em
+[`confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml).
+Os caminhos abaixo identificam os campos do YAML.
+
+| O que você quer mudar | Parâmetro | Efeito na cena |
+|---|---|---|
+| Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. A receita oficial usa `42`. |
+| Gerar mais imagens | `images.total` | Define o tamanho do pool. A receita oficial gera 1.300 cenas. |
+| Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
+| Colocar mais frutas | `objects.min`, `objects.max` | Sorteia entre 1 e 30 frutas nas cenas esparsas. Inserções rejeitadas podem reduzir o total. |
+| Incluir copas carregadas | `objects.dense` | Sorteia entre 60 e 110 frutas em 25% das cenas. É uma probabilidade, não uma cota exata. |
+| Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.depth_scale` | Controla o tamanho inicial do recorte e sua correção pela profundidade. |
+| Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
+| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige uma fração visível na inserção. O valor oficial é 0,15. Outras frutas ainda podem cobri-la depois. |
+| Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | Exclui os 15% inferiores do sorteio de posições. Não identifica o chão por segmentação. |
+| Variar a maturação | `appearance.ripeness` | Altera o matiz de parte dos recortes maduros para verde-amarelado. |
+| Combinar a fruta com a luz local | `appearance.hsv_cast` | Aproxima cor e luminosidade da fruta das do fundo. |
+| Variar sol e sombra entre frutas | `appearance.exposure_jitter` | Multiplica a intensidade por um fator entre 0,40 e 1,90 nas instâncias afetadas. |
+| Suavizar o encontro com as folhas | `occlusion.edge_blur`, `occlusion.edge_feather_radius` | Suaviza a máscara de oclusão e o contorno do recorte. |
+| Escolher o que a caixa cobre | `annotation.mode` | `visible` cobre a parte visível. `amodal` inclui a parte oculta. A receita usa `visible`. |
+
+A interface exporta `sampling.mode: paired-v1`. Nesse modo, mudar a aparência
+preserva os sorteios de geometria. A receita oficial usa a derivação legada,
+na qual mudanças de configuração também alteram os sorteios.
+Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
+Os manifestos registram sementes e hashes para identificar cada geração.
+
+</details>
