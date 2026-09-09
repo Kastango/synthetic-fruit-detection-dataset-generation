@@ -275,7 +275,7 @@ main {
 }
 .comparison {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 22px;
 }
 .image-card {
@@ -308,7 +308,8 @@ main {
 .image-button img {
   display: block;
   width: 100%;
-  height: clamp(310px, calc((100vh - 250px) / 2), 560px);
+  height: auto;
+  aspect-ratio: 3 / 4;
   object-fit: contain;
   background: #d6dfda;
 }
@@ -383,7 +384,8 @@ td {
   gap: 12px;
   align-content: center;
   padding: 18px;
-  min-height: clamp(310px, calc((100vh - 250px) / 2), 560px);
+  min-height: auto;
+  aspect-ratio: 3 / 4;
   background: #d6dfda;
 }
 .crops img {
@@ -425,6 +427,7 @@ dialog img {
     padding: 23px 18px;
   }
   .comparison {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
   .card-head {

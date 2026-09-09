@@ -244,7 +244,7 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
         )
     crops = []
     # Ordem do arquivo: nenhuma seleção pelas predições ou pela aparência.
-    for x, y, bw, bh in boxes[:6]:
+    for x, y, bw, bh in boxes[:12]:
         side = max(bw * w, bh * h) * 2
         crop = image.crop(
             (
@@ -447,7 +447,7 @@ class Studio:
                 output = self.output / key
                 output.mkdir(parents=True, exist_ok=True)
                 views, features = [], []
-                for i in range(index, index + 4):
+                for i in range(index, index + 8):
                     record = _render_one(
                         dict(
                             split="preview",
@@ -504,7 +504,7 @@ class Studio:
                 generator_sha256=code_hash,
                 asset_fingerprint=self.fingerprint,
                 yaml=yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
-                sample_images=4,
+                sample_images=8,
                 sample_boxes=sum(v["count"] for v in views),
             )
 

@@ -217,7 +217,7 @@ $("#seed").onchange = () => {
   schedule();
 };
 $("#next").onclick = () => {
-  index += 4;
+  index += current?.sample_images || 8;
   schedule();
 };
 $("#boxes").onchange = () => current && paint();

@@ -168,7 +168,7 @@ Esse kit serve para experimentar a ferramenta. A grade de pesquisa usa o
 catálogo completo. O Studio usa `data/assets/regenerated` quando disponível.
 Para indicar outro catálogo, acrescente `--asset-root /caminho/dos/ativos`.
 
-1. Ajuste os sliders e confira as quatro árvores preenchidas com poncãs.
+1. Ajuste os sliders e confira as oito árvores preenchidas com poncãs.
 2. Ative as caixas ou amplie os detalhes para conferir inserções e oclusões.
 3. Mantenha a semente para comparar ajustes nas mesmas cenas.
 4. Use "Salvar receita" para baixar o YAML.

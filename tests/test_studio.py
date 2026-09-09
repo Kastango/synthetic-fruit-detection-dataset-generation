@@ -132,7 +132,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
         preview = studio.render(
             {"seed": 12, "controls": {"sparse_max": 2, "dense_probability": 0}}
         )
-        assert len(preview["synthetic"]) == 4
+        assert len(preview["synthetic"]) == 8
         assert all(
             v["background"].startswith("data:image/jpeg") for v in preview["synthetic"]
         )
