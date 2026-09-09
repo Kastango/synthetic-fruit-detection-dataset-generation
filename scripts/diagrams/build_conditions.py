@@ -34,11 +34,11 @@ FS = 12
 # a sobra, então um conjunto pequeno tem baralho curto e seta longa.
 MAX_OFF = 16
 # Tetos distintos: a mesma escala vale para as duas colunas, mas o treino chega a
-# 120 cartas e a validação a 30. Espremer as 120 no teto da validação daria 1,9 px
+# 80 cartas e a validação a 20. Espremer as 120 no teto da validação daria 1,9 px
 # por carta — a borda comeria a foto e o baralho viraria uma mancha. Abaixo de
 # ~3,5 px a carta deixa de ler como carta, e é isso que fixa o teto do treino.
 TRAIN_MAX_DECK, VAL_MAX_DECK = 520, 288
-# As setas dividem o espaço livre. A largura total acomoda as maiores pilhas.
+# Cada grupo começa no mesmo X. As setas preenchem o espaço até o próximo grupo.
 ARROW = 40  # comprimento mínimo no maior volume
 GUTTER = 14  # folga entre baralho e seta
 TEST_CARDS_WIDTH = 140  # o teste não escala: são sempre as mesmas 119 imagens
@@ -61,12 +61,8 @@ def row_extent(train: int, val: int) -> tuple[float, float, float, float]:
     train_w = CARD_W + (deck_size(train) - 1) * card_offset(
         deck_size(train), deck_width(deck_size(train), TRAIN_MAX_DECK)
     )
-    val_w = CARD_W + (deck_size(val) - 1) * card_offset(
-        deck_size(val), deck_width(deck_size(val), VAL_MAX_DECK)
-    )
-    arrow = (WIDTH - 2 * TRAIN_X - train_w - val_w - TEST_CARDS_WIDTH - 4 * GUTTER) / 2
-    val_x = TRAIN_X + train_w + 2 * GUTTER + arrow
-    test_x = val_x + val_w + 2 * GUTTER + arrow
+    val_x = TRAIN_X + TRAIN_MAX_DECK + 2 * GUTTER + ARROW
+    test_x = val_x + VAL_MAX_DECK + 2 * GUTTER + ARROW
     return train_w, val_x, test_x, WIDTH
 
 
@@ -115,15 +111,15 @@ CONDITIONS = [
 
 TEST_IMAGES = PIPELINE["external_datasets"]["citdet"]["expected_images"]
 
-# O teste não escala com nada: é o mesmo conjunto nas sete condições.
-TEST_CARDS = 3
+# O teste usa a mesma escala de cartas e permanece igual nas sete condições.
+TEST_CARDS = round(2 * TEST_IMAGES / 26)
 
 
 # Uma unidade só para as duas colunas: 26 imagens (a validação do `1x`, o menor
-# conjunto do experimento) valem 3 cartas. Medir treino e validação contra bases
+# conjunto do experimento) valem 2 cartas. Medir treino e validação contra bases
 # diferentes fazia os dois baralhos empatarem, escondendo que a validação é um
 # quarto do treino.
-UNIT_IMAGES, UNIT_CARDS = 26, 3
+UNIT_IMAGES, UNIT_CARDS = 26, 2
 
 
 def deck_size(count: int) -> int:
@@ -132,7 +128,7 @@ def deck_size(count: int) -> int:
 
 
 def thousands(value: int) -> str:
-    return f"{value:,}".replace(",", ".")
+    return f"{value:,}"
 
 
 class Micro:
@@ -207,18 +203,19 @@ def build(name: str, train: int, val: int, slug: str) -> tuple[str, set[str]]:
     m.arrow(val_x - GUTTER, TRAIN_X + train_w + GUTTER, dy=10)
     m.arrow(val_x + val_w + GUTTER, test_x - GUTTER, dashed=True)
 
-    m.label(f"{thousands(train)} treino", TRAIN_X + train_w / 2)
-    m.label(f"{val} validação", val_x + val_w / 2)
-    m.label(f"{TEST_IMAGES} teste", test_x + test_w / 2)
+    m.label(f"{thousands(train)} train", TRAIN_X + train_w / 2)
+    m.label(f"{val} validation", val_x + val_w / 2)
+    m.label(f"{TEST_IMAGES} test", test_x + test_w / 2)
 
     width = row_extent(train, val)[3]
     ident = name.replace(".", "-")
-    title = f"Conjuntos da condição {name}"
+    title = f"Training, validation and test sets for {name}"
     desc = (
-        f"Da esquerda para a direita: {thousands(train)} imagens de treino, {val} de "
-        f"validação e as {TEST_IMAGES} imagens do teste externo CitDet, o mesmo para "
-        "todas as condições. Fotos ilustram os tipos de dados, não identificam os splits. "
-        "Treino e validação usam 3 cartas por 26 imagens; as 3 cartas de teste são fixas."
+        f"From left to right: {thousands(train)} training images, {val} validation "
+        f"images and the same {TEST_IMAGES} CitDet test images for every condition. "
+        "Each group uses two cards per 26 images, rounded to the nearest integer. "
+        "Photos illustrate data types. Card spacing compresses in larger groups. "
+        "All diagrams have equal width and fixed group starting positions."
     )
     svg = (
         f'<svg viewBox="0 0 {width} {HEIGHT}" width="{width}" role="img" '

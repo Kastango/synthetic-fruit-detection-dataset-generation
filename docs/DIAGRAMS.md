@@ -43,11 +43,12 @@ Saídas:
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
 O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
-Treino e validação usam três cartas por 26 imagens. O espaçamento diminui
-nas pilhas maiores; a largura não é uma escala linear. O teste usa três
-cartas fixas. Todos os SVGs têm 1.116 px de largura. As duas ligações dividem
-o espaço livre, com setas maiores nas condições com menos imagens.
-A pilha do CitDet fica alinhada à direita em todas as condições.
+Todos os grupos usam duas cartas por 26 imagens, com arredondamento.
+O teste tem nove cartas para 119 imagens. O espaçamento diminui nas pilhas
+maiores; a largura não é uma escala linear. Os SVGs têm 1.116 px de largura.
+Treino, validação e teste começam no mesmo X em todas as condições.
+As setas ocupam o intervalo entre o fim de cada pilha e o grupo seguinte.
+Os rótulos dos diagramas estão em inglês.
 As setas entre treino e validação representam a avaliação entre épocas.
 A validação não atualiza os pesos.
 
