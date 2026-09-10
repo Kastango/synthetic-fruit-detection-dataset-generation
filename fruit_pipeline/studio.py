@@ -106,6 +106,16 @@ CONTROLS = [
         "Recoloração aproximada de recortes maduros; revise os detalhes.",
     ),
     (
+        "ripeness_strength",
+        "Aparência",
+        "Maturação máxima (%)",
+        0,
+        100,
+        1,
+        75,
+        "Teto do verde. Cada fruta em maturação sorteia entre zero e esse teto.",
+    ),
+    (
         "light_match",
         "Aparência",
         "Influência da luz local (%)",
@@ -277,7 +287,12 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     c["placement"].update(
         z_offset=values["z_offset"], min_visibility=values["min_visibility"] / 100
     )
-    c["appearance"]["ripeness"]["fraction_affected"] = values["green_fraction"] / 100
+    ripeness = c["appearance"]["ripeness"]
+    ripeness["fraction_affected"] = values["green_fraction"] / 100
+    # Gradiente contínuo: as frutas sorteadas se espalham entre nenhum verde
+    # e o teto, e saturação e brilho acompanham a mesma intensidade.
+    ripeness["strength_range"] = [0.0, values["ripeness_strength"] / 100]
+    ripeness["scale_with_strength"] = True
     c["appearance"]["hsv_cast"]["value_power"] = values["light_match"] / 100
     spread = values["exposure_spread"] / 100
     if spread:

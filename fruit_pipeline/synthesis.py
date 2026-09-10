@@ -257,6 +257,10 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("appearance.ripeness.green_hue_degrees deve estar entre 0 e 360")
         if not 0 <= float(ripeness.get("saturation_scale", 1.0)) <= 2:
             raise ValueError("appearance.ripeness.saturation_scale deve estar entre 0 e 2")
+        if not isinstance(ripeness.get("scale_with_strength", False), bool):
+            raise ValueError(
+                "appearance.ripeness.scale_with_strength deve ser booleano"
+            )
         if not 0 <= float(ripeness.get("gloss_reduction", 0.0)) <= 1:
             raise ValueError("appearance.ripeness.gloss_reduction deve estar entre 0 e 1")
     exposure = appearance.get("exposure_jitter")
@@ -538,6 +542,7 @@ def _apply_ripeness_shift(
     h_array = np.asarray(h, dtype=np.float32)
     strength_lo, strength_hi = ripeness.get("strength_range", [0.3, 1.0])
     strength = rng.uniform(float(strength_lo), float(strength_hi))
+    scale_with_strength = bool(ripeness.get("scale_with_strength", False))
     target_hue = float(ripeness.get("green_hue_degrees", 105.0)) / 360.0 * 255.0
     hue_diff = ((target_hue - h_array + 128) % 256) - 128
     h_new = (h_array + hue_diff * strength) % 256
@@ -546,6 +551,11 @@ def _apply_ripeness_shift(
     # aglomerado de folhas. Reduzir a saturação da fruta abaixo da folha
     # real preserva a distinção entre as duas.
     saturation_scale = float(ripeness.get("saturation_scale", 1.0))
+    if scale_with_strength:
+        # Sem isso o gradiente existe só no matiz: uma fruta com 25% do
+        # deslocamento levava 100% da dessaturação e do achatamento, o que
+        # é um degrau, não um estágio intermediário de maturação.
+        saturation_scale = 1.0 + (saturation_scale - 1.0) * strength
     s_array = np.asarray(s, dtype=np.float32) * saturation_scale
     # Fruta "de vez" real tem casca mais fosca que a madura (menos cera
     # visível) — o brilho especular concentrado é justamente o que soma com
@@ -553,6 +563,8 @@ def _apply_ripeness_shift(
     # os pixels acima do percentil 75 de V do próprio recorte (o highlight),
     # não a fruta inteira, senão ela escurece de forma plana e artificial.
     gloss_reduction = float(ripeness.get("gloss_reduction", 0.0))
+    if scale_with_strength:
+        gloss_reduction *= strength
     v_array = np.asarray(v, dtype=np.float32)
     if gloss_reduction > 0:
         alpha_array = np.asarray(alpha, dtype=np.float32)
