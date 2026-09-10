@@ -18,45 +18,172 @@ function status(text, error = false) {
 function defaults() {
   return spec.defaults;
 }
+function spec_by_key(key) {
+  return spec.controls.find((c) => c.key === key);
+}
+function fmt(v) {
+  return Number.isInteger(v) ? String(v) : String(Math.round(v * 10) / 10);
+}
+// Faixa resultante de um par valor-base e variação, na unidade do controle.
+function spreadText(baseKey, spreadKey) {
+  const base = controls[baseKey];
+  const pct = controls[spreadKey];
+  if (!pct) return fmt(base);
+  const isAngle = baseKey === "light_angle";
+  const lo = isAngle ? base - pct : base * (1 - pct / 100);
+  const hi = isAngle ? base + pct : base * (1 + pct / 100);
+  return `${fmt(lo)} – ${fmt(hi)}`;
+}
+function slider(c, onInput) {
+  const input = document.createElement("input");
+  Object.assign(input, {
+    type: "range",
+    id: c.key,
+    min: c.min,
+    max: c.max,
+    step: c.step,
+    value: controls[c.key],
+  });
+  input.setAttribute("aria-description", c.help);
+  input.oninput = onInput;
+  return input;
+}
+function rangeRow(pair) {
+  const [loKey, hiKey, title] = pair;
+  const lo = spec_by_key(loKey);
+  const hi = spec_by_key(hiKey);
+  const row = document.createElement("div");
+  row.className = "control";
+  const top = document.createElement("div");
+  top.className = "control-top";
+  const label = document.createElement("label");
+  label.htmlFor = loKey;
+  label.textContent = title;
+  label.title = `${lo.help} ${hi.help}`;
+  const out = document.createElement("output");
+  top.append(label, out);
+  const dual = document.createElement("div");
+  dual.className = "dual";
+  const track = document.createElement("div");
+  track.className = "dual-track";
+  const fill = document.createElement("div");
+  fill.className = "dual-fill";
+  track.append(fill);
+  const min = Math.min(lo.min, hi.min);
+  const max = Math.max(lo.max, hi.max);
+  const paint = () => {
+    out.textContent = `${fmt(controls[loKey])} – ${fmt(controls[hiKey])}`;
+    const a = ((controls[loKey] - min) / (max - min)) * 100;
+    const b = ((controls[hiKey] - min) / (max - min)) * 100;
+    fill.style.left = a + "%";
+    fill.style.width = Math.max(0, b - a) + "%";
+  };
+  const inputs = {};
+  for (const [key, spc] of [
+    [loKey, lo],
+    [hiKey, hi],
+  ]) {
+    const input = slider({ ...spc, min, max }, () => {
+      controls[key] = Number(input.value);
+      // As alças não se cruzam: quem empurra leva a outra junto.
+      if (controls[loKey] > controls[hiKey]) {
+        const other = key === loKey ? hiKey : loKey;
+        controls[other] = controls[key];
+        inputs[other].value = controls[other];
+      }
+      paint();
+      schedule();
+    });
+    inputs[key] = input;
+    dual.append(input);
+  }
+  dual.prepend(track);
+  paint();
+  row.append(top, dual);
+  return row;
+}
+function simpleRow(c, extra) {
+  const row = document.createElement("div");
+  row.className = "control" + (extra ? " control-sub" : "");
+  const top = document.createElement("div");
+  top.className = "control-top";
+  const label = document.createElement("label");
+  label.htmlFor = c.key;
+  label.textContent = c.label;
+  label.title = c.help;
+  const out = document.createElement("output");
+  out.htmlFor = c.key;
+  const paint = () => {
+    out.textContent = extra ? extra() : fmt(controls[c.key]);
+  };
+  top.append(label, out);
+  const input = slider(c, () => {
+    controls[c.key] = Number(input.value);
+    paint();
+    if (c.repaint) c.repaint();
+    schedule();
+  });
+  paint();
+  row.append(top, input);
+  row.paint = paint;
+  return row;
+}
 function buildControls() {
   const root = $("#controls");
   root.replaceChildren();
-  for (const c of spec.controls) {
-    const row = document.createElement("div");
-    row.className = "control";
-    const top = document.createElement("div");
-    top.className = "control-top";
-    const label = document.createElement("label");
-    label.htmlFor = c.key;
-    label.textContent = c.label;
-    label.title = c.help;
-    const out = document.createElement("output");
-    out.htmlFor = c.key;
-    out.textContent = controls[c.key];
-    top.append(label, out);
-    const input = document.createElement("input");
-    Object.assign(input, {
-      type: "range",
-      id: c.key,
-      min: c.min,
-      max: c.max,
-      step: c.step,
-      value: controls[c.key],
-    });
-    input.setAttribute("aria-description", c.help);
-    input.oninput = () => {
-      controls[c.key] = Number(input.value);
-      out.textContent = input.value;
-      if (controls.fruit_min > controls.fruit_max) {
-        const other = c.key === "fruit_min" ? "fruit_max" : "fruit_min";
-        controls[other] = controls[c.key];
-        $("#" + other).value = controls[other];
-        document.querySelector(`output[for="${other}"]`).textContent = controls[other];
-      }
-      schedule();
-    };
-    row.append(top, input);
-    root.append(row);
+  const paired = new Set();
+  for (const [a, b] of spec.range_pairs) paired.add(a), paired.add(b);
+  for (const [a, b] of spec.spread_pairs) paired.add(a), paired.add(b);
+  for (const [a, b] of spec.linked_pairs) paired.add(a), paired.add(b);
+  const rangeByGroup = new Map();
+  for (const pair of spec.range_pairs)
+    rangeByGroup.set(spec_by_key(pair[0]).group, [
+      ...(rangeByGroup.get(spec_by_key(pair[0]).group) || []),
+      pair,
+    ]);
+  const spreadByGroup = new Map();
+  for (const pair of spec.spread_pairs)
+    spreadByGroup.set(spec_by_key(pair[0]).group, [
+      ...(spreadByGroup.get(spec_by_key(pair[0]).group) || []),
+      pair,
+    ]);
+  const groups = [];
+  for (const c of spec.controls)
+    if (!groups.includes(c.group)) groups.push(c.group);
+  for (const group of groups) {
+    const section = document.createElement("section");
+    section.className = "control-group";
+    const title = document.createElement("h3");
+    title.textContent = group;
+    section.append(title);
+    for (const pair of rangeByGroup.get(group) || [])
+      section.append(rangeRow(pair));
+    for (const [baseKey, spreadKey] of spreadByGroup.get(group) || []) {
+      const block = document.createElement("div");
+      block.className = "control-pair";
+      // O valor base mostra a faixa resultante; a variação mostra a amplitude.
+      // Repetir a faixa nos dois só alongava o texto e quebrava os rótulos.
+      const base = simpleRow(spec_by_key(baseKey), () =>
+        spreadText(baseKey, spreadKey),
+      );
+      const spread = simpleRow(spec_by_key(spreadKey), () =>
+        controls[spreadKey] ? `± ${fmt(controls[spreadKey])}` : "0",
+      );
+      spec_by_key(baseKey).repaint = () => spread.paint();
+      spec_by_key(spreadKey).repaint = () => base.paint();
+      block.append(base, spread);
+      section.append(block);
+    }
+    for (const [aKey, bKey] of spec.linked_pairs) {
+      if (spec_by_key(aKey).group !== group) continue;
+      const block = document.createElement("div");
+      block.className = "control-pair";
+      block.append(simpleRow(spec_by_key(aKey)), simpleRow(spec_by_key(bKey)));
+      section.append(block);
+    }
+    for (const c of spec.controls)
+      if (c.group === group && !paired.has(c.key)) section.append(simpleRow(c));
+    root.append(section);
   }
 }
 function enable(value) {

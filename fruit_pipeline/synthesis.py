@@ -294,6 +294,9 @@ def validate_synthesis_config(config: dict) -> None:
     depth_smooth_radius = config["occlusion"].get("depth_smooth_radius", 0.0)
     if float(depth_smooth_radius) < 0:
         raise ValueError("occlusion.depth_smooth_radius não pode ser negativo")
+    min_box_fill = config["annotation"].get("min_box_fill", 0.0)
+    if not 0 <= float(min_box_fill) <= 1:
+        raise ValueError("annotation.min_box_fill deve estar entre 0 e 1")
     mask_threshold = config["occlusion"].get("mask_threshold")
     if mask_threshold is not None and not 0 < float(mask_threshold) < 1:
         raise ValueError("occlusion.mask_threshold deve estar entre 0 e 1 (exclusivos)")
@@ -1075,7 +1078,11 @@ def _occlude_prior_instances(instances: list[dict], new_instance: dict) -> None:
 
 
 def _label_for(
-    instance: dict, mode: str, canvas: tuple[int, int], min_pixels: int
+    instance: dict,
+    mode: str,
+    canvas: tuple[int, int],
+    min_pixels: int,
+    min_fill: float = 0.0,
 ) -> str | None:
     if mode == "visible":
         box = _bbox(instance["visible_mask"], threshold=8)
@@ -1088,6 +1095,14 @@ def _label_for(
     left, top, right, bottom = box
     if right - left < min_pixels or bottom - top < min_pixels:
         return None
+    if min_fill > 0 and mode == "visible":
+        # min_visibility compara a parte visível com o recorte inteiro, então
+        # deixa passar fruta muito oclusa cujos pedaços restantes ficam em
+        # cantos opostos: a caixa cobre os dois e a folhagem entre eles. Este
+        # piso olha a própria caixa, e recusa a que for quase toda fundo.
+        mask = instance["visible_mask"][top:bottom, left:right]
+        if (mask > 8).sum() / max(1, mask.size) < min_fill:
+            return None
     left += instance["x"]
     right += instance["x"]
     top += instance["y"]
@@ -1404,6 +1419,7 @@ def _render_one(task: dict) -> dict:
             annotation_mode,
             canvas_size,
             int(config["annotation"]["min_box_pixels"]),
+            float(config["annotation"].get("min_box_fill", 0.0)),
         )
         if label is not None:
             labels.append(label)

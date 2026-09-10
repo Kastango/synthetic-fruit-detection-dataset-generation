@@ -182,7 +182,7 @@ CONTROLS = [
     ),
     (
         "brightness_spread",
-        "Variação",
+        "Fundo",
         "Variação de brilho (%)",
         0,
         40,
@@ -192,7 +192,7 @@ CONTROLS = [
     ),
     (
         "contrast_spread",
-        "Variação",
+        "Fundo",
         "Variação de contraste (%)",
         0,
         60,
@@ -202,7 +202,7 @@ CONTROLS = [
     ),
     (
         "saturation_spread",
-        "Variação",
+        "Fundo",
         "Variação de saturação (%)",
         0,
         40,
@@ -212,7 +212,7 @@ CONTROLS = [
     ),
     (
         "sharpness",
-        "Variação",
+        "Fundo",
         "Nitidez do fundo (%)",
         0,
         100,
@@ -222,7 +222,7 @@ CONTROLS = [
     ),
     (
         "sharpness_spread",
-        "Variação",
+        "Fundo",
         "Variação de nitidez (%)",
         0,
         100,
@@ -241,6 +241,16 @@ CONTROLS = [
         "Ajuste somente do fundo, antes da composição.",
     ),
     (
+        "background_saturation",
+        "Fundo",
+        "Saturação do fundo (%)",
+        50,
+        150,
+        1,
+        100,
+        "Intensidade de cor da cena antes de inserir as frutas.",
+    ),
+    (
         "background_contrast",
         "Fundo",
         "Contraste do fundo (%)",
@@ -251,6 +261,26 @@ CONTROLS = [
         "Ajuste somente do fundo, antes da composição.",
     ),
 ]
+# Controles que descrevem um intervalo: a interface os mostra num slider de
+# duas alças, porque um sem o outro não significa nada.
+RANGE_PAIRS = [
+    ("fruit_min", "fruit_max", "Frutas por cena"),
+    ("min_scale", "max_scale", "Tamanho das frutas (%)"),
+]
+# Controles de valor base e da variação sorteada em torno dele. A interface
+# mostra os dois juntos e exibe a faixa resultante.
+SPREAD_PAIRS = [
+    ("background_brightness", "brightness_spread"),
+    ("background_contrast", "contrast_spread"),
+    ("background_saturation", "saturation_spread"),
+    ("sharpness", "sharpness_spread"),
+    ("light_angle", "light_spread"),
+]
+
+# Controles que se explicam juntos, sem faixa combinada: um diz quantas
+# frutas entram no efeito, o outro diz até onde ele vai.
+LINKED_PAIRS = [("green_fraction", "ripeness_strength")]
+
 DEFAULTS = {row[0]: row[6] for row in CONTROLS}
 SIMPLE = {**DEFAULTS, "exposure_spread": 0}
 
@@ -342,6 +372,7 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     c["output"]["scene_grading"].update(
         brightness=values["background_brightness"] / 100,
         contrast=values["background_contrast"] / 100,
+        saturation=values["background_saturation"] / 100,
     )
     validate_synthesis_config(c)
     return c
@@ -738,6 +769,9 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                     ],
                     defaults=DEFAULTS,
                     essential=SIMPLE,
+                    range_pairs=RANGE_PAIRS,
+                    spread_pairs=SPREAD_PAIRS,
+                    linked_pairs=LINKED_PAIRS,
                 )
                 return self.send(200, json.dumps(value).encode(), "application/json")
             if path.startswith("/api/jobs/"):
