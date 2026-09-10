@@ -4,13 +4,16 @@ from __future__ import annotations
 
 import base64
 from copy import deepcopy
+from functools import lru_cache
 from io import BytesIO
 import json
+import multiprocessing
+import os
 from pathlib import Path
 import threading
 import zipfile
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from collections import OrderedDict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -19,7 +22,9 @@ from PIL import Image, ImageDraw, ImageOps
 from .common import ROOT, load_yaml, stable_hash, sha256_file, atomic_write_json
 from .synthesis import (
     create_asset_catalog,
-    _render_one,
+    _render_compact,
+    _render_preview,
+    _initialize_worker,
     scene_seed,
     validate_synthesis_config,
     generate_dataset,
@@ -342,12 +347,29 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     return c
 
 
-def picture(image: Image.Image, max_side: int = 960) -> str:
+def picture(image: Image.Image, max_side: int = 720, quality: int = 82) -> str:
+    # A prévia mostra 16 cenas numa grade; 960 px a qualidade 90 gerava dezenas
+    # de MB de base64 por atualização, que o navegador ainda precisa decodificar.
     image = image.copy()
     image.thumbnail((max_side, max_side))
     buf = BytesIO()
-    image.save(buf, format="JPEG", quality=90)
+    image.save(buf, format="JPEG", quality=quality)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
+@lru_cache(maxsize=96)
+def _background_picture(image: str, depth: str, canvas: tuple, mirrored: bool) -> str:
+    """Fundo já codificado, memorizado entre prévias.
+
+    Abrir e recodificar o fundo custava tanto quanto compor a cena, e era o
+    trecho serial da prévia. O resultado não depende de nenhum controle: só
+    do fundo sorteado, do tamanho do canvas e do espelhamento. Como o sorteio
+    da cena é estável entre ajustes, quase todo acesso vira acerto de cache.
+    """
+    background, _ = _open_background_pair(Path(image), Path(depth), canvas)
+    if mirrored:
+        background = ImageOps.mirror(background)
+    return picture(background)
 
 
 def illustration(image: Image.Image, boxes: list, name: str) -> dict:
@@ -391,7 +413,7 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
 
 
 class Studio:
-    def __init__(self, asset_root: Path, output: Path):
+    def __init__(self, asset_root: Path, output: Path, preview_workers: int | None = None):
         self.base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
         self.output = output
         catalog = create_asset_catalog(asset_root)
@@ -410,7 +432,48 @@ class Studio:
         self.jobs_lock = threading.Lock()
         self.jobs = {}
         self.executor = ThreadPoolExecutor(max_workers=1)
+        self.preview_workers = preview_workers or min(8, (os.cpu_count() or 1))
+        self.pool_lock = threading.Lock()
+        self._executor = None
         self.jobs_root = output.parent / "datasets"
+
+    def _render_scenes(self, config: dict, output: Path, index: int) -> list:
+        """Compõe as cenas da prévia em paralelo.
+
+        O render domina o custo — cerca de 1,5 s por cena, contra 0,01 s para
+        recortes e descritores —, então em série a prévia inteira levava algo
+        como 24 s. Os processos reaproveitam o mesmo contexto de worker do
+        gerador, que evita reenviar config e catálogo a cada cena.
+        """
+        tasks = [
+            (i, scene_seed(config, self.fingerprint, i), config, str(output))
+            for i in range(index, index + SAMPLE_SCENES)
+        ]
+        if self.preview_workers <= 1:
+            _initialize_worker({"assets": self.assets})
+            return [_render_preview(task) for task in tasks]
+        return list(self._pool().map(_render_preview, tasks))
+
+    def _pool(self) -> ProcessPoolExecutor:
+        """Pool reaproveitado entre prévias.
+
+        Criar processos a cada ajuste custava perto de 2,5 s, mais que compor
+        as cenas. Só o catálogo vai no inicializador, porque não muda durante
+        a sessão; receita e destino viajam em cada tarefa.
+        """
+        with self.pool_lock:
+            if self._executor is None:
+                # `spawn` em vez do fork padrão: o servidor é multi-thread e
+                # bifurcar nesse estado pode travar o filho se outra thread
+                # segurar um lock. Como o pool agora é reaproveitado, o custo
+                # maior de iniciar processos é pago uma vez só.
+                self._executor = ProcessPoolExecutor(
+                    max_workers=self.preview_workers,
+                    initializer=_initialize_worker,
+                    initargs=({"assets": self.assets},),
+                    mp_context=multiprocessing.get_context("spawn"),
+                )
+            return self._executor
 
     def start_job(self, body):
         config = resolve_recipe(
@@ -565,19 +628,8 @@ class Studio:
                 output = self.output / key
                 output.mkdir(parents=True, exist_ok=True)
                 views, features = [], []
-                for i in range(index, index + SAMPLE_SCENES):
-                    record = _render_one(
-                        dict(
-                            split="preview",
-                            index=i,
-                            generation_index=i,
-                            output=str(output),
-                            sample_seed=scene_seed(config, self.fingerprint, i),
-                            config=config,
-                            assets=self.assets,
-                            force=True,
-                        )
-                    )
+                records = self._render_scenes(config, output, index)
+                for record in records:
                     boxes = read_boxes(output / record["label"])
                     with Image.open(output / record["image"]) as im:
                         view = illustration(im, boxes, record["id"])
@@ -586,14 +638,12 @@ class Studio:
                             for p in self.assets["backgrounds"]
                             if Path(p["image"]).name == record["background"]
                         )
-                        background, _ = _open_background_pair(
-                            Path(pair["image"]),
-                            Path(pair["depth"]),
+                        view["background"] = _background_picture(
+                            pair["image"],
+                            pair["depth"],
                             tuple(config["canvas"]),
+                            bool(record["background_mirrored"]),
                         )
-                        if record["background_mirrored"]:
-                            background = ImageOps.mirror(background)
-                        view["background"] = picture(background)
                         views.append(view)
                         features.append(image_features(im, boxes))
                 self.cache[key] = (views, merge_features(features))
@@ -629,7 +679,8 @@ class Studio:
             )
 
 
-def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
+def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
+          scenes=None, preview_workers=None):
     full_assets = ROOT / "data/assets/regenerated"
     asset_root = (
         Path(asset_root)
@@ -637,8 +688,10 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None):
         else (full_assets if full_assets.exists() else ROOT / "data/studio-demo")
     )
     output = output or ROOT / "artifacts/studio/preview"
+    if scenes:
+        globals()["SAMPLE_SCENES"] = int(scenes)
     try:
-        studio = Studio(asset_root, output)
+        studio = Studio(asset_root, output, preview_workers=preview_workers)
     except FileNotFoundError:
         studio = None
     installation_lock = threading.Lock()

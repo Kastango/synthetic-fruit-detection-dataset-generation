@@ -1470,6 +1470,31 @@ def _render_compact(task: tuple[str, int, int, int]) -> dict:
     )
 
 
+def _render_preview(task: tuple) -> dict:
+    """Cena de prévia do estúdio.
+
+    Diferente de `_render_compact`, a receita e o destino vêm na tarefa, não
+    no contexto do worker: assim o pool de processos sobrevive entre prévias,
+    e cada ajuste de controle não paga a criação de processos de novo.
+    """
+    if _WORKER_CONTEXT is None:
+        raise RuntimeError("worker de síntese sem contexto")
+    index, sample_seed, config, output = task
+    return _render_one(
+        {
+            "split": "preview",
+            "index": index,
+            "generation_index": index,
+            "sample_seed": sample_seed,
+            "output": output,
+            "config": config,
+            "assets": _WORKER_CONTEXT["assets"],
+            "force": True,
+            "debug": False,
+        }
+    )
+
+
 def _background_sort_key(
     task: tuple[str, int, int, int], assets: dict
 ) -> tuple[str, str, int]:

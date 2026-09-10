@@ -11,5 +11,13 @@ if __name__ == "__main__":
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--asset-root", type=Path)
     p.add_argument("--output", type=Path)
+    p.add_argument(
+        "--scenes", type=int, help="Cenas por página da prévia (padrão 16)."
+    )
+    p.add_argument(
+        "--preview-workers",
+        type=int,
+        help="Processos que compõem a prévia (padrão: núcleos, até 8).",
+    )
     a = p.parse_args()
-    serve(a.host, a.port, a.asset_root, a.output)
+    serve(a.host, a.port, a.asset_root, a.output, a.scenes, a.preview_workers)
