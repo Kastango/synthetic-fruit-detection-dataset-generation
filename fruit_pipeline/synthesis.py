@@ -276,13 +276,14 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("contrast", "saturation", "brightness"):
             if key in grading and float(grading[key]) <= 0:
                 raise ValueError(f"output.scene_grading.{key} deve ser positivo")
-        jitter = grading.get("brightness_jitter")
-        if jitter is not None and not (
-            len(jitter) == 2 and 0 < float(jitter[0]) <= float(jitter[1])
-        ):
-            raise ValueError(
-                "output.scene_grading.brightness_jitter deve ser [min, max] positivo e crescente"
-            )
+        for key in ("brightness", "contrast", "saturation"):
+            jitter = grading.get(f"{key}_jitter")
+            if jitter is not None and not (
+                len(jitter) == 2 and 0 < float(jitter[0]) <= float(jitter[1])
+            ):
+                raise ValueError(
+                    f"output.scene_grading.{key}_jitter deve ser [min, max] positivo e crescente"
+                )
     depth_smooth_radius = config["occlusion"].get("depth_smooth_radius", 0.0)
     if float(depth_smooth_radius) < 0:
         raise ValueError("occlusion.depth_smooth_radius não pode ser negativo")
@@ -1084,8 +1085,29 @@ def _label_for(
     return f"0 {center_x:.8f} {center_y:.8f} {box_width:.8f} {box_height:.8f}"
 
 
+def _grading_factors(grading: dict, seed: int) -> dict:
+    """Multiplicador por cena para cada eixo de grading que declarar faixa.
+
+    Os 228 fundos foram fotografados sob luz difusa e saem quase uniformes:
+    a amplitude p5-p95 medida no pool sintético é 19,0 em brilho e 17,1 em
+    contraste, contra 32,5/30,3 no treino manual e 35,4/36,7 no CitDet. Um
+    fator por cena espalha o conjunto sem tocar em geometria.
+
+    Cada eixo tem seu próprio fluxo, derivado da semente da cena: ligar ou
+    desligar um deles não desloca os sorteios dos outros nem os da geometria,
+    o que preserva o pareamento de cenas do modo `paired-v1`.
+    """
+    factors = {}
+    for key in ("brightness", "contrast", "saturation"):
+        span = grading.get(f"{key}_jitter")
+        if span:
+            stream = random.Random(int(stable_hash([seed, "grading", key], 16), 16))
+            factors[key] = stream.uniform(float(span[0]), float(span[1]))
+    return factors
+
+
 def _apply_scene_grading(
-    canvas: Image.Image, grading: dict, rng: random.Random | None = None
+    canvas: Image.Image, grading: dict, factors: dict | None = None
 ) -> Image.Image:
     # Os 228 fundos foram fotografados sob luz difusa/nublada, num ângulo à
     # altura dos olhos; as fotos reais anotadas são ensolaradas, céu azul
@@ -1094,16 +1116,10 @@ def _apply_scene_grading(
     # mas contraste, saturação e nitidez mais altos na cena inteira aproximam
     # o "punch" visual da cena composta do observado nas fotos reais.
     graded = canvas
-    contrast = float(grading.get("contrast", 1.0))
-    saturation = float(grading.get("saturation", 1.0))
-    brightness = float(grading.get("brightness", 1.0))
-    # As fotos reais variam bem mais de exposição do que os 228 fundos, todos
-    # nublados: a amplitude p5-p95 do brilho médio é 32,6 no treino manual e
-    # 34,5 no CitDet, contra 16,8 no sintético. Um fator por cena espalha o
-    # conjunto na mesma faixa da coleta manual sem tocar em geometria.
-    jitter = grading.get("brightness_jitter")
-    if jitter and rng is not None:
-        brightness *= rng.uniform(float(jitter[0]), float(jitter[1]))
+    factors = factors or {}
+    contrast = float(grading.get("contrast", 1.0)) * factors.get("contrast", 1.0)
+    saturation = float(grading.get("saturation", 1.0)) * factors.get("saturation", 1.0)
+    brightness = float(grading.get("brightness", 1.0)) * factors.get("brightness", 1.0)
 
     def apply_contrast(image):
         return ImageEnhance.Contrast(image).enhance(contrast) if contrast != 1.0 else image
@@ -1238,6 +1254,7 @@ def _render_one(task: dict) -> dict:
     if background_mirrored:
         canvas, depth_image = ImageOps.mirror(canvas), ImageOps.mirror(depth_image)
     grading = config["output"].get("scene_grading")
+    grading_factors = {}
     if grading:
         # Aplicado só no fundo, antes de colar qualquer fruta: um realce
         # aplicado na cena inteira já composta também "esculpe" as frutas
@@ -1245,13 +1262,8 @@ def _render_one(task: dict) -> dict:
         # ficarem artificiais (achado de revisão visual). O objetivo é só
         # aproximar o "punch" do fundo nublado do observado nas fotos reais,
         # não realçar a fruta de novo.
-        canvas = _apply_scene_grading(
-            canvas,
-            grading,
-            random.Random(
-                int(stable_hash([task["sample_seed"], "scene_exposure"], 16), 16)
-            ),
-        )
+        grading_factors = _grading_factors(grading, task["sample_seed"])
+        canvas = _apply_scene_grading(canvas, grading, grading_factors)
     support = (
         _vegetation_support(canvas)
         if config["placement"].get("require_vegetation", False)
@@ -1342,6 +1354,7 @@ def _render_one(task: dict) -> dict:
         "seed": task["sample_seed"],
         "background": Path(pair["image"]).name,
         "background_mirrored": background_mirrored,
+        "grading_factors": {k: round(v, 6) for k, v in grading_factors.items()},
         "depth": Path(pair["depth"]).name,
         "requested_objects": requested,
         "inserted_objects": len(instances),

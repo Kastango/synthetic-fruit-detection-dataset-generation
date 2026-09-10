@@ -73,6 +73,14 @@ output:
     contrast: 1.2
     saturation: 1.0
     brightness: 0.82
+    # Multiplicadores sorteados por cena, cada eixo no seu fluxo. As faixas
+    # partem da amplitude p5-p95 medida por imagem: o pool sintético fica em
+    # 19,0 de brilho e 17,1 de contraste, contra 32,5/30,3 no treino manual e
+    # 35,4/36,7 no CitDet. Valores abaixo de 1 achatam a cena, como parte das
+    # fotos reais; acima de 1 realçam.
+    brightness_jitter: [0.90, 1.25]
+    contrast_jitter: [0.75, 1.45]
+    saturation_jitter: [0.85, 1.15]
     sharpen_radius: 2.0
     sharpen_percent: 25
     sharpen_threshold: 2

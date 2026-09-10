@@ -291,7 +291,7 @@ contra a seleção congelada antes da inferência.
 ## Exemplos de dados sintéticos
 
 Cenas de `synthetic-3x`, o mesmo subconjunto usado nos treinamentos acima,
-geradas com semente raiz 42 e amostragem pareada. A seleção usa os quantis
+geradas com semente raiz 42. A seleção usa os quantis
 25%, 50%, 75% e 97% da contagem de caixas nas 390 cenas, com desempate pelo
 índice de geração; não usa resultados de detector nem seleção estética.
 As cenas sem caixas permitem inspecionar problemas de inserção, escala e
