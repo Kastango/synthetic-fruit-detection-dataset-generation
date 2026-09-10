@@ -223,7 +223,7 @@ $("#seed").onchange = () => {
   schedule();
 };
 $("#next").onclick = () => {
-  index += current?.sample_images || 8;
+  index += current?.sample_images || 16;
   schedule();
 };
 $("#boxes").onchange = () => current && paint();

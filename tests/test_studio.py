@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 from fruit_pipeline.common import ROOT, load_yaml, sha256_file
-from fruit_pipeline.studio import resolve_recipe, DEFAULTS, SIMPLE, Studio
+from fruit_pipeline.studio import resolve_recipe, DEFAULTS, SIMPLE, Studio, SAMPLE_SCENES
 from fruit_pipeline.synthesis import generate_dataset, scene_seed, create_asset_catalog
 from fruit_pipeline.similarity import image_features, compare_features
 from test_synthesis import build_assets, tiny_config
@@ -85,7 +85,7 @@ def test_recipe_limits_and_removes_effects():
     assert "exposure_jitter" not in c["appearance"]
     assert "dense" not in c["objects"]
     assert (c["objects"]["min"], c["objects"]["max"]) == (10, 100)
-    assert c["augmentation"]["horizontal_flip"] is True
+    assert c["augmentation"]["horizontal_flip"] == 0.5
     assert "dense" in base["objects"]
     for invalid in [
         {"max_scale": float("nan")},
@@ -150,7 +150,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
         preview = studio.render(
             {"seed": 12, "controls": {"fruit_min": 1, "fruit_max": 2}}
         )
-        assert len(preview["synthetic"]) == 8
+        assert len(preview["synthetic"]) == SAMPLE_SCENES
         assert all(
             v["background"].startswith("data:image/jpeg") for v in preview["synthetic"]
         )
@@ -180,7 +180,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
             recipe = yaml.safe_load(archive.read("recipe.yaml"))
             assert recipe["seed"] == 12
             assert "dense" not in recipe["objects"]
-            assert recipe["augmentation"]["horizontal_flip"] is True
+            assert recipe["augmentation"]["horizontal_flip"] == 0.5
         assert (
             studio.start_job(
                 {
@@ -227,3 +227,48 @@ def test_preview_matches_generation_by_scene_index(tmp_path):
                 )
     finally:
         studio.executor.shutdown(wait=True)
+
+
+def test_controls_expose_variability_and_map_to_recipe():
+    """Os controles de variação viram faixas simétricas na receita."""
+    controls = dict(
+        mirror_probability=30,
+        light_angle=120,
+        light_spread=75,
+        brightness_spread=10,
+        contrast_spread=25,
+        saturation_spread=0,
+        sharpness=40,
+        sharpness_spread=50,
+    )
+    c = resolve_recipe(load_yaml(ROOT / "configs/synthesis/studio.yaml"), controls, "reference", 7)
+    assert c["augmentation"]["horizontal_flip"] == 0.3
+    cast = c["occlusion"]["cast_shadow"]
+    assert cast["light_angle_degrees"] == 120.0
+    assert cast["light_angle_jitter_degrees"] == 75.0
+    assert cast["light_angle_per_scene"] is True
+    grading = c["output"]["scene_grading"]
+    assert grading["sharpen_percent"] == 40
+    assert grading["brightness_jitter"] == [0.9, 1.1]
+    assert grading["contrast_jitter"] == [0.75, 1.25]
+    assert grading["sharpen_percent_jitter"] == [0.5, 1.5]
+    # amplitude zero mantém o eixo constante
+    assert "saturation_jitter" not in grading
+
+
+def test_variability_controls_do_not_move_boxes(tmp_path):
+    """Ligar variação de aparência não pode alterar as caixas."""
+    assets = tmp_path / "assets"
+    build_assets(assets)
+    base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
+    plain = resolve_recipe(base, {"brightness_spread": 0, "contrast_spread": 0}, "reference", 5)
+    varied = resolve_recipe(base, {"brightness_spread": 20, "contrast_spread": 40}, "reference", 5)
+    for name, cfg in (("plain", plain), ("varied", varied)):
+        cfg["images"]["total"] = 4
+        generate_dataset(assets, tmp_path / name, cfg, train_ratio=0.5, split_seed=42, workers=1)
+    labels = []
+    for name in ("plain", "varied"):
+        labels.append(sorted(
+            p.read_text() for p in (tmp_path / name).rglob("*.txt")
+        ))
+    assert labels[0] == labels[1]

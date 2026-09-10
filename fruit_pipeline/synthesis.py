@@ -176,8 +176,11 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("objects.min e objects.max devem ser inteiros")
     if not 0 <= objects["min"] <= objects["max"]:
         raise ValueError("intervalo de objetos inválido")
-    if not isinstance(config.get("augmentation", {}).get("horizontal_flip", False), bool):
-        raise ValueError("augmentation.horizontal_flip deve ser booleano")
+    flip = config.get("augmentation", {}).get("horizontal_flip", False)
+    if not isinstance(flip, bool) and not 0 <= float(flip) <= 1:
+        raise ValueError(
+            "augmentation.horizontal_flip deve ser booleano ou probabilidade de 0 a 1"
+        )
     dense = objects.get("dense")
     if dense:
         if not 0 <= float(dense.get("probability", 0.0)) <= 1:
@@ -276,7 +279,7 @@ def validate_synthesis_config(config: dict) -> None:
         for key in ("contrast", "saturation", "brightness"):
             if key in grading and float(grading[key]) <= 0:
                 raise ValueError(f"output.scene_grading.{key} deve ser positivo")
-        for key in ("brightness", "contrast", "saturation"):
+        for key in ("brightness", "contrast", "saturation", "sharpen_percent"):
             jitter = grading.get(f"{key}_jitter")
             if jitter is not None and not (
                 len(jitter) == 2 and 0 < float(jitter[0]) <= float(jitter[1])
@@ -1214,8 +1217,60 @@ def _sample_object_count(objects: dict, rng: random.Random) -> int:
     return lo + min(hi - lo, int((hi - lo + 1) * u))
 
 
+def _mirror_probability(config: dict) -> float:
+    """Chance de espelhar. `true` equivale a 0,5, mantendo receitas antigas."""
+    flip = config.get("augmentation", {}).get("horizontal_flip", False)
+    if isinstance(flip, bool):
+        return 0.5 if flip else 0.0
+    return float(flip)
+
+
 def _mirror_rng(seed: int, subject: str, index: int = 0) -> random.Random:
     return random.Random(int(stable_hash([seed, "mirror", subject, index], 16), 16))
+
+
+def _scene_appearance(config: dict, seed: int) -> dict:
+    """Resolve por cena os ajustes de aparência que hoje seriam constantes.
+
+    Devolve uma cópia rasa do config com os valores já sorteados, de modo que
+    o resto do compositor continue lendo escalares. Cada eixo tem seu próprio
+    fluxo, derivado da semente da cena: ligar um deles não desloca os sorteios
+    dos outros nem os da geometria, então as caixas não mudam.
+
+    Nada aqui toca máscara de visibilidade ou critério de aceitação; são só
+    propriedades fotográficas da cena.
+    """
+    output = config.get("output", {})
+    grading = output.get("scene_grading")
+    occlusion = config.get("occlusion", {})
+    cast = occlusion.get("cast_shadow")
+    sharpen_span = (grading or {}).get("sharpen_percent_jitter")
+    scene_light = bool((cast or {}).get("light_angle_per_scene", False))
+    if not (sharpen_span or scene_light):
+        return config
+
+    def stream(name):
+        return random.Random(int(stable_hash([seed, "scene_appearance", name], 16), 16))
+
+    config = dict(config)
+    if sharpen_span:
+        factor = stream("sharpen").uniform(float(sharpen_span[0]), float(sharpen_span[1]))
+        grading = dict(grading)
+        grading["sharpen_percent"] = max(
+            0, round(float(grading.get("sharpen_percent", 0)) * factor)
+        )
+        output = dict(output, scene_grading=grading)
+    config["output"] = output
+    if scene_light:
+        # Numa fotografia o sol está num lugar só. O sorteio por fruta deixava
+        # sombras de direções diferentes na mesma cena; aqui o ângulo é da
+        # cena, e a variação entre cenas pode ser bem maior.
+        span = float(cast.get("light_angle_jitter_degrees", 20.0))
+        angle = float(cast.get("light_angle_degrees", 315.0))
+        angle += stream("light").uniform(-span, span)
+        cast = dict(cast, light_angle_degrees=angle, light_angle_jitter_degrees=0.0)
+        config["occlusion"] = dict(occlusion, cast_shadow=cast)
+    return config
 
 
 def _render_one(task: dict) -> dict:
@@ -1244,13 +1299,14 @@ def _render_one(task: dict) -> dict:
     cutouts = task["assets"]["cutouts"]
     pair = rng.choice(backgrounds)
     canvas_size = tuple(map(int, config["canvas"]))
+    config = _scene_appearance(config, task["sample_seed"])
     canvas, depth_image = _open_background_pair(
         Path(pair["image"]), Path(pair["depth"]), canvas_size
     )
-    mirror_enabled = config.get("augmentation", {}).get("horizontal_flip", False)
-    background_mirrored = mirror_enabled and _mirror_rng(
+    mirror_probability = _mirror_probability(config)
+    background_mirrored = mirror_probability > 0 and _mirror_rng(
         task["sample_seed"], "background"
-    ).random() < 0.5
+    ).random() < mirror_probability
     if background_mirrored:
         canvas, depth_image = ImageOps.mirror(canvas), ImageOps.mirror(depth_image)
     grading = config["output"].get("scene_grading")
@@ -1293,7 +1349,11 @@ def _render_one(task: dict) -> dict:
         if config.get("sampling", {}).get("mode") == "paired-v1":
             rng = random.Random(int(stable_hash([task["sample_seed"], "object", object_index], 16), 16))
         fruit = _open_cutout_cached(cutout_path)
-        if mirror_enabled and _mirror_rng(task["sample_seed"], "fruit", object_index).random() < 0.5:
+        if (
+            mirror_probability > 0
+            and _mirror_rng(task["sample_seed"], "fruit", object_index).random()
+            < mirror_probability
+        ):
             fruit = ImageOps.mirror(fruit)
         fruit = _scale_cutout(fruit, scale_config, rng, canvas_size)
         rotation = float(config["objects"]["rotation_degrees"])

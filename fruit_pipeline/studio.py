@@ -31,6 +31,9 @@ import numpy as np
 
 # Controles de pesquisa. Os detalhes mecânicos continuam explícitos no YAML
 # exportado; restringir a superfície de ajuste não apaga sua existência.
+SAMPLE_SCENES = 16
+SAMPLE_CROPS = 48
+
 CONTROLS = [
     (
         "fruit_min",
@@ -133,6 +136,86 @@ CONTROLS = [
         "Escurecimento próximo à borda de oclusão.",
     ),
     (
+        "mirror_probability",
+        "Cena",
+        "Espelhamento (%)",
+        0,
+        100,
+        1,
+        50,
+        "Chance de espelhar o fundo e cada fruta; cria composições novas a partir do mesmo catálogo.",
+    ),
+    (
+        "light_angle",
+        "Luz",
+        "Direção da luz (graus)",
+        0,
+        359,
+        1,
+        315,
+        "Ângulo do sol na cena. As sombras caem do lado oposto.",
+    ),
+    (
+        "light_spread",
+        "Luz",
+        "Variação da direção (graus)",
+        0,
+        180,
+        1,
+        20,
+        "Quanto a direção muda entre cenas. O ângulo é único dentro de cada cena.",
+    ),
+    (
+        "brightness_spread",
+        "Variação",
+        "Variação de brilho (%)",
+        0,
+        40,
+        1,
+        0,
+        "Faixa em torno do brilho do fundo, sorteada por cena.",
+    ),
+    (
+        "contrast_spread",
+        "Variação",
+        "Variação de contraste (%)",
+        0,
+        60,
+        1,
+        0,
+        "Faixa em torno do contraste do fundo. Valores baixos achatam a cena.",
+    ),
+    (
+        "saturation_spread",
+        "Variação",
+        "Variação de saturação (%)",
+        0,
+        40,
+        1,
+        0,
+        "Faixa em torno da saturação do fundo, sorteada por cena.",
+    ),
+    (
+        "sharpness",
+        "Variação",
+        "Nitidez do fundo (%)",
+        0,
+        100,
+        1,
+        25,
+        "Realce de bordas aplicado ao fundo antes de inserir as frutas.",
+    ),
+    (
+        "sharpness_spread",
+        "Variação",
+        "Variação de nitidez (%)",
+        0,
+        100,
+        1,
+        0,
+        "Faixa em torno da nitidez, sorteada por cena.",
+    ),
+    (
         "background_brightness",
         "Fundo",
         "Brilho do fundo (%)",
@@ -187,7 +270,7 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     c.update(name="studio_candidate", seed=seed, sampling={"mode": "paired-v1"})
     c["objects"].pop("dense", None)
     c["objects"].update(min=int(values["fruit_min"]), max=int(values["fruit_max"]))
-    c["augmentation"] = {"horizontal_flip": True}
+    c["augmentation"] = {"horizontal_flip": values["mirror_probability"] / 100}
     c["objects"].update(
         min_scale=values["min_scale"] / 100, max_scale=values["max_scale"] / 100
     )
@@ -207,6 +290,35 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     if preset == "essential":
         c["occlusion"].pop("cast_shadow", None)
     c["occlusion"]["contact_shadow"]["strength"] = values["contact_shadow"] / 100
+    cast = c["occlusion"].get("cast_shadow")
+    if cast:
+        # Um ângulo por cena, e não por fruta: numa fotografia o sol está num
+        # lugar só. Com isso a variação entre cenas pode ser bem maior.
+        cast.update(
+            light_angle_degrees=float(values["light_angle"]),
+            light_angle_jitter_degrees=float(values["light_spread"]),
+            light_angle_per_scene=True,
+        )
+    grading = c["output"]["scene_grading"]
+    grading["sharpen_percent"] = int(values["sharpness"])
+    # Cada faixa é simétrica em torno do valor base: o controle é a amplitude,
+    # não os extremos. Amplitude zero mantém o eixo constante, como antes.
+    for control, key in (
+        ("brightness_spread", "brightness"),
+        ("contrast_spread", "contrast"),
+        ("saturation_spread", "saturation"),
+        ("sharpness_spread", "sharpen_percent"),
+    ):
+        spread = values[control] / 100
+        if spread:
+            # O piso fica acima de zero: um fator nulo zeraria o eixo em vez
+            # de reduzi-lo, e a validação da receita recusa faixas em zero.
+            grading[f"{key}_jitter"] = [
+                round(max(0.01, 1 - spread), 4),
+                round(1 + spread, 4),
+            ]
+        else:
+            grading.pop(f"{key}_jitter", None)
     c["output"]["scene_grading"].update(
         brightness=values["background_brightness"] / 100,
         contrast=values["background_contrast"] / 100,
@@ -235,7 +347,7 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
         )
     crops = []
     # Ordem do arquivo: nenhuma seleção pelas predições ou pela aparência.
-    for x, y, bw, bh in boxes[:12]:
+    for x, y, bw, bh in boxes[:SAMPLE_CROPS]:
         side = max(bw * w, bh * h) * 2
         crop = image.crop(
             (
@@ -438,7 +550,7 @@ class Studio:
                 output = self.output / key
                 output.mkdir(parents=True, exist_ok=True)
                 views, features = [], []
-                for i in range(index, index + 8):
+                for i in range(index, index + SAMPLE_SCENES):
                     record = _render_one(
                         dict(
                             split="preview",
@@ -497,7 +609,7 @@ class Studio:
                 generator_sha256=code_hash,
                 asset_fingerprint=self.fingerprint,
                 yaml=yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
-                sample_images=8,
+                sample_images=SAMPLE_SCENES,
                 sample_boxes=sum(v["count"] for v in views),
             )
 
