@@ -47,6 +47,12 @@ function buildControls() {
     input.oninput = () => {
       controls[c.key] = Number(input.value);
       out.textContent = input.value;
+      if (controls.fruit_min > controls.fruit_max) {
+        const other = c.key === "fruit_min" ? "fruit_max" : "fruit_min";
+        controls[other] = controls[c.key];
+        $("#" + other).value = controls[other];
+        document.querySelector(`output[for="${other}"]`).textContent = controls[other];
+      }
       schedule();
     };
     row.append(top, input);

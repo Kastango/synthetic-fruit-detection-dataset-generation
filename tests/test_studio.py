@@ -50,6 +50,9 @@ def test_seed_reproduces_across_workers_and_name_and_total(tmp_path):
     build_assets(assets)
     c = tiny_config()
     c["sampling"] = {"mode": "paired-v1"}
+    c["augmentation"] = {"horizontal_flip": True}
+    c["objects"].update(min=1, max=4)
+    c["images"]["total"] = 20
     a = tmp_path / "a"
     b = tmp_path / "b"
     generate_dataset(assets, a, c, train_ratio=0.67, split_seed=42)
@@ -57,6 +60,16 @@ def test_seed_reproduces_across_workers_and_name_and_total(tmp_path):
     for file in (a / "images").rglob("*.jpg"):
         assert file.read_bytes() == (b / file.relative_to(a)).read_bytes()
     assert (a / "manifest.jsonl").read_bytes() == (b / "manifest.jsonl").read_bytes()
+    rows = [json.loads(line) for line in (a / "manifest.jsonl").read_text().splitlines()]
+    assert len({row["background"] for row in rows}) == 4
+    assert {row["background_mirrored"] for row in rows} == {True, False}
+    unmirrored = deepcopy(c)
+    unmirrored["augmentation"]["horizontal_flip"] = False
+    generate_dataset(assets, tmp_path / "unmirrored", unmirrored, train_ratio=0.67, split_seed=42)
+    before = [json.loads(line) for line in (tmp_path / "unmirrored/manifest.jsonl").read_text().splitlines()]
+    assert [(r["background"], r["requested_objects"]) for r in rows] == [
+        (r["background"], r["requested_objects"]) for r in before
+    ]
     other = deepcopy(c)
     other["name"] = "renamed"
     other["images"]["total"] = 40
@@ -70,12 +83,17 @@ def test_recipe_limits_and_removes_effects():
     c = resolve_recipe(base, SIMPLE, "essential", 42)
     assert "cast_shadow" not in c["occlusion"]
     assert "exposure_jitter" not in c["appearance"]
-    assert c["objects"]["dense"] == base["objects"]["dense"]
+    assert "dense" not in c["objects"]
+    assert (c["objects"]["min"], c["objects"]["max"]) == (10, 100)
+    assert c["augmentation"]["horizontal_flip"] is True
+    assert "dense" in base["objects"]
     for invalid in [
         {"max_scale": float("nan")},
         {"min_scale": 7, "max_scale": 6},
         {"unknown": 1},
-        {"sparse_max": 3.5},
+        {"fruit_max": 3.5},
+        {"fruit_min": 20, "fruit_max": 10},
+        {"fruit_min": -1},
     ]:
         with pytest.raises(ValueError):
             resolve_recipe(base, invalid, "reference", 42)
@@ -130,7 +148,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
     studio = Studio(assets, tmp_path / "studio/preview")
     try:
         preview = studio.render(
-            {"seed": 12, "controls": {"sparse_max": 2, "dense_probability": 0}}
+            {"seed": 12, "controls": {"fruit_min": 1, "fruit_max": 2}}
         )
         assert len(preview["synthetic"]) == 8
         assert all(
@@ -140,7 +158,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
         job = studio.start_job(
             {
                 "seed": 12,
-                "controls": {"sparse_max": 2, "dense_probability": 0},
+                "controls": {"fruit_min": 1, "fruit_max": 2},
                 "total": 3,
             }
         )
@@ -159,12 +177,15 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
             assert len([n for n in names if n.endswith(".jpg")]) == 3
             assert len([n for n in names if n.startswith("labels/")]) == 3
             assert "path" not in yaml.safe_load(archive.read("data.yaml"))
-            assert yaml.safe_load(archive.read("recipe.yaml"))["seed"] == 12
+            recipe = yaml.safe_load(archive.read("recipe.yaml"))
+            assert recipe["seed"] == 12
+            assert "dense" not in recipe["objects"]
+            assert recipe["augmentation"]["horizontal_flip"] is True
         assert (
             studio.start_job(
                 {
                     "seed": 12,
-                    "controls": {"sparse_max": 2, "dense_probability": 0},
+                    "controls": {"fruit_min": 1, "fruit_max": 2},
                     "total": 3,
                 }
             )["id"]
@@ -187,7 +208,7 @@ def test_preview_matches_generation_by_scene_index(tmp_path):
     studio = Studio(assets, tmp_path / "preview")
     try:
         preview = studio.render(
-            {"seed": 42, "controls": {"sparse_max": 2, "dense_probability": 0}}
+            {"seed": 42, "controls": {"fruit_min": 1, "fruit_max": 2}}
         )
         config = deepcopy(preview["config"])
         config["images"]["total"] = 4

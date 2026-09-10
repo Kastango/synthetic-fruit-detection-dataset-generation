@@ -1,0 +1,82 @@
+name: studio
+seed: 42
+images:
+  total: 390
+canvas:
+- 720
+- 960
+objects:
+  min: 10
+  max: 100
+  min_scale: 0.01
+  max_scale: 0.065
+  rotation_degrees: 180
+  depth_scale:
+    near_scale: 1.3
+    far_scale: 0.6
+placement:
+  min_depth: 20
+  min_visibility: 0.15
+  max_attempts_per_object: 100
+  z_patch_fraction: 0.2
+  z_offset: -5
+  z_offset_jitter: 30
+  exclude_bottom_fraction: 0.15
+appearance:
+  ripeness:
+    enabled: true
+    fraction_affected: 0.18
+    green_hue_degrees: 85
+    strength_range:
+    - 0.25
+    - 0.75
+    saturation_scale: 0.8
+    gloss_reduction: 0.4
+  exposure_jitter:
+    enabled: true
+    probability: 0.8
+    range:
+    - 0.4
+    - 1.9
+    saturation_pull: 0.35
+  hsv_cast:
+    use_hardlight_target: true
+    hue_power: 0.12
+    saturation_power: 0.18
+    value_power: 0.45
+    value_power_jitter: 0.3
+    min_value_ratio: 0.15
+    bright_flatten_strength: 0.7
+occlusion:
+  edge_blur: 1.5
+  depth_smooth_radius: 1.2
+  mask_threshold: 0.5
+  edge_feather_radius: 0.8
+  contact_shadow:
+    strength: 0.45
+    radius_fraction: 0.04
+  cast_shadow:
+    probability: 0.4
+    strength: 0.4
+    min_coverage: 0.3
+    max_coverage: 0.6
+    offset_fraction: 0.35
+    light_angle_degrees: 315.0
+    light_angle_jitter_degrees: 20.0
+    blur_radius: 3.0
+annotation:
+  mode: visible
+  min_box_pixels: 2
+output:
+  jpeg_quality: 95
+  scene_grading:
+    contrast: 1.2
+    saturation: 1.0
+    brightness: 0.82
+    sharpen_radius: 2.0
+    sharpen_percent: 25
+    sharpen_threshold: 2
+sampling:
+  mode: paired-v1
+augmentation:
+  horizontal_flip: true

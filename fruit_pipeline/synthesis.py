@@ -33,7 +33,7 @@ from .common import (
     stable_hash,
 )
 
-GENERATOR_SCHEMA_VERSION = 7
+GENERATOR_SCHEMA_VERSION = 8
 ASSET_CATALOG_SCHEMA_VERSION = 2
 SCENE_SPLIT_SCHEMA_VERSION = 1
 
@@ -171,8 +171,13 @@ def validate_synthesis_config(config: dict) -> None:
     if width <= 0 or height <= 0:
         raise ValueError("canvas deve ser positivo")
     objects = config["objects"]
-    if not 0 <= int(objects["min"]) <= int(objects["max"]):
+    if any(isinstance(objects[k], bool) or not isinstance(objects[k], int)
+           for k in ("min", "max")):
+        raise ValueError("objects.min e objects.max devem ser inteiros")
+    if not 0 <= objects["min"] <= objects["max"]:
         raise ValueError("intervalo de objetos inválido")
+    if not isinstance(config.get("augmentation", {}).get("horizontal_flip", False), bool):
+        raise ValueError("augmentation.horizontal_flip deve ser booleano")
     dense = objects.get("dense")
     if dense:
         if not 0 <= float(dense.get("probability", 0.0)) <= 1:
@@ -1178,6 +1183,25 @@ def _build_debug_panel(
     return panel
 
 
+def _sample_object_count(objects: dict, rng: random.Random) -> int:
+    """U simétrico em intervalos inteiros iguais, sem parâmetro de curvatura."""
+    dense = objects.get("dense")
+    if dense:
+        # Leitura das receitas históricas, preservando seus sorteios.
+        if rng.random() < float(dense.get("probability", 0.0)):
+            return rng.randint(int(dense["min"]), int(dense["max"]))
+        return rng.randint(int(objects["min"]), int(objects["max"]))
+    lo, hi = objects["min"], objects["max"]
+    # Inversa da CDF da distribuição arco-seno. Todos os inteiros têm
+    # probabilidade positiva; mínimo e máximo recebem a mesma massa.
+    u = math.sin(math.pi * rng.random() / 2) ** 2
+    return lo + min(hi - lo, int((hi - lo + 1) * u))
+
+
+def _mirror_rng(seed: int, subject: str, index: int = 0) -> random.Random:
+    return random.Random(int(stable_hash([seed, "mirror", subject, index], 16), 16))
+
+
 def _render_one(task: dict) -> dict:
     split_name = task["split"]
     index = task["index"]
@@ -1207,6 +1231,12 @@ def _render_one(task: dict) -> dict:
     canvas, depth_image = _open_background_pair(
         Path(pair["image"]), Path(pair["depth"]), canvas_size
     )
+    mirror_enabled = config.get("augmentation", {}).get("horizontal_flip", False)
+    background_mirrored = mirror_enabled and _mirror_rng(
+        task["sample_seed"], "background"
+    ).random() < 0.5
+    if background_mirrored:
+        canvas, depth_image = ImageOps.mirror(canvas), ImageOps.mirror(depth_image)
     grading = config["output"].get("scene_grading")
     if grading:
         # Aplicado só no fundo, antes de colar qualquer fruta: um realce
@@ -1237,18 +1267,7 @@ def _render_one(task: dict) -> dict:
         # cena composta.
         depth_image = depth_image.filter(ImageFilter.GaussianBlur(depth_smooth_radius))
     depth = np.asarray(depth_image, dtype=np.uint8)
-    dense = config["objects"].get("dense")
-    if dense and rng.random() < float(dense.get("probability", 0.0)):
-        # O CitDet real chega a ~85 frutos/imagem em mediana (até 233); o
-        # range padrão (min/max) sozinho nunca cobre isso, então a maioria
-        # das cenas sintéticas fica bem mais esparsa que esse domínio. Uma
-        # fração das cenas sorteia desse range denso à parte, preservando a
-        # distribuição original (mais parecida com manual-full) no resto.
-        requested = rng.randint(int(dense["min"]), int(dense["max"]))
-    else:
-        requested = rng.randint(
-            int(config["objects"]["min"]), int(config["objects"]["max"])
-        )
+    requested = _sample_object_count(config["objects"], rng)
     if requested <= len(cutouts):
         chosen = rng.sample(cutouts, requested)
     else:
@@ -1262,6 +1281,8 @@ def _render_one(task: dict) -> dict:
         if config.get("sampling", {}).get("mode") == "paired-v1":
             rng = random.Random(int(stable_hash([task["sample_seed"], "object", object_index], 16), 16))
         fruit = _open_cutout_cached(cutout_path)
+        if mirror_enabled and _mirror_rng(task["sample_seed"], "fruit", object_index).random() < 0.5:
+            fruit = ImageOps.mirror(fruit)
         fruit = _scale_cutout(fruit, scale_config, rng, canvas_size)
         rotation = float(config["objects"]["rotation_degrees"])
         if rotation:
@@ -1320,6 +1341,7 @@ def _render_one(task: dict) -> dict:
         "generation_id": f"scene_{generation_index:06d}",
         "seed": task["sample_seed"],
         "background": Path(pair["image"]).name,
+        "background_mirrored": background_mirrored,
         "depth": Path(pair["depth"]).name,
         "requested_objects": requested,
         "inserted_objects": len(instances),

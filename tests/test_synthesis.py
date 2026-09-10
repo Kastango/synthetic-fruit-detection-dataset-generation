@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import json
+import random
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
 import pytest
-from PIL import Image
+from PIL import Image, ImageOps
 
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
     _apply_appearance_hsv_cast,
     _count_adjusted_scale,
+    _sample_object_count,
     _vegetation_support,
     _finish_placement,
     create_asset_catalog,
@@ -19,6 +22,85 @@ from fruit_pipeline.synthesis import (
     materialize_nested_subsets,
     validate_synthesis_config,
 )
+
+
+def test_count_distribution_is_symmetric_u_with_all_integers_reachable():
+    objects = {"min": 10, "max": 100}
+    def sample(seed):
+        rng = random.Random(seed)
+        return [_sample_object_count(objects, rng) for _ in range(50000)]
+    values = sample(42)
+    assert values == sample(42)
+    assert values != sample(43)
+    counts = Counter(values)
+    assert set(counts) == set(range(10, 101))
+    low = sum(counts[n] for n in range(10, 20))
+    high = sum(counts[n] for n in range(91, 101))
+    middle = sum(counts[n] for n in range(50, 60))
+    assert low > 2 * middle and high > 2 * middle
+    assert low == pytest.approx(high, rel=0.05)
+    assert np.mean(values) == pytest.approx(55, abs=0.5)
+
+
+@pytest.mark.parametrize("lo,hi", [(0, 0), (7, 7), (0, 1)])
+def test_count_distribution_small_intervals(lo, hi):
+    rng = random.Random(42)
+    values = {_sample_object_count({"min": lo, "max": hi}, rng) for _ in range(100)}
+    assert values == set(range(lo, hi + 1))
+
+
+def test_historical_count_recipe_preserves_random_sequence():
+    objects = {"min": 1, "max": 30, "dense": {"min": 60, "max": 110, "probability": 0.25}}
+    actual, expected = random.Random(42), random.Random(42)
+    for _ in range(1000):
+        bounds = (60, 110) if expected.random() < 0.25 else (1, 30)
+        assert _sample_object_count(objects, actual) == expected.randint(*bounds)
+    assert actual.getstate() == expected.getstate()
+
+
+@pytest.mark.parametrize("value", [True, 1.5, "10"])
+def test_count_requires_integers(value):
+    config = tiny_config()
+    config["objects"]["min"] = value
+    with pytest.raises(ValueError, match="inteiros"):
+        validate_synthesis_config(config)
+
+
+def test_mirroring_keeps_background_depth_and_cutout_alpha_aligned(tmp_path, monkeypatch):
+    import fruit_pipeline.synthesis as synthesis
+
+    assets = tmp_path / "assets"
+    build_assets(assets)
+    background = Image.new("RGB", (64, 64), "green")
+    background.paste("blue", (0, 0, 25, 64))
+    depth = Image.new("L", (64, 64), 150)
+    depth.paste(40, (0, 0, 25, 64))
+    fruit = Image.new("RGBA", (16, 16), (230, 120, 20, 0))
+    fruit.paste((250, 160, 10, 255), (1, 2, 7, 13))
+    monkeypatch.setattr(synthesis, "_open_background_pair", lambda *a: (background.copy(), depth.copy()))
+    for path in (assets / "pictures_trimmed").glob("*.png"):
+        fruit.save(path)
+    monkeypatch.setattr(synthesis, "_mirror_rng", lambda *a: random.Random(1))
+    seen = []
+    original_scale = synthesis._scale_cutout
+    def scale(image, *args):
+        assert image.tobytes() == ImageOps.mirror(fruit).tobytes()
+        seen.append(True)
+        return original_scale(image, *args)
+    monkeypatch.setattr(synthesis, "_scale_cutout", scale)
+    def debug(canvas, depth_image, instances):
+        assert depth_image.tobytes() == ImageOps.mirror(depth).tobytes()
+        # O fundo azul e a profundidade correspondente passam para a direita.
+        assert canvas.getpixel((63, 0)) == (0, 0, 255)
+        return canvas
+    monkeypatch.setattr(synthesis, "_build_debug_panel", debug)
+    config = tiny_config()
+    config["augmentation"] = {"horizontal_flip": True}
+    output = tmp_path / "output"
+    generate_dataset(assets, output, config, train_ratio=0.67, split_seed=42, debug=True)
+    rows = [json.loads(line) for line in (output / "manifest.jsonl").read_text().splitlines()]
+    assert len(seen) == 3
+    assert all(row["background_mirrored"] for row in rows)
 
 
 def build_assets(root: Path) -> None:

@@ -33,34 +33,24 @@ import numpy as np
 # exportado; restringir a superfície de ajuste não apaga sua existência.
 CONTROLS = [
     (
-        "sparse_max",
+        "fruit_min",
         "Cena",
-        "Máximo no modo esparso",
-        1,
-        60,
-        1,
-        30,
-        "Frutas solicitadas; oclusões podem reduzir as caixas finais.",
-    ),
-    (
-        "dense_probability",
-        "Cena",
-        "Cenas densas (%)",
+        "Mínimo de frutas",
         0,
-        30,
-        1,
-        25,
-        "Mistura entre os dois regimes. Referência atual: 25%.",
-    ),
-    (
-        "dense_max",
-        "Cena",
-        "Máximo no modo denso",
-        60,
         150,
         1,
-        110,
-        "O modo denso começa em 60 frutas.",
+        10,
+        "Quantidades próximas dos extremos aparecem mais que as do centro.",
+    ),
+    (
+        "fruit_max",
+        "Cena",
+        "Máximo de frutas",
+        0,
+        150,
+        1,
+        100,
+        "Frutas solicitadas; rejeições e oclusões podem reduzir o total visível.",
     ),
     (
         "min_scale",
@@ -185,6 +175,8 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
             raise ValueError(f"{key}: use um valor inteiro")
     if values["min_scale"] > values["max_scale"]:
         raise ValueError("Tamanho mínimo não pode superar o máximo")
+    if values["fruit_min"] > values["fruit_max"]:
+        raise ValueError("Mínimo de frutas não pode superar o máximo")
     if (
         isinstance(seed, bool)
         or not isinstance(seed, int)
@@ -193,10 +185,9 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
         raise ValueError("Semente deve ser um inteiro entre 0 e 2147483647")
     c = deepcopy(base)
     c.update(name="studio_candidate", seed=seed, sampling={"mode": "paired-v1"})
-    c["objects"]["max"] = int(values["sparse_max"])
-    c["objects"]["dense"].update(
-        probability=values["dense_probability"] / 100, max=int(values["dense_max"])
-    )
+    c["objects"].pop("dense", None)
+    c["objects"].update(min=int(values["fruit_min"]), max=int(values["fruit_max"]))
+    c["augmentation"] = {"horizontal_flip": True}
     c["objects"].update(
         min_scale=values["min_scale"] / 100, max_scale=values["max_scale"] / 100
     )
@@ -274,7 +265,7 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
 
 class Studio:
     def __init__(self, asset_root: Path, output: Path):
-        self.base = load_yaml(ROOT / "configs/synthesis/confirmatory_pool.yaml")
+        self.base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
         self.output = output
         catalog = create_asset_catalog(asset_root)
         self.fingerprint = catalog["source_fingerprint"]
@@ -473,6 +464,8 @@ class Studio:
                             Path(pair["depth"]),
                             tuple(config["canvas"]),
                         )
+                        if record["background_mirrored"]:
+                            background = ImageOps.mirror(background)
                         view["background"] = picture(background)
                         views.append(view)
                         features.append(image_features(im, boxes))

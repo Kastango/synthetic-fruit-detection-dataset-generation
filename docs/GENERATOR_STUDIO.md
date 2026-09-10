@@ -32,6 +32,21 @@ Cada fundo deve ter seu mapa correspondente, e os recortes devem preservar
 a transparência. Sem esse argumento, o Studio prefere o catálogo completo
 em `data/assets/regenerated` quando ele existe.
 
+## Quantidade e variedade
+
+Ajuste somente o mínimo e o máximo de frutas. A curva em U favorece
+quantidades próximas dos extremos e mantém todos os valores possíveis.
+Entre 10 e 100, a menor probabilidade fica no centro, em 55. Limites iguais
+fixam a quantidade solicitada. Rejeições e oclusões podem reduzir as caixas.
+
+O gerador sorteia um fundo por cena, com reposição. Fundos e frutas têm
+50% de chance de espelhamento horizontal, com sorteios independentes.
+O mapa de profundidade acompanha o fundo. A receita exporta
+`augmentation.horizontal_flip: true`; use `false` no YAML para desativar.
+
+A receita inicial está em `configs/synthesis/studio.yaml`. As receitas
+antigas com `objects.dense` conservam a amostragem anterior.
+
 ## Sementes e reprodução
 
 Mantenha a semente para comparar os ajustes nas mesmas cenas. A exportação

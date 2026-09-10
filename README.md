@@ -189,17 +189,17 @@ Comece pela quantidade e pelo tamanho das frutas. Depois ajuste a oclusão e
 a aparência. Confira se as frutas cabem na copa, se a luz combina com o fundo
 e se as bordas dos recortes continuam visíveis.
 
-A receita oficial fica em
-[`confirmatory_pool.yaml`](configs/synthesis/confirmatory_pool.yaml).
+A receita inicial do Studio fica em
+[`studio.yaml`](configs/synthesis/studio.yaml).
 Os caminhos abaixo identificam os campos do YAML.
 
 | O que você quer mudar | Parâmetro | Efeito na cena |
 |---|---|---|
-| Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. A receita oficial usa `42`. |
-| Gerar mais imagens | `images.total` | Define o tamanho do pool. A receita oficial gera 1.300 cenas. |
+| Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. O Studio começa com `42`. |
+| Gerar mais imagens | `images.total` | Define o tamanho do pool. O Studio começa com 390 cenas. |
 | Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
-| Colocar mais frutas | `objects.min`, `objects.max` | Sorteia entre 1 e 30 frutas nas cenas esparsas. Inserções rejeitadas podem reduzir o total. |
-| Incluir copas carregadas | `objects.dense` | Sorteia entre 60 e 110 frutas em 25% das cenas. É uma probabilidade, não uma cota exata. |
+| Mudar a quantidade de frutas | `objects.min`, `objects.max` | Sorteia em uma curva em U. Quantidades próximas dos limites aparecem mais; próximas do centro, menos. Rejeições e oclusões podem reduzir o total visível. |
+| Espelhar os ativos | `augmentation.horizontal_flip` | Ativa 50% de chance de espelhamento horizontal por fundo e por fruta. O mapa acompanha o fundo. |
 | Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.depth_scale` | Controla o tamanho inicial do recorte e sua correção pela profundidade. |
 | Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
 | Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige uma fração visível na inserção. O valor oficial é 0,15. Outras frutas ainda podem cobri-la depois. |
@@ -211,9 +211,11 @@ Os caminhos abaixo identificam os campos do YAML.
 | Escolher o que a caixa cobre | `annotation.mode` | `visible` cobre a parte visível. `amodal` inclui a parte oculta. A receita usa `visible`. |
 
 A interface exporta `sampling.mode: paired-v1`. Nesse modo, mudar a aparência
-preserva os sorteios de geometria. A receita oficial usa a derivação legada,
-na qual mudanças de configuração também alteram os sorteios.
+preserva os sorteios de geometria. Fundos são sorteados com reposição.
+Os espelhamentos também usam a semente.
 Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
 Os manifestos registram sementes e hashes para identificar cada geração.
+A receita histórica `confirmatory_pool.yaml` conserva os dois grupos usados
+nos experimentos publicados. Esses resultados não avaliam a nova curva em U.
 
 </details>
