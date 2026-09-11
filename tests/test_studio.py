@@ -272,3 +272,42 @@ def test_variability_controls_do_not_move_boxes(tmp_path):
             p.read_text() for p in (tmp_path / name).rglob("*.txt")
         ))
     assert labels[0] == labels[1]
+
+
+def test_import_recovers_control_positions():
+    """Importar a receita exportada devolve os mesmos controles."""
+    from fruit_pipeline.studio import controls_from_recipe
+
+    escolhidos = dict(
+        fruit_min=20,
+        fruit_max=80,
+        contrast_spread=25,
+        light_angle=120,
+        light_spread=70,
+        mirror_probability=30,
+        min_visible_pixels=150,
+        ripeness_strength=60,
+    )
+    base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
+    receita = resolve_recipe(base, escolhidos, "reference", 7)
+    voltou = controls_from_recipe(receita)
+    for chave, valor in {**DEFAULTS, **escolhidos}.items():
+        assert chave in voltou, chave
+        assert abs(float(voltou[chave]) - float(valor)) <= 0.15, chave
+
+
+def test_import_clamps_values_outside_the_control_range():
+    """Receita editada à mão não pode deixar a interface fora dos limites."""
+    from fruit_pipeline.studio import controls_from_recipe, CONTROLS
+
+    limites = {row[0]: (row[3], row[4]) for row in CONTROLS}
+    receita = {
+        "objects": {"min": -50, "max": 9999, "min_scale": 5.0, "max_scale": 9.0},
+        "placement": {"min_visibility": 4.0, "min_visible_pixels": 99999},
+        "augmentation": {"horizontal_flip": True},
+    }
+    voltou = controls_from_recipe(receita)
+    for chave, valor in voltou.items():
+        low, high = limites[chave]
+        assert low <= valor <= high, (chave, valor)
+    assert voltou["mirror_probability"] == 50

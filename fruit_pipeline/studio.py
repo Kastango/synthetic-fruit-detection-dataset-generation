@@ -390,6 +390,83 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     return c
 
 
+def controls_from_recipe(recipe: dict) -> dict:
+    """Recupera as posições dos controles a partir de uma receita exportada.
+
+    É a inversa de `resolve_recipe`, limitada ao que a interface expõe: o YAML
+    guarda constantes que não têm slider, e essas continuam vindo da receita
+    base. Cada valor é preso à faixa do seu controle, para que uma receita
+    editada à mão fora dos limites não deixe a interface num estado inválido.
+    """
+    if not isinstance(recipe, dict):
+        raise ValueError("Receita inválida")
+    objects = recipe.get("objects") or {}
+    placement = recipe.get("placement") or {}
+    appearance = recipe.get("appearance") or {}
+    occlusion = recipe.get("occlusion") or {}
+    grading = (recipe.get("output") or {}).get("scene_grading") or {}
+    ripeness = appearance.get("ripeness") or {}
+    cast = occlusion.get("cast_shadow") or {}
+    exposure = appearance.get("exposure_jitter") or {}
+    flip = (recipe.get("augmentation") or {}).get("horizontal_flip", 0)
+    if isinstance(flip, bool):
+        flip = 0.5 if flip else 0.0
+
+    def spread(key):
+        span = grading.get(f"{key}_jitter")
+        return (float(span[1]) - 1.0) * 100 if span else 0
+
+    exposure_range = exposure.get("range")
+    valores = {
+        "fruit_min": objects.get("min"),
+        "fruit_max": objects.get("max"),
+        "min_scale": _maybe(objects.get("min_scale"), 100),
+        "max_scale": _maybe(objects.get("max_scale"), 100),
+        "z_offset": placement.get("z_offset"),
+        "min_visibility": _maybe(placement.get("min_visibility"), 100),
+        "min_visible_pixels": placement.get("min_visible_pixels"),
+        "green_fraction": _maybe(ripeness.get("fraction_affected"), 100),
+        "ripeness_strength": _maybe(
+            (ripeness.get("strength_range") or [None, None])[1], 100
+        ),
+        "light_match": _maybe((appearance.get("hsv_cast") or {}).get("value_power"), 100),
+        "exposure_spread": (
+            (1.0 - float(exposure_range[0])) / 0.6 * 100 if exposure_range else 0
+        ),
+        "contact_shadow": _maybe(
+            (occlusion.get("contact_shadow") or {}).get("strength"), 100
+        ),
+        "mirror_probability": float(flip) * 100,
+        "light_angle": cast.get("light_angle_degrees"),
+        "light_spread": cast.get("light_angle_jitter_degrees"),
+        "sharpness": grading.get("sharpen_percent"),
+        "sharpness_spread": spread("sharpen_percent"),
+        "brightness_spread": spread("brightness"),
+        "contrast_spread": spread("contrast"),
+        "saturation_spread": spread("saturation"),
+        "background_brightness": _maybe(grading.get("brightness"), 100),
+        "background_contrast": _maybe(grading.get("contrast"), 100),
+        "background_saturation": _maybe(grading.get("saturation"), 100),
+    }
+    limites = {row[0]: (row[3], row[4], row[5]) for row in CONTROLS}
+    saida = {}
+    for chave, valor in valores.items():
+        if valor is None or chave not in limites:
+            continue
+        low, high, step = limites[chave]
+        numero = float(valor)
+        if float(step).is_integer():
+            numero = round(numero)
+        else:
+            numero = round(numero, 1)
+        saida[chave] = min(max(numero, low), high)
+    return saida
+
+
+def _maybe(value, factor):
+    return None if value is None else float(value) * factor
+
+
 def picture(image: Image.Image, max_side: int = 720, quality: int = 82) -> str:
     # A prévia mostra 16 cenas numa grade; 960 px a qualidade 90 gerava dezenas
     # de MB de base64 por atualização, que o navegador ainda precisa decodificar.
@@ -838,7 +915,7 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
 
         def do_POST(self):
             nonlocal studio
-            if self.path not in {"/api/preview", "/api/generate", "/api/assets"}:
+            if self.path not in {"/api/preview", "/api/generate", "/api/assets", "/api/import"}:
                 return self.send(404, b"Not found", "text/plain")
             if self.headers.get("Sec-Fetch-Site") == "cross-site":
                 return self.send(403, b"Forbidden", "text/plain")
@@ -848,11 +925,26 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                 ):
                     raise ValueError("Use application/json")
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 16384:
+                if not 0 < length <= 262144:
                     raise ValueError("Requisição inválida")
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
                     raise ValueError("Requisição deve ser um objeto")
+                if self.path == "/api/import":
+                    texto = body.get("recipe")
+                    if not isinstance(texto, str) or not texto.strip():
+                        raise ValueError("Envie o conteúdo do YAML da receita")
+                    receita = yaml.safe_load(texto)
+                    valores = controls_from_recipe(receita)
+                    semente = receita.get("seed") if isinstance(receita, dict) else None
+                    if not (isinstance(semente, int) and not isinstance(semente, bool)
+                            and 0 <= semente <= 2**31 - 1):
+                        semente = None
+                    return self.send(
+                        200,
+                        json.dumps({"controls": valores, "seed": semente}).encode(),
+                        "application/json",
+                    )
                 if self.path == "/api/assets":
                     with installation_lock:
                         if studio is None:

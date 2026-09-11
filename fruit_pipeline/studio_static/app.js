@@ -326,6 +326,26 @@ function download(name, text, type) {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+$("#import").onclick = () => $("#import-file").click();
+$("#import-file").onchange = async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = "";
+  try {
+    status("Lendo receita…");
+    const { controls: valores, seed } = await api("/api/import", {
+      recipe: await file.text(),
+    });
+    // Só os controles reconhecidos mudam: uma receita com constantes fora da
+    // interface mantém o restante como está, em vez de voltar ao padrão.
+    controls = { ...controls, ...valores };
+    if (seed !== null && seed !== undefined) $("#seed").value = seed;
+    buildControls();
+    schedule();
+  } catch (error) {
+    status(error.message, true);
+  }
+};
 $("#export").onclick = () => {
   if (current)
     download("studio_candidate.yaml", current.yaml, "application/yaml");
