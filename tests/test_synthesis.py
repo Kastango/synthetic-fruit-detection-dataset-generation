@@ -1005,13 +1005,61 @@ def test_parallel_generation_matches_single_worker(
         assert (single / relative).read_bytes() == (parallel / relative).read_bytes()
 
 
+def _instancia(x, y, z, lado, canvas_lado):
+    """Instância mínima, com as chaves que a composição usa."""
+    import numpy as np
+    from PIL import Image
+
+    mask = np.full((lado, lado), 255, dtype=np.uint8)
+    imagem = Image.new("RGBA", (lado, lado), (200, 120, 40, 255))
+    return {
+        "x": x,
+        "y": y,
+        "z": z,
+        "image": imagem,
+        "visible_mask": mask.copy(),
+        "insert_mask": mask.copy(),
+        "amodal_mask": mask.copy(),
+    }
+
+
+def test_enforce_labels_devolve_apenas_instancias_publicaveis(tmp_path):
+    """A verificação tem de valer sobre a cena composta, não sobre a anterior.
+
+    Duas frutas quase sobrepostas: a que entra depois está mais ao fundo. Na
+    ordem de inserção ela cobre a outra e ambas parecem válidas; na ordem de
+    profundidade ela é coberta e não sobra fruta visível suficiente. Se a
+    verificação rodar antes de recompor, ela é entregue sem poder render
+    rótulo — que é a garantia que este teste protege.
+    """
+    from PIL import Image
+    from fruit_pipeline.synthesis import _enforce_labels, _publishable
+
+    lado, canvas_lado = 20, 64
+    perto = _instancia(10, 10, z=200.0, lado=lado, canvas_lado=canvas_lado)
+    longe = _instancia(12, 12, z=40.0, lado=lado, canvas_lado=canvas_lado)
+    instancias = [perto, longe]
+    config = {
+        "placement": {"min_visibility": 0.25, "min_visible_pixels": 120},
+        "annotation": {"mode": "visible", "min_box_pixels": 2},
+    }
+    base = Image.new("RGB", (canvas_lado, canvas_lado), (20, 60, 30))
+    _, mantidas, _ = _enforce_labels(
+        base.copy(), base, instancias, config, (canvas_lado, canvas_lado)
+    )
+    assert mantidas, "a composição não pode descartar tudo"
+    for instancia in mantidas:
+        assert _publishable(instancia, config, (canvas_lado, canvas_lado))
+
+
 def test_every_composed_fruit_yields_a_label(tmp_path):
     """Nenhuma fruta desenhada pode ficar sem rótulo, e nenhum rótulo pode
     ficar abaixo dos pisos que a receita declara.
 
-    A garantia já esteve quebrada por uma definição duplicada de função que
-    sobrescrevia a verificação sem quebrar teste nenhum: os manifestos
-    mostravam mais frutas inseridas do que caixas escritas.
+    A cena precisa ser densa: a garantia quebrou quando a verificação rodava
+    antes da recomposição em ordem de profundidade, e essa diferença só
+    aparece quando há sobreposição suficiente entre frutas para que a ordem
+    mude quem oclui quem. Com poucas frutas o defeito passa despercebido.
     """
     import json
 
@@ -1019,16 +1067,25 @@ def test_every_composed_fruit_yields_a_label(tmp_path):
     build_assets(assets)
     config = tiny_config()
     config["sampling"] = {"mode": "paired-v1"}
-    config["objects"].update(min=6, max=10)
-    config["placement"]["min_visible_pixels"] = 40
+    config["canvas"] = [96, 96]
+    config["objects"].update(min=28, max=34, min_scale=0.18, max_scale=0.34)
+    config["placement"].update(
+        min_visibility=0.25, min_visible_pixels=25, max_attempts_per_object=40
+    )
+    config["images"]["total"] = 6
     output = tmp_path / "pool"
-    generate_dataset(assets, output, config, train_ratio=0.75, split_seed=42, workers=1)
+    generate_dataset(assets, output, config, train_ratio=0.5, split_seed=42, workers=1)
 
-    for row in (json.loads(l) for l in (output / "manifest.jsonl").read_text().splitlines()):
+    linhas = (output / "manifest.jsonl").read_text().splitlines()
+    total = 0
+    for row in (json.loads(l) for l in linhas):
         caixas = [
             linha
             for linha in (output / row["label"]).read_text().splitlines()
             if linha.strip()
         ]
+        total += len(caixas)
         assert row["inserted_objects"] == len(caixas), row["generation_id"]
         assert row["annotations"] == len(caixas), row["generation_id"]
+    # sem sobreposição não haveria o que testar
+    assert total >= 40, f"cenas rasas demais para exercitar a garantia: {total}"
