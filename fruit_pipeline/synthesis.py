@@ -1173,6 +1173,102 @@ def _publishable(
     )
 
 
+def _compose_by_depth(
+    base_canvas: Image.Image, instances: list[dict]
+) -> Image.Image:
+    """Compõe do fundo para a frente, recalculando a oclusão entre frutas."""
+    canvas = base_canvas.copy()
+    for instance in instances:
+        instance["visible_mask"] = instance["insert_mask"].copy()
+    kept = []
+    for instance in sorted(instances, key=lambda i: i["z"]):
+        # Indo do mais distante ao mais próximo, a fruta que chega está sempre
+        # à frente das já compostas, então cobri-las é o comportamento certo.
+        _occlude_prior_instances(kept, instance)
+        canvas.paste(
+            instance["image"], (instance["x"], instance["y"]), instance["image"]
+        )
+        kept.append(instance)
+    return canvas
+
+
+def _enforce_labels(
+    canvas: Image.Image,
+    base_canvas: Image.Image,
+    instances: list[dict],
+    config: dict,
+    canvas_size: tuple[int, int],
+) -> tuple[Image.Image, list[dict], int]:
+    """Entrega a cena composta por profundidade, só com rótulos verificáveis.
+
+    A cena é sempre recomposta: durante a colocação cada fruta nova cobria
+    todas as anteriores, independentemente da profundidade, e quase metade
+    das sobreposições entre frutas saía invertida.
+
+    A verificação precisa rodar sobre as máscaras da composição final, não
+    sobre as da colocação. Sob a ordem de profundidade as relações de oclusão
+    mudam — uma fruta distante que antes cobria as outras passa a ser coberta
+    —, então aprovar com uma máscara e entregar outra deixaria passar
+    exatamente o rótulo que este predicado existe para barrar.
+
+    Remover uma fruta só aumenta a visibilidade das demais, porque quem sai é
+    oclusor; o laço converge em poucas voltas e tem teto por segurança.
+    """
+    remaining = list(instances)
+    for _ in range(8):
+        canvas = _compose_by_depth(base_canvas, remaining)
+        survivors = [i for i in remaining if _publishable(i, config, canvas_size)]
+        if len(survivors) == len(remaining):
+            break
+        remaining = survivors
+    else:
+        canvas = _compose_by_depth(base_canvas, remaining)
+    ordem = {id(i): n for n, i in enumerate(instances)}
+    remaining.sort(key=lambda i: ordem[id(i)])
+    return canvas, remaining, len(instances) - len(remaining)
+
+
+def _publishable(
+    instance: dict, config: dict, canvas_size: tuple[int, int]
+) -> bool:
+    """Critério único: esta instância rende um rótulo verificável?
+
+    Um rótulo só faz sentido se apontar para fruta que uma pessoa
+    conseguiria identificar na imagem composta. Antes, os critérios estavam
+    espalhados — a fração de visibilidade era checada na inserção, o tamanho
+    da caixa depois da colagem — e nenhum deles valia sobre a cena final,
+    porque cada fruta nova oclui as anteriores. O resultado eram rótulos
+    apontando para folhagem e frutas desenhadas sem anotação.
+
+    Os quatro testes se complementam e nenhum substitui o outro:
+
+    - `min_visibility` limita quanto da fruta some atrás de outra coisa;
+    - `min_visible_pixels` limita o tamanho absoluto do que sobrou, porque
+      60% de uma fruta minúscula continua não sendo reconhecível — medimos
+      correlação de apenas 0,41 entre os dois;
+    - `min_box_pixels` recusa a caixa degenerada;
+    - `min_box_fill` recusa a caixa que é quase toda fundo.
+    """
+    placement = config["placement"]
+    annotation = config["annotation"]
+    amodal = int((instance["amodal_mask"] > 8).sum())
+    visible = int((instance["visible_mask"] > 8).sum())
+    if amodal and visible / amodal < float(placement["min_visibility"]):
+        return False
+    if visible < int(placement.get("min_visible_pixels", 0)):
+        return False
+    return (
+        _label_for(
+            instance,
+            annotation["mode"],
+            canvas_size,
+            int(annotation["min_box_pixels"]),
+            float(annotation.get("min_box_fill", 0.0)),
+        )
+        is not None
+    )
+
+
 def _enforce_labels(
     canvas: Image.Image,
     base_canvas: Image.Image,

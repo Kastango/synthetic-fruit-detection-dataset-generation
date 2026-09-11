@@ -91,6 +91,16 @@ CONTROLS = [
         "Valores negativos colocam a fruta atrás da folhagem.",
     ),
     (
+        "min_visible_pixels",
+        "Geometria",
+        "Fruta visível mínima (px)",
+        0,
+        400,
+        10,
+        100,
+        "Piso absoluto de pixels de fruta. Sem ele, sobram caixas onde não há fruta visível.",
+    ),
+    (
         "min_visibility",
         "Geometria",
         "Visibilidade mínima (%)",
@@ -320,7 +330,9 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
         min_scale=values["min_scale"] / 100, max_scale=values["max_scale"] / 100
     )
     c["placement"].update(
-        z_offset=values["z_offset"], min_visibility=values["min_visibility"] / 100
+        z_offset=values["z_offset"],
+        min_visibility=values["min_visibility"] / 100,
+        min_visible_pixels=int(values["min_visible_pixels"]),
     )
     ripeness = c["appearance"]["ripeness"]
     ripeness["fraction_affected"] = values["green_fraction"] / 100

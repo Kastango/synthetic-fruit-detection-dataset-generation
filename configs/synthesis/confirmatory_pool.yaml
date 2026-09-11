@@ -24,6 +24,12 @@ objects:
 placement:
   min_depth: 20
   min_visibility: 0.15
+  # Piso absoluto de fruta visível. A fração sozinha não basta: ela
+  # correlaciona apenas 0,41 com a quantidade de fruta que sobrou, então
+  # deixava passar caixas de 20 px² em que não há fruta visível alguma —
+  # restos de fruta escondida atrás de outra. Cem pixels é o ponto em que
+  # a fruta volta a ser reconhecível na inspeção visual.
+  min_visible_pixels: 100
   max_attempts_per_object: 100
   z_patch_fraction: 0.2
   z_offset: -5
