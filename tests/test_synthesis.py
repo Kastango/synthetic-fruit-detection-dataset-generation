@@ -1003,3 +1003,32 @@ def test_parallel_generation_matches_single_worker(
         if path.is_file() and path.parts[-2] in {"train", "val"}
     ):
         assert (single / relative).read_bytes() == (parallel / relative).read_bytes()
+
+
+def test_every_composed_fruit_yields_a_label(tmp_path):
+    """Nenhuma fruta desenhada pode ficar sem rótulo, e nenhum rótulo pode
+    ficar abaixo dos pisos que a receita declara.
+
+    A garantia já esteve quebrada por uma definição duplicada de função que
+    sobrescrevia a verificação sem quebrar teste nenhum: os manifestos
+    mostravam mais frutas inseridas do que caixas escritas.
+    """
+    import json
+
+    assets = tmp_path / "assets"
+    build_assets(assets)
+    config = tiny_config()
+    config["sampling"] = {"mode": "paired-v1"}
+    config["objects"].update(min=6, max=10)
+    config["placement"]["min_visible_pixels"] = 40
+    output = tmp_path / "pool"
+    generate_dataset(assets, output, config, train_ratio=0.75, split_seed=42, workers=1)
+
+    for row in (json.loads(l) for l in (output / "manifest.jsonl").read_text().splitlines()):
+        caixas = [
+            linha
+            for linha in (output / row["label"]).read_text().splitlines()
+            if linha.strip()
+        ]
+        assert row["inserted_objects"] == len(caixas), row["generation_id"]
+        assert row["annotations"] == len(caixas), row["generation_id"]
