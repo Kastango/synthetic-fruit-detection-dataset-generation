@@ -71,33 +71,24 @@ outra coleta reservada.
 
 ## Resultados e limites da interpretação
 
-No CitDet, as maiores médias de mAP@0.5:0.95 entre os volumes sintéticos foram
-0,228 para YOLOv8s, 0,243 para YOLO26s e 0,217 para RT-DETR-L. As referências
-`manual-full` correspondentes foram 0,215, 0,241 e 0,147. O treino
-exclusivamente sintético igualou ou superou o treino com fotos reais anotadas
-à mão nos três detectores, com margem de 0,013 no YOLOv8s e 0,069 no
-RT-DETR-L; no YOLO26s a diferença de 0,002 é compatível com empate.
+**A grade está sendo regerada.** O gerador passou a exigir que toda fruta
+composta renda um rótulo que uma pessoa consiga verificar na imagem: nenhuma
+fruta é desenhada sem anotação, e nenhum rótulo fica abaixo dos pisos que a
+receita declara. A verificação vale sobre a cena final, depois de todas as
+oclusões, e não apenas no momento da inserção.
 
-Esses máximos foram identificados após comparar cinco volumes no próprio
-CitDet; não equivalem a uma escolha prévia de condição nem demonstram
-superioridade estatística. Na validação local a ordem se inverte e
-`manual-full` lidera nos três detectores, com 0,511, 0,511 e 0,388 contra
-0,397, 0,388 e 0,346 do melhor sintético. A afirmação sustentada pelos dados
-é sobre transferência para coleta externa, não sobre superioridade geral.
+Isso muda os conjuntos sintéticos, então os números anteriores descreviam um
+gerador que não existe mais e foram retirados em vez de mantidos com ressalva.
+Os detalhes do protocolo e dos conjuntos de avaliação seguem em
+[docs/RESULTS.md](docs/RESULTS.md).
 
-![Médias de mAP em função do volume sintético no CitDet e na validação manual](docs/figures/results/synthetic-volume-vs-map.svg)
-
-*Figura 2. Médias das duas sementes de treinamento. Linhas tracejadas indicam
-`manual-full` para o mesmo detector. O eixo começa em zero, e `controlled`
-aparece como referência pontilhada. A validação manual à direita foi usada
-na seleção dos checkpoints de `manual-full`; não é um segundo teste externo.*
 
 - O gerador foi calibrado com estatísticas de caixas e aparência dos conjuntos
   avaliados. O CitDet permanece externo à coleta, mas não é um teste intocado
   pelo desenvolvimento. Uma confirmação exige um novo conjunto reservado.
 - `manual_full_val` reutiliza 26 imagens de validação de `manual-full`. Isso
-  favorece a avaliação dessa condição por seleção de checkpoint; a magnitude
-  do viés não foi estimada.
+  favorece a avaliação dessa condição por seleção de checkpoint; o viés foi
+  medido em +0,0039 de mAP@.50:.95, contra +0,0004 nas condições sintéticas.
 - O split sintético separa cenas, permitindo compartilhar fundos e recortes.
   A validação mede novas composições de ativos conhecidos.
 - Há duas sementes de treinamento e um único pool sintético. As médias não

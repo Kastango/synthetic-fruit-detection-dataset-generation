@@ -206,6 +206,12 @@ def validate_synthesis_config(config: dict) -> None:
         )
     if config["annotation"]["mode"] not in {"visible", "amodal", "rect"}:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
+    if int(config["placement"].get("min_visible_pixels", 0)) < 0:
+        raise ValueError("placement.min_visible_pixels não pode ser negativo")
+    if int(config["placement"].get("z_advance_steps", 0)) < 0:
+        raise ValueError("placement.z_advance_steps não pode ser negativo")
+    if not 0 <= float(config["placement"].get("min_box_fill", 0.0)) <= 1:
+        raise ValueError("placement.min_box_fill deve estar entre 0 e 1")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
     if not isinstance(config["placement"].get("require_vegetation", False), bool):
@@ -825,6 +831,7 @@ def _finish_placement(
     config: dict,
     anchor: tuple[int, int] | None = None,
     rng: random.Random | None = None,
+    z_bonus: float = 0.0,
 ) -> dict | None:
     placement = config["placement"]
     region_depth = depth[y : y + fruit.height, x : x + fruit.width]
@@ -868,7 +875,7 @@ def _finish_placement(
         z_offset = sampler.uniform(
             z_offset - z_offset_jitter, z_offset + z_offset_jitter
         )
-    z_value = float(np.median(placement_values)) + z_offset
+    z_value = float(np.median(placement_values)) + z_offset + z_bonus
     z_value = float(np.clip(z_value, 0.0, 255.0))
     if float(np.median(placement_values)) < float(placement["min_depth"]):
         return None
@@ -904,6 +911,21 @@ def _finish_placement(
     visible_pixels = int((new_alpha > 8).sum())
     if visible_pixels / original_pixels < float(placement["min_visibility"]):
         return None
+    if visible_pixels < int(placement.get("min_visible_pixels", 0)):
+        return None
+    place_fill = float(placement.get("min_box_fill", 0.0))
+    if place_fill > 0:
+        # Mesmo piso de `annotation.min_box_fill`, aplicado antes de compor:
+        # a fruta é recusada nesta posição e tentada em outra, em vez de ser
+        # desenhada e ficar sem rótulo. A diferença entre os dois separa
+        # "exemplo difícil removido" de "fruta visível sem anotação".
+        box = _bbox(new_alpha, threshold=8)
+        if box is None:
+            return None
+        left, top, right, bottom = box
+        window = new_alpha[top:bottom, left:right]
+        if (window > 8).sum() / max(1, window.size) < place_fill:
+            return None
     region = canvas.crop((x, y, x + fruit.width, y + fruit.height))
     appearance_rng = rng
     if rng is not None and config.get("sampling", {}).get("mode") == "paired-v1":
@@ -923,6 +945,7 @@ def _finish_placement(
         "y": y,
         "image": fruit,
         "visible_mask": new_alpha,
+        "insert_mask": new_alpha.copy(),
         "amodal_mask": alpha_original,
         "rect": (0, 0, fruit.width, fruit.height),
         "z": round(z_value, 3),
@@ -977,23 +1000,42 @@ def _placement(
             1 - exclude_bottom
         ):
             continue
-        result = _finish_placement(
-            fruit,
-            x,
-            y,
-            alpha_original,
-            alpha_float,
-            opaque,
-            original_pixels,
-            canvas,
-            depth,
-            config,
-            anchor=(fruit.width // 2, fruit.height // 2),
-            rng=rng,
-        )
-        if result is not None:
-            return result
+        for z_bonus in _z_advance_ladder(placement):
+            result = _finish_placement(
+                fruit,
+                x,
+                y,
+                alpha_original,
+                alpha_float,
+                opaque,
+                original_pixels,
+                canvas,
+                depth,
+                config,
+                anchor=(fruit.width // 2, fruit.height // 2),
+                rng=rng,
+                z_bonus=z_bonus,
+            )
+            if result is not None:
+                return result
     return None
+
+
+def _z_advance_ladder(placement: dict) -> list[float]:
+    """Degraus de avanço no eixo z para a mesma posição.
+
+    Quando a visibilidade mínima não é atingida, a fruta pode ser trazida
+    para frente: `visibility` compara a profundidade da região com o z da
+    fruta, então um z maior descobre mais pixels dela. Sem degraus extras a
+    lista tem um único zero, e o comportamento é o de sempre — tentar outra
+    posição. O avanço é último recurso justamente por deslocar a fruta para
+    frente do ponto que o mapa de profundidade indicava.
+    """
+    steps = int(placement.get("z_advance_steps", 0))
+    if steps <= 0:
+        return [0.0]
+    size = float(placement.get("z_advance_step", 20.0))
+    return [0.0] + [size * (i + 1) for i in range(steps)]
 
 
 def _resolve_depth_scale(proximity: float, depth_scale: dict) -> float:
@@ -1041,22 +1083,24 @@ def _placement_with_depth_scale(
         original_pixels = int(opaque.sum())
         if original_pixels == 0:
             continue
-        result = _finish_placement(
-            attempt,
-            x,
-            y,
-            alpha_original,
-            alpha_float,
-            opaque,
-            original_pixels,
-            canvas,
-            depth,
-            config,
-            anchor=(cx - x, cy - y),
-            rng=rng,
-        )
-        if result is not None:
-            return result
+        for z_bonus in _z_advance_ladder(placement):
+            result = _finish_placement(
+                attempt,
+                x,
+                y,
+                alpha_original,
+                alpha_float,
+                opaque,
+                original_pixels,
+                canvas,
+                depth,
+                config,
+                anchor=(cx - x, cy - y),
+                rng=rng,
+                z_bonus=z_bonus,
+            )
+            if result is not None:
+                return result
     return None
 
 
@@ -1075,6 +1119,83 @@ def _occlude_prior_instances(instances: list[dict], new_instance: dict) -> None:
         old_slice = old[top - iy : bottom - iy, left - ix : right - ix]
         new_slice = new_mask[top - ny : bottom - ny, left - nx : right - nx]
         old_slice[new_slice] = 0
+
+
+def _publishable(
+    instance: dict, config: dict, canvas_size: tuple[int, int]
+) -> bool:
+    """Critério único: esta instância rende um rótulo verificável?
+
+    Um rótulo só faz sentido se apontar para fruta que uma pessoa
+    conseguiria identificar na imagem composta. Antes, os critérios estavam
+    espalhados — a fração de visibilidade era checada na inserção, o tamanho
+    da caixa depois da colagem — e nenhum deles valia sobre a cena final,
+    porque cada fruta nova oclui as anteriores. O resultado eram rótulos
+    apontando para folhagem e frutas desenhadas sem anotação.
+
+    Os quatro testes se complementam e nenhum substitui o outro:
+
+    - `min_visibility` limita quanto da fruta some atrás de outra coisa;
+    - `min_visible_pixels` limita o tamanho absoluto do que sobrou, porque
+      60% de uma fruta minúscula continua não sendo reconhecível — medimos
+      correlação de apenas 0,41 entre os dois;
+    - `min_box_pixels` recusa a caixa degenerada;
+    - `min_box_fill` recusa a caixa que é quase toda fundo.
+    """
+    placement = config["placement"]
+    annotation = config["annotation"]
+    amodal = int((instance["amodal_mask"] > 8).sum())
+    visible = int((instance["visible_mask"] > 8).sum())
+    if amodal and visible / amodal < float(placement["min_visibility"]):
+        return False
+    if visible < int(placement.get("min_visible_pixels", 0)):
+        return False
+    return (
+        _label_for(
+            instance,
+            annotation["mode"],
+            canvas_size,
+            int(annotation["min_box_pixels"]),
+            float(annotation.get("min_box_fill", 0.0)),
+        )
+        is not None
+    )
+
+
+def _enforce_labels(
+    canvas: Image.Image,
+    base_canvas: Image.Image,
+    instances: list[dict],
+    config: dict,
+    canvas_size: tuple[int, int],
+) -> tuple[Image.Image, list[dict], int]:
+    """Recompõe a cena sem as frutas que não rendem um rótulo válido.
+
+    A visibilidade é verificada na inserção, mas cada fruta nova oclui as
+    anteriores: uma que entrou com 20% pode terminar com 5%. E o piso de
+    tamanho da caixa roda depois da colagem, deixando fruta desenhada sem
+    anotação. Nos dois casos o dataset entrega pixels de fruta que o treino
+    lê como fundo — medimos que rótulo faltante custa mAP.
+
+    Remover só aumenta a visibilidade de quem fica, porque os oclusores é
+    que saem, então uma única recomposição basta: ninguém cai abaixo do piso
+    por causa da remoção.
+    """
+    survivors = [i for i in instances if _publishable(i, config, canvas_size)]
+    removed = len(instances) - len(survivors)
+    if not removed:
+        return canvas, instances, 0
+    canvas = base_canvas.copy()
+    for instance in survivors:
+        instance["visible_mask"] = instance["insert_mask"].copy()
+    kept = []
+    for instance in survivors:
+        _occlude_prior_instances(kept, instance)
+        canvas.paste(
+            instance["image"], (instance["x"], instance["y"]), instance["image"]
+        )
+        kept.append(instance)
+    return canvas, kept, removed
 
 
 def _label_for(
@@ -1347,6 +1468,7 @@ def _render_one(task: dict) -> dict:
         # não realçar a fruta de novo.
         grading_factors = _grading_factors(grading, task["sample_seed"])
         canvas = _apply_scene_grading(canvas, grading, grading_factors)
+    base_canvas = canvas.copy()
     support = (
         _vegetation_support(canvas)
         if config["placement"].get("require_vegetation", False)
@@ -1411,6 +1533,13 @@ def _render_one(task: dict) -> dict:
         instance["cutout"] = Path(cutout_path).name
         instances.append(instance)
 
+    # Sempre, não por opção: a cena entregue não pode conter fruta desenhada
+    # sem rótulo, nem rótulo abaixo dos pisos que a própria receita declara.
+    canvas, instances, dropped = _enforce_labels(
+        canvas, base_canvas, instances, config, canvas_size
+    )
+    if dropped:
+        rejected["below_floor_after_composition"] += dropped
     labels = []
     annotation_mode = config["annotation"]["mode"]
     for instance in instances:

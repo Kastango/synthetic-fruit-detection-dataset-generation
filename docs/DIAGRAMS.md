@@ -139,11 +139,9 @@ os arquivos. A licença do código não substitui os termos desses recursos.
 .venv/bin/python scripts/plot_confirmatory_results.py
 ```
 
-Esse comando usa [`results-summary.json`](results-summary.json), que preserva
-as médias arredondadas publicadas, e não exige checkpoints. Para usar os JSONs
-originais, passe `--results-dir artifacts/confirmatory`. O comando gera quatro SVGs
-e tabelas intermediárias, mas não reescreve a interpretação em `RESULTS.md`.
-O snapshot não contém valores por semente; não derive barras de erro dele.
+Esse comando lê os JSONs por execução em `artifacts/confirmatory`, gerados pela
+avaliação. Gera quatro SVGs e tabelas intermediárias, mas não reescreve a
+interpretação em `RESULTS.md`.
 
 Os exemplos de detecção usam `scripts/render_detection_examples.py`, que
 requer checkpoints e o conjunto escolhido preparado. Use `--dataset`,

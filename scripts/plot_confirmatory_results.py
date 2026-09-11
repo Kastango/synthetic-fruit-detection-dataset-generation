@@ -247,14 +247,13 @@ def main() -> None:
     parser.add_argument(
         "--results-dir",
         type=Path,
-        help="Use original test_results_*.json instead of the published snapshot",
+        help="Diretório com os test_results_*.json (padrão: artifacts/confirmatory)",
     )
     args = parser.parse_args()
-    if args.results_dir:
-        results = {name: load_results(name, args.results_dir) for name in TESTS}
-    else:
-        snapshot = json.loads((ROOT / "docs/results-summary.json").read_text())
-        results = {name: snapshot["tests"][name] for name in TESTS}
+    # Sem snapshot versionado: o gráfico sai dos JSONs por execução, que são
+    # a única fonte que acompanha o gerador vigente.
+    results_dir = args.results_dir or ROOT / "artifacts/confirmatory"
+    results = {name: load_results(name, results_dir) for name in TESTS}
     ARTIFACTS.mkdir(parents=True, exist_ok=True)
     tables = "\n".join(
         markdown_table(name, summary) for name, summary in results.items()
