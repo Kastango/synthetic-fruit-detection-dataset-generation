@@ -1183,19 +1183,27 @@ def _enforce_labels(
     """
     survivors = [i for i in instances if _publishable(i, config, canvas_size)]
     removed = len(instances) - len(survivors)
-    if not removed:
-        return canvas, instances, 0
+    # A cena é sempre recomposta, mesmo sem remoções, porque a ordem de
+    # composição precisa ser a da profundidade e não a de inserção. Durante a
+    # colocação, cada fruta nova cobria todas as anteriores: quase metade das
+    # sobreposições entre frutas saía invertida, com a de trás por cima.
     canvas = base_canvas.copy()
     for instance in survivors:
         instance["visible_mask"] = instance["insert_mask"].copy()
+    ordered = sorted(survivors, key=lambda i: i["z"])
     kept = []
-    for instance in survivors:
+    for instance in ordered:
+        # Indo do fundo para a frente, a fruta que chega está sempre à frente
+        # das já compostas, então cobri-las é o comportamento correto.
         _occlude_prior_instances(kept, instance)
         canvas.paste(
             instance["image"], (instance["x"], instance["y"]), instance["image"]
         )
         kept.append(instance)
-    return canvas, kept, removed
+    # A ordem original é restaurada: o manifesto e os rótulos seguem a ordem
+    # de geração, que é o que torna as cenas comparáveis entre receitas.
+    kept_ids = {id(i) for i in kept}
+    return canvas, [i for i in survivors if id(i) in kept_ids], removed
 
 
 def _label_for(
