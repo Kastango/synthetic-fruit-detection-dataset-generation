@@ -171,6 +171,8 @@ def validate_synthesis_config(config: dict) -> None:
     if width <= 0 or height <= 0:
         raise ValueError("canvas deve ser positivo")
     objects = config["objects"]
+    if objects.get("scale_distribution", "uniform") not in ("uniform", "log-uniform"):
+        raise ValueError("objects.scale_distribution deve ser uniform ou log-uniform")
     if any(isinstance(objects[k], bool) or not isinstance(objects[k], int)
            for k in ("min", "max")):
         raise ValueError("objects.min e objects.max devem ser inteiros")
@@ -430,7 +432,16 @@ def _scale_cutout(
     # A escala é sempre relativa ao canvas: o tamanho aparente da fruta na
     # imagem é o que precisa casar com a distribuição real de caixas, e ele não
     # depende da resolução do recorte-fonte.
-    fraction = rng.uniform(float(config["min_scale"]), float(config["max_scale"]))
+    lo, hi = float(config["min_scale"]), float(config["max_scale"])
+    if config.get("scale_distribution", "uniform") == "log-uniform" and lo > 0:
+        # A distribuição real de tamanhos é assimétrica: no `manual-full` a
+        # mediana (0,0365 da largura) fica muito mais perto do p5 (0,0201) que
+        # do p95 (0,0893). Um sorteio uniforme põe a mediana no meio da faixa
+        # e produz fruta grande demais no centro da distribuição; em escala
+        # logarítmica a assimetria aparece naturalmente.
+        fraction = math.exp(rng.uniform(math.log(lo), math.log(hi)))
+    else:
+        fraction = rng.uniform(lo, hi)
     scale = fraction * min(canvas) / max(image.size)
     size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
     return image.resize(size, Image.Resampling.LANCZOS)

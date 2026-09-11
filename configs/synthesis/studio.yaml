@@ -8,8 +8,14 @@ canvas:
 objects:
   min: 10
   max: 100
-  min_scale: 0.01
-  max_scale: 0.065
+  min_scale: 0.018
+  max_scale: 0.1
+  # Calibrado contra a distribuição de caixas do `manual-full`: lado maior
+  # com p5 0,0201, mediana 0,0365 e p95 0,0893 da largura da imagem. O
+  # sorteio é log-uniforme porque a distribuição real é assimétrica — a
+  # mediana fica muito mais perto do p5 que do p95, e um sorteio uniforme
+  # produziria fruta grande demais no centro da distribuição.
+  scale_distribution: log-uniform
   rotation_degrees: 180
 placement:
   min_depth: 20
