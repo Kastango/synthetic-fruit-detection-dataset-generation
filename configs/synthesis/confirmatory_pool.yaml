@@ -34,7 +34,9 @@ placement:
   z_patch_fraction: 0.2
   z_offset: -5
   z_offset_jitter: 30
-  exclude_bottom_fraction: 0.15
+  # Sem trava na faixa inferior: o CitDet anota muita fruta caída, e
+  # proibir a base da imagem impedia o gerador de produzir essa categoria.
+  exclude_bottom_fraction: 0.0
 appearance:
   ripeness:
     enabled: true
@@ -45,6 +47,20 @@ appearance:
     - 0.75
     saturation_scale: 0.8
     gloss_reduction: 0.4
+  rot:
+    # Fruta caída e apodrecida, que domina o gabarito do CitDet e que o
+    # gerador não produzia: matiz para o marrom, dessaturada e mais escura.
+    # Um fruto tem um estado só, então quem entra aqui não entra em ripeness.
+    enabled: true
+    fraction_affected: 0.12
+    green_hue_degrees: 25
+    strength_range:
+    - 0.0
+    - 0.9
+    saturation_scale: 0.55
+    value_scale: 0.6
+    gloss_reduction: 0.8
+    scale_with_strength: true
   exposure_jitter:
     enabled: true
     probability: 0.8
@@ -58,6 +74,12 @@ appearance:
     saturation_power: 0.18
     value_power: 0.45
     value_power_jitter: 0.3
+    # Nem toda fruta adota a cor do ambiente na mesma medida: com o
+    # valor fixo, fruta sob copa escura sempre saía escura, e nas fotos
+    # reais há laranja nítida dentro de folhagem densa.
+    strength_range:
+    - 0.35
+    - 1.0
     min_value_ratio: 0.15
     bright_flatten_strength: 0.7
 occlusion:

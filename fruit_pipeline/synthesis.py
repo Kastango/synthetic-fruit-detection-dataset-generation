@@ -251,6 +251,17 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError(
                 "appearance.hsv_cast.bright_flatten_strength deve estar entre 0 e 1"
             )
+    span = (appearance.get("hsv_cast") or {}).get("strength_range")
+    if span is not None and not (
+        len(span) == 2 and 0 <= float(span[0]) <= float(span[1])
+    ):
+        raise ValueError(
+            "appearance.hsv_cast.strength_range deve ser [min, max] não negativo"
+        )
+    for chave in ("ripeness", "rot"):
+        estado = appearance.get(chave)
+        if estado and not 0 <= float(estado.get("value_scale", 1.0)) <= 2:
+            raise ValueError(f"appearance.{chave}.value_scale deve estar entre 0 e 2")
     ripeness = appearance.get("ripeness")
     if ripeness and ripeness.get("enabled", False):
         if not 0 <= float(ripeness.get("fraction_affected", 0.0)) <= 1:
@@ -484,9 +495,20 @@ def _apply_appearance_hsv_cast(
     h_array = np.asarray(fruit_h, dtype=np.float32)
     s_array = np.asarray(fruit_s, dtype=np.float32)
     v_array = np.asarray(fruit_v, dtype=np.float32)
-    hue_power = min(max(float(hsv_cast["hue_power"]), 0.0), 1.0)
-    saturation_power = min(max(float(hsv_cast["saturation_power"]), 0.0), 1.0)
-    value_power = float(hsv_cast["value_power"])
+    # Quanto desta fruta adota a cor do ambiente. Fixo, toda fruta sob copa
+    # escura sai escura; nas fotos reais há fruta laranja mesmo em folhagem
+    # densa, porque ela pega um facho de luz ou está à frente da sombra. Um
+    # multiplicador por instância deixa parte das frutas quase intocada.
+    influence = 1.0
+    span = hsv_cast.get("strength_range")
+    if span:
+        sampler = rng or random.Random()
+        influence = sampler.uniform(float(span[0]), float(span[1]))
+    hue_power = min(max(float(hsv_cast["hue_power"]) * influence, 0.0), 1.0)
+    saturation_power = min(
+        max(float(hsv_cast["saturation_power"]) * influence, 0.0), 1.0
+    )
+    value_power = float(hsv_cast["value_power"]) * influence
     value_power_jitter = float(hsv_cast.get("value_power_jitter", 0.0))
     if value_power_jitter > 0:
         # Um value_power fixo dá a mesma resposta de luz/sombra pra toda
@@ -582,10 +604,13 @@ def _apply_ripeness_shift(
     # o matiz/saturação pra ler como "plástico" em vez de fruta. Achata só
     # os pixels acima do percentil 75 de V do próprio recorte (o highlight),
     # não a fruta inteira, senão ela escurece de forma plana e artificial.
+    value_scale = float(ripeness.get("value_scale", 1.0))
+    if scale_with_strength:
+        value_scale = 1.0 + (value_scale - 1.0) * strength
     gloss_reduction = float(ripeness.get("gloss_reduction", 0.0))
     if scale_with_strength:
         gloss_reduction *= strength
-    v_array = np.asarray(v, dtype=np.float32)
+    v_array = np.asarray(v, dtype=np.float32) * value_scale
     if gloss_reduction > 0:
         alpha_array = np.asarray(alpha, dtype=np.float32)
         opaque = alpha_array > 8
@@ -655,9 +680,15 @@ def _apply_appearance(
     appearance: dict,
     rng: random.Random | None = None,
 ) -> Image.Image:
-    ripeness = appearance.get("ripeness")
-    if ripeness and ripeness.get("enabled", False) and rng is not None:
-        fruit = _apply_ripeness_shift(fruit, ripeness, rng)
+    # Um fruto tem um estado só. Sortear os dois de forma independente
+    # produziria fruta verde e podre ao mesmo tempo, que não existe no pomar.
+    for chave in ("ripeness", "rot"):
+        estado = appearance.get(chave)
+        if estado and estado.get("enabled", False) and rng is not None:
+            antes = fruit
+            fruit = _apply_ripeness_shift(fruit, estado, rng)
+            if fruit is not antes:
+                break
     fruit = _apply_appearance_hsv_cast(
         fruit, background_region, appearance["hsv_cast"], rng
     )
