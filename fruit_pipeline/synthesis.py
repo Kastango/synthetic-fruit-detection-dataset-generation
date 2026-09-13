@@ -195,6 +195,9 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("scale_with_count requer objects.max positivo")
     if not 0 < float(objects["min_scale"]) <= float(objects["max_scale"]):
         raise ValueError("intervalo de escala inválido")
+    scene_scale = objects.get("scene_scale")
+    if scene_scale and float(scene_scale.get("spread", 0)) < 1:
+        raise ValueError("objects.scene_scale.spread deve ser >= 1")
     depth_scale = objects.get("depth_scale")
     if (
         depth_scale
@@ -292,6 +295,10 @@ def validate_synthesis_config(config: dict) -> None:
         if not 0 < float(low) <= float(high):
             raise ValueError(
                 "appearance.exposure_jitter.range deve ser crescente e positivo"
+            )
+        if exposure.get("distribution", "uniform") not in ("uniform", "log-uniform"):
+            raise ValueError(
+                "appearance.exposure_jitter.distribution deve ser uniform ou log-uniform"
             )
         if not 0 <= float(exposure.get("saturation_pull", 0.0)) <= 1:
             raise ValueError(
@@ -437,6 +444,23 @@ def _count_adjusted_scale(objects: dict, requested: int) -> dict:
     }
 
 
+def _scene_scale_center(objects: dict, seed) -> float | None:
+    """Sorteia a distância da câmera desta cena, ou None se não houver.
+
+    Numa foto real todas as frutas estão à mesma distância: dentro da cena o
+    tamanho varia pouco (p90/p10 ≈ 1,9x no `manual-full`) e entre cenas varia
+    muito (2,6x entre as medianas). Sortear a escala fruta a fruta inverte
+    isso — produz cenas todas do mesmo tamanho médio e, dentro de cada uma,
+    uma sopa de tamanhos que nenhuma câmera enquadraria.
+    """
+    spread = float((objects.get("scene_scale") or {}).get("spread", 0) or 0)
+    if spread <= 1:
+        return None
+    sorteio = random.Random(int(stable_hash([seed, "scene_scale"], 16), 16))
+    lo, hi = float(objects["min_scale"]), float(objects["max_scale"])
+    return math.exp(sorteio.uniform(math.log(lo), math.log(hi)))
+
+
 def _scale_cutout(
     image: Image.Image, config: dict, rng: random.Random, canvas: tuple[int, int]
 ) -> Image.Image:
@@ -444,7 +468,14 @@ def _scale_cutout(
     # imagem é o que precisa casar com a distribuição real de caixas, e ele não
     # depende da resolução do recorte-fonte.
     lo, hi = float(config["min_scale"]), float(config["max_scale"])
-    if config.get("scale_distribution", "uniform") == "log-uniform" and lo > 0:
+    centro = config.get("scene_scale_center")
+    if centro:
+        # Com a distância da cena já sorteada, min_scale e max_scale passam a
+        # delimitar o centro; aqui só resta a variação real de calibre entre
+        # frutas da mesma árvore.
+        meia = math.log(float(config["scene_scale"]["spread"])) / 2
+        fraction = centro * math.exp(rng.uniform(-meia, meia))
+    elif config.get("scale_distribution", "uniform") == "log-uniform" and lo > 0:
         # A distribuição real de tamanhos é assimétrica: no `manual-full` a
         # mediana (0,0365 da largura) fica muito mais perto do p5 (0,0201) que
         # do p95 (0,0893). Um sorteio uniforme põe a mediana no meio da faixa
@@ -644,7 +675,16 @@ def _apply_exposure_jitter(
     if rng.random() > float(exposure.get("probability", 0.0)):
         return fruit
     low, high = exposure.get("range", [1.0, 1.0])
-    factor = rng.uniform(float(low), float(high))
+    if exposure.get("distribution", "uniform") == "log-uniform" and float(low) > 0:
+        # A luz que chega a uma fruta dentro da copa é o produto das
+        # transmitâncias das folhas que atravessou, não uma soma: a
+        # distribuição natural é logarítmica, com massa na sombra e uma cauda
+        # de sol direto. Sorteio uniforme põe a mediana no meio da faixa e
+        # produz sombra profunda de menos — 9% das frutas contra 18% no CitDet
+        # e 32% no manual-full, que é justamente onde o detector mais erra.
+        factor = math.exp(rng.uniform(math.log(float(low)), math.log(float(high))))
+    else:
+        factor = rng.uniform(float(low), float(high))
     alpha = fruit.getchannel("A")
     h, s, v = fruit.convert("RGB").convert("HSV").split()
     v_array = np.asarray(v, dtype=np.float32) * factor
@@ -1555,6 +1595,9 @@ def _render_one(task: dict) -> dict:
     instances = []
     rejected = Counter()
     scale_config = _count_adjusted_scale(config["objects"], requested)
+    centro_da_cena = _scene_scale_center(scale_config, task["sample_seed"])
+    if centro_da_cena:
+        scale_config = {**scale_config, "scene_scale_center": centro_da_cena}
     for object_index, cutout_path in enumerate(chosen):
         if config.get("sampling", {}).get("mode") == "paired-v1":
             rng = random.Random(int(stable_hash([task["sample_seed"], "object", object_index], 16), 16))

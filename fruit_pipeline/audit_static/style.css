@@ -1,0 +1,176 @@
+:root {
+  --bg: #f6f8f7;
+  --paper: #fff;
+  --ink: #233a33;
+  --muted: #63766c;
+  --line: #d6dfda;
+  --green: #346851;
+  --gt: #00d9ff;
+  --pred: #ffaf38;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 system-ui, sans-serif;
+}
+button,
+textarea {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 22px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+.titulo {
+  font-weight: 700;
+}
+.progresso {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+main {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 18px;
+  padding: 18px 22px;
+  align-items: start;
+}
+figure {
+  margin: 0;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+}
+figure img {
+  max-width: 100%;
+  max-height: calc(100vh - 130px);
+  object-fit: contain;
+}
+
+aside {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 18px;
+}
+.bloco {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.rotulo-bloco {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.nome {
+  font-weight: 700;
+  word-break: break-all;
+}
+.meta {
+  color: var(--muted);
+  font-size: 13px;
+}
+.discordancia {
+  margin-top: 4px;
+}
+
+.marcas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.marcas li {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.marcas li b {
+  display: inline-block;
+  width: 18px;
+  color: var(--muted);
+}
+.marcas li small {
+  display: block;
+  margin-left: 18px;
+  color: var(--muted);
+}
+.marcas li.ativa {
+  border-color: var(--green);
+  background: #eaf2ee;
+}
+.marcas li.ativa b {
+  color: var(--green);
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 7px 9px;
+  resize: vertical;
+}
+
+.navegacao {
+  display: flex;
+  gap: 8px;
+}
+.navegacao button {
+  flex: 1;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+.navegacao .primaria {
+  flex: 2;
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 700;
+}
+
+.legenda p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.amostra {
+  display: inline-block;
+  width: 22px;
+  height: 3px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.amostra.gt {
+  background: var(--gt);
+}
+.amostra.pred {
+  background: var(--pred);
+}
+.atalhos {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 8px;
+}

@@ -1089,3 +1089,91 @@ def test_every_composed_fruit_yields_a_label(tmp_path):
         assert row["annotations"] == len(caixas), row["generation_id"]
     # sem sobreposição não haveria o que testar
     assert total >= 40, f"cenas rasas demais para exercitar a garantia: {total}"
+
+
+def test_distancia_da_cena_aperta_o_tamanho_dentro_e_solta_entre_cenas():
+    """Numa foto real as frutas estão todas à mesma distância da câmera.
+
+    Sem `scene_scale` cada fruta sorteia a escala sozinha: a cena vira uma
+    sopa de tamanhos e todas as cenas ficam com a mesma média. Com ele, o
+    espalhamento migra de dentro da cena para entre cenas, que é o que se
+    mede nos dois gabaritos reais (p90/p10 ≈ 1,9x dentro, 2,6x entre).
+    """
+    from fruit_pipeline.synthesis import _scale_cutout, _scene_scale_center
+
+    objetos = {"min_scale": 0.012, "max_scale": 0.055, "scale_distribution": "log-uniform"}
+    com_distancia = {**objetos, "scene_scale": {"spread": 2.24}}
+    canvas = (960, 960)
+    fonte = Image.new("RGBA", (200, 200))
+
+    def lados(config, semente_da_cena):
+        centro = _scene_scale_center(config, semente_da_cena)
+        if centro:
+            config = {**config, "scene_scale_center": centro}
+        rng = random.Random(semente_da_cena)
+        return [max(_scale_cutout(fonte, config, rng, canvas).size) for _ in range(40)]
+
+    def dispersao(valores):
+        return float(np.percentile(valores, 90)) / float(np.percentile(valores, 10))
+
+    cenas_sem = [lados(objetos, s) for s in range(12)]
+    cenas_com = [lados(com_distancia, s) for s in range(12)]
+
+    dentro_sem = np.median([dispersao(c) for c in cenas_sem])
+    dentro_com = np.median([dispersao(c) for c in cenas_com])
+    entre_sem = dispersao([np.median(c) for c in cenas_sem])
+    entre_com = dispersao([np.median(c) for c in cenas_com])
+
+    assert dentro_com < dentro_sem
+    assert entre_com > entre_sem
+    # O teto declarado é o do centro da cena, então cada fruta ainda varia em
+    # torno dele — mas só dentro do `spread`.
+    assert dentro_com <= 2.24
+
+
+def test_exposicao_log_uniforme_desloca_a_massa_para_a_sombra():
+    """A luz atravessa folhas por produto de transmitâncias, não por soma.
+
+    O sorteio uniforme põe a mediana no meio da faixa e entrega sombra
+    profunda de menos; o log-uniforme concentra na sombra e deixa o sol
+    direto como cauda, que é o formato dos dois gabaritos reais.
+    """
+    from fruit_pipeline.synthesis import _apply_exposure_jitter
+
+    fruta = Image.new("RGBA", (8, 8), (200, 120, 40, 255))
+
+    def fatores(distribuicao):
+        base = np.asarray(Image.new("RGBA", (8, 8), (200, 120, 40, 255)).convert("HSV"))[
+            :, :, 2
+        ].mean()
+        saidas = []
+        for semente in range(400):
+            config = {"probability": 1.0, "range": [0.3, 2.0], "distribution": distribuicao}
+            resultado = _apply_exposure_jitter(fruta, config, random.Random(semente))
+            valor = np.asarray(resultado.convert("RGB").convert("HSV"))[:, :, 2].mean()
+            saidas.append(valor / base)
+        return np.array(saidas)
+
+    uniforme = fatores("uniform")
+    logaritmico = fatores("log-uniform")
+    assert np.median(logaritmico) < np.median(uniforme)
+    assert (logaritmico < 0.55).mean() > 2 * (uniforme < 0.55).mean()
+
+
+def test_distribuicao_de_exposicao_desconhecida_e_recusada() -> None:
+    config = tiny_config()
+    config["appearance"]["exposure_jitter"] = {
+        "enabled": True,
+        "probability": 0.5,
+        "range": [0.5, 1.5],
+        "distribution": "normal",
+    }
+    with pytest.raises(ValueError, match="distribution"):
+        validate_synthesis_config(config)
+
+
+def test_espalhamento_da_distancia_da_cena_e_validado() -> None:
+    config = tiny_config()
+    config["objects"]["scene_scale"] = {"spread": 0.8}
+    with pytest.raises(ValueError, match="scene_scale"):
+        validate_synthesis_config(config)

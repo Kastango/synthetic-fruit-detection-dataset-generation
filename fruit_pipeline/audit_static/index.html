@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Auditoria do gabarito</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <div class="titulo">Auditoria do gabarito</div>
+  <div id="progresso" class="progresso"></div>
+</header>
+
+<main>
+  <figure id="palco"><img id="figura" alt=""></figure>
+
+  <aside>
+    <div class="bloco">
+      <div id="identidade" class="identidade"></div>
+      <div id="discordancia" class="discordancia"></div>
+    </div>
+
+    <div class="bloco">
+      <div class="rotulo-bloco">Marcas</div>
+      <ul id="marcas" class="marcas"></ul>
+    </div>
+
+    <div class="bloco">
+      <div class="rotulo-bloco">Observação</div>
+      <textarea id="nota" rows="3" placeholder="opcional"></textarea>
+    </div>
+
+    <div class="bloco navegacao">
+      <button id="anterior">← anterior</button>
+      <button id="proxima" class="primaria">salvar e seguir →</button>
+    </div>
+
+    <div class="bloco legenda">
+      <p><span class="amostra gt"></span> gabarito</p>
+      <p id="legenda-pred" hidden><span class="amostra pred"></span> detector</p>
+      <p class="atalhos">
+        <b>1–6</b> marcas · <b>Enter</b> salvar e seguir · <b>←</b> voltar ·
+        <b>p</b> liga/desliga o detector
+      </p>
+    </div>
+  </aside>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>
