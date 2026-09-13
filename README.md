@@ -188,11 +188,11 @@ Os caminhos abaixo identificam os campos do YAML.
 | Repetir uma composição | `seed` | Repete os sorteios com os mesmos ativos, código e bibliotecas. O Studio começa com `42`. |
 | Gerar mais imagens | `images.total` | Define o tamanho do pool. O Studio começa com 390 cenas. |
 | Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
-| Mudar a quantidade de frutas | `objects.min`, `objects.max` | Sorteia em uma curva em U. Quantidades próximas dos limites aparecem mais; próximas do centro, menos. Rejeições e oclusões podem reduzir o total visível. |
+| Mudar a quantidade de frutas | `objects.min`, `objects.max` | Sorteia de 1 a 60 com uma distribuição beta calibrada pela média e variância dos cenários reais. Rejeições e oclusões podem reduzir o total visível. |
 | Espelhar os ativos | `augmentation.horizontal_flip` | Ativa 50% de chance de espelhamento horizontal por fundo e por fruta. O mapa acompanha o fundo. |
 | Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.scene_scale.spread` | Sorteia o centro de escala por cena e a dispersão dos recortes ao redor dele. |
 | Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
-| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige 20% de superfície visível, também verificados depois das oclusões finais. |
+| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige 15% de superfície visível, também verificados depois das oclusões finais. |
 | Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | O padrão é 0: toda a altura está liberada. Não identifica o chão por segmentação. |
 | Variar a maturação | `appearance.ripeness` | Altera o matiz de parte dos recortes maduros para verde-amarelado. |
 | Combinar a fruta com a luz local | `appearance.hsv_cast` | Aproxima cor e luminosidade da fruta das do fundo. |
@@ -206,7 +206,6 @@ Os espelhamentos também usam a semente.
 Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
 Os manifestos registram sementes e hashes para identificar cada geração.
 A receita oficial `confirmatory_pool.yaml` usa a mesma composição do Studio,
-com total de 1.300 imagens. As medições reais e os alvos 50/50 estão em
-[DATASET_PROFILES.md](docs/DATASET_PROFILES.md).
+com total de 1.300 imagens, 1% de negativos e piso de 60 pixels visíveis.
 
 </details>

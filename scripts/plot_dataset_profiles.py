@@ -18,7 +18,7 @@ def main():
         "--input", type=Path, default=Path("artifacts/dataset_profiles/images.csv")
     )
     parser.add_argument(
-        "--output", type=Path, default=Path("docs/figures/dataset-profiles.png")
+        "--output", type=Path, default=Path("artifacts/dataset_profiles/distributions.png")
     )
     args = parser.parse_args()
     rows = list(csv.DictReader(args.input.open()))

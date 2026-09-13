@@ -14,41 +14,34 @@ sampling:
   mode: paired-v1
 
 objects:
-  min: 10
-  max: 110
-  # Cenas de copa sem fruta nenhuma. Sem negativos o detector nunca vê
-  # folhagem que não esconde nada e passa a responder à textura da folha: no
-  # gabarito externo foram 525 previsões sem par contra 1.473 caixas, quase
-  # todas sobre folha limpa.
-  empty_probability: 0.07
-  min_scale: 0.012
-  max_scale: 0.055
-  # Com scene_scale, min_scale e max_scale delimitam o CENTRO da cena, não
-  # cada fruta. O sorteio é log-uniforme porque a distribuição real de
-  # tamanhos é assimétrica: no `manual-full` a mediana (0,0365 da largura)
-  # fica muito mais perto do p5 (0,0201) que do p95 (0,0893).
+  # Mínimo observado nos dois domínios. O máximo é o teto definido pelo usuário.
+  min: 1
+  max: 60
+  # Beta limitada a [1,60], ajustada pelos momentos da mistura 50/50:
+  # média 14,443; variância 123,207 (desvio 11,100) frutas por imagem.
+  # O arredondamento discretiza a amostra; rejeições podem reduzir a entrega.
+  count_distribution:
+    mode: beta
+    alpha: 0.90471226
+    beta: 3.06598030
+  # Negativos deliberados, em fluxo aleatório independente.
+  empty_probability: 0.01
+  # Centro de escala por cena, relativo ao menor lado do canvas.
+  # Faixa ampliada para frutas maiores e mais variedade entre enquadramentos.
+  min_scale: 0.018
+  max_scale: 0.15
   scale_distribution: log-uniform
   scene_scale:
-    # Numa foto real todas as frutas estão à mesma distância da câmera: dentro
-    # do quadro o tamanho varia pouco (p90/p10 ≈ 1,8x no `manual-full` e 1,9x
-    # no gabarito externo) e entre quadros varia muito (2,6x entre as
-    # medianas). Sortear a escala fruta a fruta invertia isso — cada cena
-    # virava uma sopa de tamanhos e todas as cenas saíam com a mesma média.
-    # 2,24 é a razão máximo/mínimo dentro da cena que reproduz p90/p10 ≈ 1,9x.
+    # Mantém moderada a variação entre frutas da mesma cena.
     spread: 2.24
   rotation_degrees: 180
 
 placement:
   min_depth: 20
-  # O gabarito externo declara o critério: fruto com mais de ~80% de oclusão
-  # não é anotado. Vinte por cento de fruta visível é o mesmo piso, medido
-  # sobre a fruta e não sobre a caixa.
-  min_visibility: 0.2
-  # Piso absoluto de fruta visível. A fração sozinha não basta: ela
-  # correlaciona apenas 0,41 com a quantidade de fruta que sobrou, então
-  # deixava passar caixas em que não há fruta visível alguma — restos de fruta
-  # escondida atrás de outra.
-  min_visible_pixels: 90
+  # Piso escolhido pelo usuário, verificado também após as oclusões finais.
+  min_visibility: 0.15
+  # Quantidade mínima de pixels de máscara visível, não lado de caixa.
+  min_visible_pixels: 60
   max_attempts_per_object: 100
   z_patch_fraction: 0.2
   z_offset: -7

@@ -1153,3 +1153,37 @@ def test_retired_recipe_options_are_not_silently_ignored(section, option):
     target[option] = False
     with pytest.raises(ValueError, match="Opções aposentadas"):
         validate_synthesis_config(config)
+
+
+def test_calibrated_beta_matches_mixture_moments_and_bounds():
+    from fruit_pipeline.common import ROOT, load_yaml
+    objects = load_yaml(ROOT / "configs/synthesis/studio.yaml")["objects"]
+    rng = random.Random(42)
+    values = np.array([_sample_object_count(objects, rng) for _ in range(100000)])
+    assert values.min() == 1
+    assert values.max() <= 60
+    assert np.mean(values) == pytest.approx(14.443, abs=0.15)
+    assert np.var(values) == pytest.approx(123.207, abs=2)
+    assert np.percentile(values, 50) < 15
+    assert (values <= 5).mean() > 0.15
+    again = random.Random(42)
+    assert values[:100].tolist() == [_sample_object_count(objects, again) for _ in range(100)]
+
+
+@pytest.mark.parametrize("value", [0, -1, float("inf"), float("nan"), True, "1"])
+def test_beta_parameters_must_be_positive_finite_numbers(value):
+    config = tiny_config()
+    config["objects"]["count_distribution"] = {"mode": "beta", "alpha": value, "beta": 2}
+    with pytest.raises(ValueError, match="count_distribution"):
+        validate_synthesis_config(config)
+
+
+def test_beta_rejects_unknown_mode_and_conflicting_dense():
+    config = tiny_config()
+    config["objects"]["count_distribution"] = {"mode": "normal", "alpha": 1, "beta": 2}
+    with pytest.raises(ValueError, match="mode"):
+        validate_synthesis_config(config)
+    config["objects"]["count_distribution"]["mode"] = "beta"
+    config["objects"]["dense"] = {"min": 40, "max": 60}
+    with pytest.raises(ValueError, match="dense"):
+        validate_synthesis_config(config)

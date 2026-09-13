@@ -46,7 +46,7 @@ CONTROLS = [
         0,
         150,
         1,
-        "Quantidades próximas dos extremos aparecem mais que as do centro.",
+        "A distribuição da receita favorece cenas esparsas e mantém uma cauda densa.",
     ),
     (
         "fruit_max",
@@ -314,7 +314,8 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     )
     c["augmentation"] = {"horizontal_flip": values["mirror_probability"] / 100}
     c["objects"].update(
-        min_scale=values["min_scale"] / 100, max_scale=values["max_scale"] / 100
+        min_scale=round(values["min_scale"] / 100, 6),
+        max_scale=round(values["max_scale"] / 100, 6)
     )
     c["placement"].update(
         z_offset=values["z_offset"],

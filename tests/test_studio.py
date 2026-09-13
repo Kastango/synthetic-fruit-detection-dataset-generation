@@ -343,7 +343,7 @@ def test_sliders_partem_da_receita_base():
     from fruit_pipeline.studio import BASE_RECIPE, DEFAULTS, controls_from_recipe
 
     assert DEFAULTS == controls_from_recipe(BASE_RECIPE)
-    assert DEFAULTS["empty_probability"] == 7
+    assert DEFAULTS["empty_probability"] == 1
     assert len(DEFAULTS) == 24
 
 

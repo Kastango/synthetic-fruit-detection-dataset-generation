@@ -3,8 +3,7 @@
 Este documento descreve somente os dados que participam do protocolo atual:
 a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e a
 coleta externa de avaliação. As contagens de imagens vêm da
-configuração; as caixas sintéticas foram contadas no pool de 13/09/2026.
-As medições completas estão em [DATASET_PROFILES.md](DATASET_PROFILES.md).
+configuração. As caixas sintéticas dependem da regeneração com a receita vigente.
 
 ## Visão geral
 
@@ -12,11 +11,11 @@ As medições completas estão em [DATASET_PROFILES.md](DATASET_PROFILES.md).
 |---|---|---:|---:|---:|---:|
 | `manual-full` | referência com anotação humana | 104 | 26 | — | 2.093 |
 | `controlled` | controle sem composição | 284 | 71 | — | 127 |
-| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 6.612 |
-| `synthetic-2x` | síntese | 208 | 52 | — | 11.620 |
-| `synthetic-3x` | síntese | 312 | 78 | — | 17.790 |
-| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 29.966 |
-| `synthetic-10x` | maior volume sintético previsto | 1.040 | 260 | — | 61.425 |
+| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | a gerar |
+| `synthetic-2x` | síntese | 208 | 52 | — | a gerar |
+| `synthetic-3x` | síntese | 312 | 78 | — | a gerar |
+| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | a gerar |
+| `synthetic-10x` | maior volume sintético previsto | 1.040 | 260 | — | a gerar |
 | `oranges_field` | avaliação externa/desenvolvimento | — | — | 1.243 | 15.893 |
 
 **Protocolo de treino.** São 42 execuções: 7 condições × 3 detectores ×
@@ -151,8 +150,8 @@ O gerador cria primeiro um pool único de 1.300 identidades de cena em resoluç�
 
 1. escolhe um par fundo/mapa de profundidade do catálogo;
 2. corrige contraste, brilho e nitidez do fundo antes de inserir frutas;
-3. em 7% das cenas para aqui, e a copa fica sem fruta nenhuma;
-4. nas demais, solicita 10–110 frutas com distribuição em U;
+3. em 1% das cenas para aqui, e a copa fica sem fruta nenhuma;
+4. nas demais, solicita 1–60 frutas com distribuição beta;
 5. sorteia um centro de escala log-uniforme por cena, varia cada fruta
    em torno dele (`spread: 2.24`) e sorteia sua rotação;
 6. tenta posições, define a oclusão pelo eixo z e verifica a visibilidade
@@ -168,19 +167,19 @@ Parâmetros que definem o pool confirmatório:
 | Propriedade | Valor atual |
 |---|---|
 | resolução gerada | 720×960, retrato |
-| cenas sem fruta | probabilidade 7%; observado 84/1.300 = 6,46% |
-| objetos solicitados nas demais | 10–110, curva em U, sem bloco `dense` |
-| escala por cena | centro 0,012–0,055 do menor lado do canvas, log-uniforme; dispersão 2,24 |
+| cenas sem fruta | probabilidade 1% |
+| objetos solicitados nas demais | 1–60, beta(0,90471226; 3,06598030) |
+| escala por cena | centro 0,018–0,15 do menor lado do canvas, log-uniforme; dispersão 2,24 |
 | rotação | até ±180° |
-| visibilidade mínima da fruta | 20%, verificada sobre a cena final |
-| piso de fruta visível | 90 pixels de máscara |
+| visibilidade mínima da fruta | 15%, verificada sobre a cena final |
+| piso de fruta visível | 60 pixels de máscara |
 | região inferior excluída da colocação | nenhuma |
 | caixas | parte visível final, largura e altura mínimas de 2 px |
 | split do pool | 80/20, semente 42 |
 | qualidade JPEG | 95, sem subamostragem de croma |
 
 A configuração integral e versionável está em
-`configs/synthesis/confirmatory_pool.yaml`. As contagens descrevem o pool medido, gerado antes da simplificação do código; a
+`configs/synthesis/confirmatory_pool.yaml`. As contagens exigem regenerar o pool com a receita vigente; a
 divisão por split e a cobertura dos ativos precisam ser consultadas nos
 manifestos da execução, não inferidas da proporção de imagens.
 
@@ -191,11 +190,11 @@ Depois disso, cada condição toma prefixos crescentes de ambas as partições:
 
 | Condição | Imagens treino | Imagens validação | Caixas totais publicadas |
 |---|---:|---:|---:|
-| `synthetic-1x` | 104 | 26 | 6.612 |
-| `synthetic-2x` | 208 | 52 | 11.620 |
-| `synthetic-3x` | 312 | 78 | 17.790 |
-| `synthetic-5x` | 520 | 130 | 29.966 |
-| `synthetic-10x` | 1.040 | 260 | 61.425 |
+| `synthetic-1x` | 104 | 26 | a gerar |
+| `synthetic-2x` | 208 | 52 | a gerar |
+| `synthetic-3x` | 312 | 78 | a gerar |
+| `synthetic-5x` | 520 | 130 | a gerar |
+| `synthetic-10x` | 1.040 | 260 | a gerar |
 
 Os conjuntos são estritamente aninhados: `2x` contém todas as cenas de `1x`,
 `3x` contém todas as de `2x` e assim por diante, tanto no treino quanto na
@@ -326,8 +325,8 @@ Três limites precisam acompanhar qualquer número dela:
   gabarito e não é possível filtrá-la. A inspeção visual indica que é bem menor
   que os 62% da coleta anterior, mas não é zero.
 - **Os recortes são correlacionados.** A medição atual também encontrou dez
-  repetições exatas por SHA-256 e cinco caixas duplicadas. Os casos estão no
-  relatório de perfis; nada foi removido silenciosamente do gabarito.
+  repetições exatas por SHA-256 e cinco caixas duplicadas. Nada foi removido
+  silenciosamente do gabarito.
   As 1.243 imagens vêm de 655 fotos, então
   o tamanho efetivo da amostra é menor que a contagem de imagens sugere.
 
@@ -344,10 +343,15 @@ A receita é [`configs/synthesis/confirmatory_pool.yaml`](../configs/synthesis/c
 A receita calibrada pelo usuário é o padrão de ambos. Os YAMLs diferem somente
 no nome e no total de imagens: Studio 390, pool 1.300. Os sliders leem o YAML;
 um teste verifica que abrir/exportar os padrões preserva todos os parâmetros.
-Foram preservados 25% de maturação, 12% de podridão, visibilidade 20%, piso de
-90 pixels, z −7, chão liberado, luz por cena, espelhamento 50% e gradação com
-variação por cena. A mistura 50/50 é um alvo de análise, ainda não uma nova
-receita promovida. Consulte [DATASET_PROFILES.md](DATASET_PROFILES.md).
+A receita usa contagem beta entre 1 e 60, ajustada pela média 14,443 e
+variância 123,207 da mistura 50/50 dos dois cenários reais. O mínimo 1 é o
+mínimo observado; o teto 60 foi definido pelo usuário. O sorteio é arredondado
+para inteiro. Cenas negativas têm probabilidade independente de 1%.
+
+O centro da escala vai de 0,018 a 0,15 do menor lado do canvas. Foram mantidos
+25% de maturação, 12% de podridão, z −7, chão liberado, luz por cena,
+espelhamento 50% e gradação com variação por cena. Os pisos agora são 15%
+de visibilidade e 60 pixels de máscara visível, inclusive na cena final.
 
 Foram removidas as opções experimentais `objects.depth_scale`,
 `objects.dense.scale_with_count` e `placement.require_vegetation`. Receitas
@@ -356,13 +360,11 @@ interpretadas silenciosamente de outra forma. `scene_scale` continua ativo.
 
 ### Reprodutibilidade
 
-O pool medido tem 1.300 imagens, 61.425 caixas e 84 negativos. Os manifestos
-conservam a receita e o hash do gerador que realmente o produziu. A simplificação
-altera o hash do código; a pipeline recusará retomar esse diretório sem
-regeneração explícita. Não se deve reescrever o hash antigo para simular uma
-nova geração. Seis cenas selecionadas por quantis, incluindo negativa e densa,
-saíram com pixels e rótulos idênticos antes/depois da simplificação. Essa
-verificação é amostral; não equivale à regeneração integral do pool.
+A receita e o código mudaram. O pool anterior não representa esta versão:
+seus manifestos preservam a configuração e o hash que realmente o produziram.
+A pipeline recusa retomá-lo com uma configuração diferente. Regere o pool e
+os subconjuntos explicitamente antes de treinar; não edite hashes históricos
+para simular uma geração nova.
 
 O treino continua sem congelamento. As rodadas exploratórias e a grade
 aposentada foram apagadas a pedido do usuário; seus números não constituem

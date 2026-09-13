@@ -192,6 +192,17 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError(
             "augmentation.horizontal_flip deve ser booleano ou probabilidade de 0 a 1"
         )
+    distribution = objects.get("count_distribution")
+    if distribution is not None:
+        if not isinstance(distribution, dict) or distribution.get("mode") != "beta":
+            raise ValueError("objects.count_distribution.mode deve ser beta")
+        for parameter in ("alpha", "beta"):
+            value = distribution.get(parameter)
+            if (isinstance(value, bool) or not isinstance(value, (int, float))
+                    or not math.isfinite(value) or value <= 0):
+                raise ValueError(f"count_distribution.{parameter} deve ser finito e positivo")
+        if objects.get("dense"):
+            raise ValueError("count_distribution não pode ser combinado com objects.dense")
     dense = objects.get("dense")
     if dense:
         if not 0 <= float(dense.get("probability", 0.0)) <= 1:
@@ -1340,7 +1351,7 @@ def _build_debug_panel(
 
 
 def _sample_object_count(objects: dict, rng: random.Random) -> int:
-    """U simétrico em intervalos inteiros iguais, sem parâmetro de curvatura."""
+    """Beta calibrada por receita; receitas sem distribuição conservam o U."""
     dense = objects.get("dense")
     if dense:
         # Leitura das receitas históricas, preservando seus sorteios.
@@ -1348,6 +1359,10 @@ def _sample_object_count(objects: dict, rng: random.Random) -> int:
             return rng.randint(int(dense["min"]), int(dense["max"]))
         return rng.randint(int(objects["min"]), int(objects["max"]))
     lo, hi = objects["min"], objects["max"]
+    distribution = objects.get("count_distribution")
+    if distribution:
+        fraction = rng.betavariate(distribution["alpha"], distribution["beta"])
+        return lo + round((hi - lo) * fraction)
     # Inversa da CDF da distribuição arco-seno. Todos os inteiros têm
     # probabilidade positiva; mínimo e máximo recebem a mesma massa.
     u = math.sin(math.pi * rng.random() / 2) ** 2

@@ -5,25 +5,15 @@ Não há resultados de detectores publicados para a versão atual. As rodadas
 exploratórias, a grade aposentada e suas tabelas foram removidas a pedido do
 usuário. O histórico Git permanece intacto.
 
-O pool oficial contém 1.300 cenas, 61.425 caixas e 84 negativos (6,46%).
-A receita aprovada pelo usuário é o padrão do Studio: 7% de negativos,
-10–110 objetos solicitados, centro de escala por cena 0,012–0,055,
-dispersão 2,24, visibilidade mínima 20% e piso de 90 pixels visíveis.
-As contagens por condição e o protocolo estão em [DATASETS.md](DATASETS.md).
-
-## Medições dos dados
-
-O [relatório de perfis](DATASET_PROFILES.md) compara `manual-full`,
-`oranges_field` e o pool sintético atual e calcula os alvos **50/50 por
-cenário**, conforme solicitado. Os dados incluem tamanhos de caixas,
-densidade, negativos, distribuição espacial, brilho, contraste, saturação,
-condições externas e verificações de integridade.
+A receita aprovada pelo usuário é o padrão do Studio: 1% de negativos,
+1–60 objetos solicitados com distribuição beta, centro de escala por cena
+0,018–0,15, dispersão 2,24, visibilidade mínima 15% e piso de 60 pixels.
+O pool anterior precisa ser regenerado. O protocolo está em [DATASETS.md](DATASETS.md).
 
 `oranges_field` é uma coleta externa usada para desenvolvimento: seu protocolo
-de anotação, erros e estatísticas influenciaram o gerador. Avaliá-la depois de
-selecionar checkpoints não torna seus resultados independentes desses ajustes.
-`manual_full_val` também participa da seleção dos checkpoints de `manual-full`.
-Será necessária outra coleta intocada para uma avaliação confirmatória.
+e suas estatísticas influenciaram a receita. Uma avaliação confirmatória requer
+outra coleta intocada. `manual_full_val` também participa da seleção dos
+checkpoints de `manual-full`.
 
 ## Auditar manual-full
 
@@ -32,7 +22,6 @@ imagens/anotações contra o manifesto importado:
 
 ```bash
 .venv/bin/python scripts/validate_data.py --stage real
-.venv/bin/python scripts/measure_dataset_profiles.py --manual-weight 0.5
 ```
 
 A primeira passou para as 130 imagens e 2.093 caixas. O perfil também decodificou
@@ -77,8 +66,6 @@ O protocolo usa 7 condições, 3 modelos e sementes 41/42, sem congelamento.
 YOLOv8s/YOLO26s usam SGD e batch 8; RT-DETR-L usa AdamW e batch 2.
 Confira os demais parâmetros em [confirmatory.yaml](../configs/confirmatory.yaml).
 
-O pool foi criado antes da simplificação do código. Seus hashes históricos
-foram preservados. Seis cenas por quantis foram reproduzidas com imagem e
-rótulo idênticos; a verificação foi amostral. A pipeline exige regeneração
-explícita quando o hash do gerador muda. Não retome os treinos até concluir a
-revisão e decidir se a receita será ajustada aos alvos medidos.
+O pool anterior foi criado com outra receita e outro código. Seus hashes
+foram preservados. Regere o pool e seus subconjuntos antes de retomar a grade.
+A revisão visual do manual-full continua pendente dos vereditos do anotador.
