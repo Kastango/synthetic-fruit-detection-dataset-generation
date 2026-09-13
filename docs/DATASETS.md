@@ -21,11 +21,10 @@ configuração; as caixas sintéticas totais são as publicadas em
 
 **Protocolo de treino.** As 42 execuções — 7 condições × 3 detectores ×
 2 sementes — compartilham exatamente o mesmo protocolo: 50 épocas, `imgsz` 960,
-`batch` 8, SGD com `lr0` 0,01, `freeze: 5`, `mosaic` 1.0 com `close_mosaic` 5 e
-as mesmas augmentações de cor e geometria. Nenhum hiperparâmetro varia por
-condição ou por detector, inclusive nas condições de dados reais. O motivo da
-escolha do congelamento, e seu custo medido para a linha de base real, estão
-em [Congelamento uniforme do backbone](#congelamento-uniforme-do-backbone).
+`batch` 8, SGD com `lr0` 0,01, `mosaic` 1.0 com `close_mosaic` 5 e as mesmas
+augmentações de cor e geometria, sem congelamento de camadas. Nenhum
+hiperparâmetro varia por condição ou por detector, inclusive nas condições de
+dados reais.
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
 de cada execução é escolhido sem consultar o teste externo; somente após a
@@ -146,34 +145,37 @@ O gerador cria primeiro um pool único de 1.300 identidades de cena em resoluç�
 
 1. escolhe um par fundo/mapa de profundidade do catálogo;
 2. corrige contraste, brilho e nitidez do fundo antes de inserir frutas;
-3. solicita 1–30 frutas ou, com probabilidade de 25%, 60–110 frutas;
-4. sorteia escala-base e rotação do recorte;
-5. tenta posições, usa a proximidade local para ajustar escala e oclusão e
-   verifica a visibilidade mínima na inserção;
-6. ajusta matiz, HSV cast e exposição, aplica sombras e compõe a fruta,
-   atualizando a oclusão das instâncias anteriores;
-7. após todas as inserções, extrai cada caixa da parte visível final;
-8. salva imagem, rótulo YOLO e metadados da cena.
+3. em 15% das cenas para aqui, e a copa fica sem fruta nenhuma;
+4. nas demais, solicita 1–30 frutas ou, com probabilidade de 25%, 60–110;
+5. sorteia escala-base e rotação do recorte;
+6. tenta posições, define a oclusão pelo eixo z e verifica a visibilidade
+   mínima na inserção;
+7. ajusta matiz, HSV cast e exposição, aplica sombras e compõe a cena em
+   ordem de profundidade;
+8. recompõe até que toda fruta desenhada renda uma caixa verificável, e
+   extrai cada caixa da parte visível final;
+9. salva imagem, rótulo YOLO e metadados da cena.
 
 Parâmetros que definem o pool confirmatório:
 
 | Propriedade | Valor atual |
 |---|---|
 | resolução gerada | 720×960, retrato |
-| objetos solicitados por cena | 1–30 em 75% das cenas, 60–110 em 25% |
-| escala-base | maior lado do recorte = 0,01–0,065 do menor lado do canvas |
+| cenas sem fruta | 15% |
+| objetos solicitados nas demais | 1–30 em 75% delas, 60–110 em 25% |
+| escala-base | maior lado do recorte = 0,018–0,1 do menor lado do canvas, log-uniforme |
 | rotação | até ±180° |
-| escala guiada por profundidade | 0,6× (longe) a 1,3× (perto) |
-| visibilidade mínima na inserção | 15% |
-| região inferior excluída da colocação | 15% |
+| visibilidade mínima da fruta | 20%, verificada sobre a cena final |
+| piso de fruta visível | 100 px |
+| região inferior excluída da colocação | nenhuma |
 | caixas | parte visível final, largura e altura mínimas de 2 px |
 | split do pool | 80/20, semente 42 |
 | qualidade JPEG | 95, sem subamostragem de croma |
 
 A configuração integral e versionável está em
-`configs/synthesis/confirmatory_pool.yaml`. As contagens abaixo agregam treino e validação e correspondem às publicadas
-em [`RESULTS.md`](RESULTS.md). O pool avaliado contém 41.583 caixas. A divisão
-de caixas por split e a cobertura dos ativos precisam ser consultadas nos
+`configs/synthesis/confirmatory_pool.yaml`. As contagens de caixas por
+condição só valem depois que o pool for regerado com a receita vigente; a
+divisão por split e a cobertura dos ativos precisam ser consultadas nos
 manifestos da execução, não inferidas da proporção de imagens.
 
 ### Formação de `synthetic-1x` a `synthetic-10x`
@@ -344,35 +346,29 @@ conjunto de avaliação, **essa proporção precisa ser rederivada**: enquanto i
 não for feito, os 25% são um valor herdado, não um valor justificado pela
 distribuição que estamos medindo.
 
-### Congelamento uniforme do backbone
+### Sem congelamento de camadas
 
-A grade usa `freeze: 5` em **todas** as condições e todos os modelos, inclusive
-nos treinos com dados reais. É uma decisão de projeto tomada com o custo já
-medido, e o custo fica registrado aqui em vez de omitido.
+A grade treina todos os pesos, em todas as condições e todos os modelos.
 
-Congelar os blocos iniciais prejudica o treino com dados reais. Medido com o
-mesmo protocolo e as mesmas sementes, `manual-full` sem congelamento obtém
-0,5459 no conjunto local e com `freeze: 5` obtém 0,5062, uma perda de 0,0346,
-com as duas sementes abaixo das do controle. O ganho compensatório no treino
-sintético foi medido contra a coleta externa anterior e **precisa ser refeito**
-contra a atual antes de continuar sustentando a decisão.
+Congelar os blocos iniciais (`freeze: 5`) rende de +0,009 a +0,016 mAP no
+treino sintético, replicado em três conjuntos e duas arquiteturas. Esse ganho,
+porém, foi medido inteiramente contra a coleta externa que não faz mais parte
+do protocolo — aquela em que 62% do gabarito era fruta no chão. Contra a
+coleta atual ele não está verificado.
 
-O motivo de aplicá-lo mesmo assim é a uniformidade: comparar condições exige
-que treino, épocas, augmentação e congelamento sejam os mesmos para todas
-elas. Um protocolo escolhido por condição, ainda que cada escolha fosse ótima
-isoladamente, tornaria as diferenças entre condições ininterpretáveis.
+O custo, esse continua medido no conjunto local e é grande: `manual-full` sem
+congelamento obtém 0,5459 e com `freeze: 5` obtém 0,5062, uma perda de 0,0346,
+com as duas sementes abaixo das do controle. Manter um congelamento que
+comprovadamente prejudica a linha de base real, sustentado por um ganho que
+não se pode mais verificar, é o tipo de escolha que a troca de conjunto existe
+para evitar.
 
-Ao ler a grade, considere que a escolha do congelamento foi feita depois de
-medir que ele favorece o treino sintético e desfavorece o real, e que portanto
-a linha de base real aparece abaixo do seu próprio melhor desempenho possível.
-Os números do treino real sem congelamento estão no parágrafo acima
-justamente para que essa distância seja verificável.
-
-A interpretação causal é que congelar remove a capacidade de adaptar filtros
-de baixo nível à estatística do domínio de treino. Isso penaliza quem treina
-no mesmo domínio em que testa e beneficia quem treina em cena composta: o
-modelo congelado ajusta pior a validação sintética e transfere melhor, o que
-é remoção de sobreajuste aos artefatos de composição, não ganho de capacidade.
+A interpretação causal que motivava o congelamento continua plausível e
+continua testável: congelar remove a capacidade de adaptar filtros de baixo
+nível à estatística do domínio de treino, o que penaliza quem treina no mesmo
+domínio em que testa e pode beneficiar quem treina em cena composta. Se valer
+a pena, é um experimento a refazer contra a coleta atual — não um padrão a
+herdar.
 
 ### Reprodutibilidade verificada
 

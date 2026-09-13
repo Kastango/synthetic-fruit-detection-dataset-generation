@@ -311,3 +311,16 @@ def test_import_clamps_values_outside_the_control_range():
         low, high = limites[chave]
         assert low <= valor <= high, (chave, valor)
     assert voltou["mirror_probability"] == 50
+
+
+def test_cenas_vazias_aparecem_no_studio_e_voltam_da_receita():
+    """O controle de negativos precisa existir e sobreviver ao ida-e-volta."""
+    from fruit_pipeline.studio import CONTROLS, controls_from_recipe, resolve_recipe
+
+    chaves = [c[0] for c in CONTROLS]
+    assert "empty_probability" in chaves
+
+    base = load_yaml(ROOT / "configs/synthesis/confirmatory_pool.yaml")
+    receita = resolve_recipe(base, {"empty_probability": 22}, "reference", 42)
+    assert receita["objects"]["empty_probability"] == 0.22
+    assert controls_from_recipe(receita)["empty_probability"] == 22

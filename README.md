@@ -55,7 +55,6 @@ A configuração completa está em
 | Sementes de treino | 41 e 42 |
 | Duração | Até 50 épocas, com `patience: 30` |
 | Entrada | `imgsz: 960` |
-| Congelamento | `freeze: 5`, os cinco primeiros módulos de cada modelo |
 | YOLOs | SGD, taxa inicial 0,01, batch 8 |
 | RT-DETR | AdamW, taxa inicial 0,0001, batch 2 |
 

@@ -1177,3 +1177,75 @@ def test_espalhamento_da_distancia_da_cena_e_validado() -> None:
     config["objects"]["scene_scale"] = {"spread": 0.8}
     with pytest.raises(ValueError, match="scene_scale"):
         validate_synthesis_config(config)
+
+
+def test_cenas_vazias_saem_sem_fruta_e_sem_rotulo(tmp_path: Path) -> None:
+    """Copa sem fruta nenhuma é um exemplo, não um defeito.
+
+    Sem negativo o detector nunca vê folhagem que não esconde nada e passa a
+    responder à textura de folha. O rótulo dessas cenas precisa existir e ficar
+    vazio: um `.txt` ausente seria imagem sem anotação, que é outra coisa.
+    """
+    assets = tmp_path / "assets"
+    build_assets(assets)
+    config = tiny_config()
+    config["images"] = {"total": 24}
+    config["objects"]["empty_probability"] = 0.5
+    root = tmp_path / "pool"
+    generate_dataset(assets, root, config, train_ratio=0.75, split_seed=42, workers=1)
+
+    rotulos = sorted(root.rglob("labels/*/*.txt"))
+    assert rotulos, "o pool precisa ter rótulos"
+    vazios = [r for r in rotulos if not r.read_text().strip()]
+    assert vazios, "nenhuma cena vazia foi produzida"
+    assert len(vazios) < len(rotulos), "todas as cenas ficaram vazias"
+
+    for rotulo in vazios:
+        imagem = Path(str(rotulo).replace("/labels/", "/images/")).with_suffix(".jpg")
+        assert imagem.exists(), "cena vazia tem de continuar tendo imagem"
+
+    registros = [
+        json.loads(linha)
+        for linha in (root / "manifest.jsonl").read_text().splitlines()
+        if linha.strip()
+    ]
+    sem_fruta = [r for r in registros if r["annotations"] == 0]
+    assert len(sem_fruta) == len(vazios)
+    assert all(r["inserted_objects"] == 0 for r in sem_fruta)
+
+
+def test_cenas_vazias_nao_deslocam_os_sorteios_das_demais(tmp_path: Path) -> None:
+    """Ligar os negativos não pode mudar as cenas que continuam com fruta.
+
+    O sorteio tem fluxo próprio justamente para isso: sem essa separação,
+    comparar uma receita com e sem negativos compararia dois pools inteiramente
+    diferentes em vez de medir o efeito dos negativos.
+    """
+    assets = tmp_path / "assets"
+    build_assets(assets)
+
+    def gera(pasta, probabilidade):
+        config = tiny_config()
+        config["images"] = {"total": 16}
+        config["sampling"] = {"mode": "paired-v1"}
+        if probabilidade:
+            config["objects"]["empty_probability"] = probabilidade
+        generate_dataset(assets, pasta, config, train_ratio=0.75, split_seed=42, workers=1)
+        return {
+            r.name: r.read_text() for r in sorted(pasta.rglob("labels/*/*.txt"))
+        }
+
+    sem = gera(tmp_path / "sem", 0.0)
+    com = gera(tmp_path / "com", 0.35)
+    esvaziadas = [n for n, texto in com.items() if not texto.strip()]
+    assert esvaziadas, "nenhuma cena foi esvaziada"
+    for nome, texto in com.items():
+        if nome not in esvaziadas:
+            assert texto == sem[nome], f"a cena {nome} mudou sem precisar"
+
+
+def test_probabilidade_de_cena_vazia_e_validada() -> None:
+    config = tiny_config()
+    config["objects"]["empty_probability"] = 1.4
+    with pytest.raises(ValueError, match="empty_probability"):
+        validate_synthesis_config(config)

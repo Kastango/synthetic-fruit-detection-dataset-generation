@@ -107,8 +107,18 @@ CONTROLS = [
         5,
         80,
         1,
-        15,
+        20,
         "Limiar na inserção; frutas posteriores ainda podem ocluir.",
+    ),
+    (
+        "empty_probability",
+        "Geometria",
+        "Cenas sem fruta (%)",
+        0,
+        50,
+        1,
+        15,
+        "Copa sem fruta nenhuma. Sem negativos o detector responde à folha.",
     ),
     (
         "green_fraction",
@@ -324,7 +334,11 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     c = deepcopy(base)
     c.update(name="studio_candidate", seed=seed, sampling={"mode": "paired-v1"})
     c["objects"].pop("dense", None)
-    c["objects"].update(min=int(values["fruit_min"]), max=int(values["fruit_max"]))
+    c["objects"].update(
+        min=int(values["fruit_min"]),
+        max=int(values["fruit_max"]),
+        empty_probability=values["empty_probability"] / 100,
+    )
     c["augmentation"] = {"horizontal_flip": values["mirror_probability"] / 100}
     c["objects"].update(
         min_scale=values["min_scale"] / 100, max_scale=values["max_scale"] / 100
@@ -425,6 +439,7 @@ def controls_from_recipe(recipe: dict) -> dict:
         "z_offset": placement.get("z_offset"),
         "min_visibility": _maybe(placement.get("min_visibility"), 100),
         "min_visible_pixels": placement.get("min_visible_pixels"),
+        "empty_probability": _maybe(objects.get("empty_probability"), 100),
         "green_fraction": _maybe(ripeness.get("fraction_affected"), 100),
         "ripeness_strength": _maybe(
             (ripeness.get("strength_range") or [None, None])[1], 100

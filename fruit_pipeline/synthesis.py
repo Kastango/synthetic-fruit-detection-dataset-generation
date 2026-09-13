@@ -198,6 +198,8 @@ def validate_synthesis_config(config: dict) -> None:
     scene_scale = objects.get("scene_scale")
     if scene_scale and float(scene_scale.get("spread", 0)) < 1:
         raise ValueError("objects.scene_scale.spread deve ser >= 1")
+    if not 0 <= float(objects.get("empty_probability", 0.0)) <= 1:
+        raise ValueError("objects.empty_probability deve estar entre 0 e 1")
     depth_scale = objects.get("depth_scale")
     if (
         depth_scale
@@ -1466,6 +1468,23 @@ def _sample_object_count(objects: dict, rng: random.Random) -> int:
     return lo + min(hi - lo, int((hi - lo + 1) * u))
 
 
+def _cena_sem_fruta(objects: dict, seed) -> bool:
+    """Decide se esta cena é uma copa sem fruta nenhuma.
+
+    Sem negativos o detector nunca vê folhagem que não esconde nada, e passa a
+    responder à textura de folha. Medido na coleta externa: 525 previsões sem
+    par contra 1.473 caixas de gabarito, quase todas sobre folha limpa.
+
+    O sorteio tem fluxo próprio, derivado da semente da cena, para que ligar ou
+    desligar os negativos não desloque os sorteios de geometria e aparência das
+    demais cenas.
+    """
+    probabilidade = float(objects.get("empty_probability", 0.0))
+    if probabilidade <= 0:
+        return False
+    return random.Random(int(stable_hash([seed, "empty"], 16), 16)).random() < probabilidade
+
+
 def _mirror_probability(config: dict) -> float:
     """Chance de espelhar. `true` equivale a 0,5, mantendo receitas antigas."""
     flip = config.get("augmentation", {}).get("horizontal_flip", False)
@@ -1586,6 +1605,8 @@ def _render_one(task: dict) -> dict:
         depth_image = depth_image.filter(ImageFilter.GaussianBlur(depth_smooth_radius))
     depth = np.asarray(depth_image, dtype=np.uint8)
     requested = _sample_object_count(config["objects"], rng)
+    if _cena_sem_fruta(config["objects"], task["sample_seed"]):
+        requested = 0
     if requested <= len(cutouts):
         chosen = rng.sample(cutouts, requested)
     else:

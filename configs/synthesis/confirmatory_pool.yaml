@@ -21,9 +21,17 @@ objects:
     probability: 0.25
     min: 60
     max: 110
+  # Cenas de copa sem fruta nenhuma. Sem elas o detector nunca vê folhagem
+  # que não esconde nada e passa a responder à textura de folha: na coleta
+  # externa foram 525 previsões sem par contra 1.473 caixas de gabarito,
+  # quase todas sobre folha limpa.
+  empty_probability: 0.15
 placement:
   min_depth: 20
-  min_visibility: 0.15
+  # O gabarito externo declara o critério: fruto com mais de ~80% de oclusão
+  # não é anotado. Vinte por cento de fruta visível é o mesmo piso, medido
+  # sobre a fruta e não sobre a caixa.
+  min_visibility: 0.2
   # Piso absoluto de fruta visível. A fração sozinha não basta: ela
   # correlaciona apenas 0,41 com a quantidade de fruta que sobrou, então
   # deixava passar caixas de 20 px² em que não há fruta visível alguma —

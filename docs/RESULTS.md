@@ -5,8 +5,8 @@ nenhum número anterior sobrevive às duas:
 
 1. **O gerador.** Toda fruta composta passou a exigir um rótulo que uma pessoa
    consiga verificar na imagem final, a cena é composta em ordem de
-   profundidade, e a escala de cada cena passou a ter uma distância de câmera.
-   Os conjuntos sintéticos mudaram.
+   profundidade, a escala de cada cena passou a ter uma distância de câmera e
+   parte das cenas não tem fruta nenhuma. Os conjuntos sintéticos mudaram.
 2. **O conjunto de avaliação externa.** O CitDet saiu do protocolo.
 
 Publicar a tabela antiga com ressalva seria pior do que não publicá-la: ela
@@ -83,9 +83,9 @@ coincide com a da avaliação local.
 
 Continua o de [`configs/confirmatory.yaml`](../configs/confirmatory.yaml):
 7 condições × 3 detectores × 2 sementes, 42 execuções que compartilham 50
-épocas, `imgsz` 960, `batch` 8, `freeze: 5`, `mosaic` 1.0 com `close_mosaic` 5
-e as mesmas augmentações de cor. Nenhum hiperparâmetro varia por condição ou
-por detector.
+épocas, `imgsz` 960, `batch` 8, `mosaic` 1.0 com `close_mosaic` 5 e as mesmas
+augmentações de cor, sem congelamento de camadas. Nenhum hiperparâmetro varia
+por condição ou por detector.
 
 ## Garantias que o gerador entrega
 
@@ -95,14 +95,27 @@ por teste:
 | Garantia | Valor |
 |---|---|
 | Fruta desenhada sem rótulo | nenhuma |
-| Visibilidade mínima da fruta entregue | a que a receita declara, medida sobre a fruta e não sobre a caixa |
+| Visibilidade mínima da fruta entregue | 20% da fruta, medida sobre a fruta e não sobre a caixa |
 | Lado mínimo da caixa | o que a receita declara |
 | Oclusão invertida na imagem entregue (fruta ao fundo cobrindo fruta à frente) | nenhuma |
+| Cenas de copa sem fruta nenhuma | 15% |
 
 A escala é calibrada contra a distribuição real de caixas, e a dispersão de
 tamanho segue a da fotografia: pouca variação dentro de uma cena (p90/p10 ≈
 1,8×) e muita entre cenas (≈ 2,4×), contra 1,8× e 2,6× medidos no
 `manual-full`.
+
+Os 20% de visibilidade vêm do critério escrito do gabarito externo: fruto com
+mais de ~80% de oclusão não é anotado. Na prática o efeito no volume é pequeno
+— 0,5% menos caixas que a 15% — porque a inserção reposiciona a fruta até ela
+passar no piso, em vez de descartá-la. O que muda é onde a fruta pode ficar,
+não quantas existem.
+
+Os 15% de cenas vazias respondem ao erro medido no gabarito externo: 525
+previsões sem par contra 1.473 caixas, quase todas sobre folha limpa. Um
+detector que nunca viu copa sem fruta responde à textura da folha. O sorteio
+tem fluxo próprio, então ligar ou desligar os negativos deixa as demais cenas
+byte a byte idênticas — verificado em 168 de 168 cenas com fruta.
 
 ## Histórico dos experimentos exploratórios
 
