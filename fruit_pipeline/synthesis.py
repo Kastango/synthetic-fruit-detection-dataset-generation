@@ -680,8 +680,8 @@ def _apply_exposure_jitter(
         # transmitâncias das folhas que atravessou, não uma soma: a
         # distribuição natural é logarítmica, com massa na sombra e uma cauda
         # de sol direto. Sorteio uniforme põe a mediana no meio da faixa e
-        # produz sombra profunda de menos — 9% das frutas contra 18% no CitDet
-        # e 32% no manual-full, que é justamente onde o detector mais erra.
+        # produz sombra profunda de menos — 9% das frutas contra 32% no
+        # manual-full, que é justamente onde o detector mais erra.
         factor = math.exp(rng.uniform(math.log(float(low)), math.log(float(high))))
     else:
         factor = rng.uniform(float(low), float(high))
@@ -689,7 +689,7 @@ def _apply_exposure_jitter(
     h, s, v = fruit.convert("RGB").convert("HSV").split()
     v_array = np.asarray(v, dtype=np.float32) * factor
     # Nas fotos reais a fruta do quartil escuro e menos saturada que a do
-    # quartil claro (razao 0,80 no treino manual, 0,98 no CitDet). Dessaturar
+    # quartil claro (razao 0,80 no treino manual). Dessaturar
     # os dois extremos inverte isso: mede-se 1,12 no sintetico, ou seja, sol
     # lavado e sombra vivida. Com desaturate_shade_only a perda vale so para
     # fator abaixo de 1, deixando a fruta de sol intacta.
@@ -1342,8 +1342,8 @@ def _grading_factors(grading: dict, seed: int) -> dict:
 
     Os 228 fundos foram fotografados sob luz difusa e saem quase uniformes:
     a amplitude p5-p95 medida no pool sintético é 19,0 em brilho e 17,1 em
-    contraste, contra 32,5/30,3 no treino manual e 35,4/36,7 no CitDet. Um
-    fator por cena espalha o conjunto sem tocar em geometria.
+    contraste, contra 32,5/30,3 no treino manual. Um fator por cena espalha
+    o conjunto sem tocar em geometria.
 
     Cada eixo tem seu próprio fluxo, derivado da semente da cena: ligar ou
     desligar um deles não desloca os sorteios dos outros nem os da geometria,

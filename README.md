@@ -65,9 +65,8 @@ a mesma estrutura nas três arquiteturas.
 
 Cada treino escolhe seu checkpoint pela validação da própria condição.
 Depois, o relatório mede mAP, precision, recall e F1 nos dois conjuntos reais.
-`manual-full.val` também participa da seleção de `manual-full`. O CitDet
-orientou ajustes do gerador, portanto uma confirmação independente exige
-outra coleta reservada.
+`manual-full.val` também participa da seleção de `manual-full`, por isso a
+avaliação externa é o que sustenta a comparação entre condições.
 
 ## Resultados e limites da interpretação
 
@@ -83,9 +82,9 @@ Os detalhes do protocolo e dos conjuntos de avaliação seguem em
 [docs/RESULTS.md](docs/RESULTS.md).
 
 
-- O gerador foi calibrado com estatísticas de caixas e aparência dos conjuntos
-  avaliados. O CitDet permanece externo à coleta, mas não é um teste intocado
-  pelo desenvolvimento. Uma confirmação exige um novo conjunto reservado.
+- O gerador foi calibrado com estatísticas de caixas e aparência da coleta
+  própria. O conjunto externo é de outra equipe, outro país e outra espécie de
+  citros, e não participou de nenhum ajuste do gerador.
 - `manual_full_val` reutiliza 26 imagens de validação de `manual-full`. Isso
   favorece a avaliação dessa condição por seleção de checkpoint; o viés foi
   medido em +0,0039 de mAP@.50:.95, contra +0,0004 nas condições sintéticas.

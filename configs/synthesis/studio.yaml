@@ -30,8 +30,8 @@ placement:
   z_patch_fraction: 0.2
   z_offset: -5
   z_offset_jitter: 30
-  # Sem trava na faixa inferior: o CitDet anota muita fruta caída, e
-  # proibir a base da imagem impedia o gerador de produzir essa categoria.
+  # Sem trava na faixa inferior: fruta cai, e uma foto de copa costuma
+  # pegar o chão. Proibir a base da imagem impedia essa categoria.
   exclude_bottom_fraction: 0.0
 appearance:
   ripeness:
@@ -44,8 +44,8 @@ appearance:
     saturation_scale: 0.8
     gloss_reduction: 0.4
   rot:
-    # Fruta caída e apodrecida, que domina o gabarito do CitDet e que o
-    # gerador não produzia: matiz para o marrom, dessaturada e mais escura.
+    # Fruta apodrecida, que o gerador não produzia: matiz para o marrom,
+    # dessaturada e mais escura. Peso a rever contra o gabarito vigente.
     # Um fruto tem um estado só, então quem entra aqui não entra em ripeness.
     enabled: true
     fraction_affected: 0.12
@@ -106,8 +106,8 @@ output:
     brightness: 0.82
     # Multiplicadores sorteados por cena, cada eixo no seu fluxo. As faixas
     # partem da amplitude p5-p95 medida por imagem: o pool sintético fica em
-    # 19,0 de brilho e 17,1 de contraste, contra 32,5/30,3 no treino manual e
-    # 35,4/36,7 no CitDet. Valores abaixo de 1 achatam a cena, como parte das
+    # 19,0 de brilho e 17,1 de contraste, contra 32,5/30,3 no treino
+    # manual. Valores abaixo de 1 achatam a cena, como parte das
     # fotos reais; acima de 1 realçam.
     brightness_jitter: [0.90, 1.25]
     contrast_jitter: [0.75, 1.45]

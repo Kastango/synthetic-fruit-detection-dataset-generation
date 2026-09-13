@@ -33,15 +33,14 @@ def test_all_mode_uses_only_the_rebuild_inputs() -> None:
 def test_canonical_dataset_download_urls_are_frozen() -> None:
     config = load_yaml(ROOT / "configs" / "pipeline.yaml")
     manual = config["real_dataset"]["source"]
-    citdet = config["external_datasets"]["citdet"]
+    externo = config["external_datasets"]["oranges_field"]
 
     assert manual["download_url"] == (
         "https://drive.usercontent.google.com/download?"
         "id=1wonaftsf0E_KzMJ3O1-a-79ik-PcsICy&export=download&authuser=0"
     )
-    assert citdet["download_url"] == (
-        "https://mavmatrix.uta.edu/context/cse_datasets/article/1000/"
-        "type/native/viewcontent"
+    assert externo["download_url"] == (
+        "https://data.mendeley.com/public-api/zip/93f32zgkxz/download/1"
     )
 
 

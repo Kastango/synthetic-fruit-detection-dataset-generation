@@ -3,8 +3,8 @@ protocol:
   runs_subdir: confirmatory
   ultralytics_version: 8.4.121
   validation: data/real_yolo_confirmatory/images/val
-  external_test: citdet
-  test: data/external_tests/citdet/images/test
+  external_test: oranges_field
+  test: data/external_tests/oranges_field/images/test
   class_names: [poncan]
 
 conditions:

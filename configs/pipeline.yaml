@@ -57,26 +57,22 @@ segmentation:
   output_size: 1024
 
 external_datasets:
-  citdet:
-    landing_page: https://mavmatrix.uta.edu/cse_datasets/1/
-    download_url: https://mavmatrix.uta.edu/context/cse_datasets/article/1000/type/native/viewcontent
-    archive_name: UTA_CSE_Dataset.zip
-    expected_bytes: 1103158596
-    sha256: 15610a71de5540baf23f70b6c66123c30859ce42e0846dc843c21d277bfe71b1
-    nested_archive: CitDet-test.zip
-    annotation_format: coco
-    expected_images: 119
-    expected_boxes: 10082
-    collapse_to_single_class: true
-    license: CC BY-NC-SA 4.0
-  oranges_mendeley:
+  # Laranja em árvore, sete celulares, nove condições de tempo e hora, cinco
+  # cultivares do verde ao maduro. O protocolo de anotação é escrito: uma
+  # caixa por fruto, fruto com mais de ~80% de oclusão não é anotado, fruto
+  # pequeno ou borrado demais para identificação é descartado. Não há classe
+  # de fruta no chão.
+  oranges_field:
     landing_page: https://data.mendeley.com/datasets/93f32zgkxz/1
-    download_url: null
+    download_url: https://data.mendeley.com/public-api/zip/93f32zgkxz/download/1
     archive_name: oranges-in-the-field.zip
-    expected_images: 5025
     annotation_format: auto
     collapse_to_single_class: true
     license: CC BY-NC 3.0
+    citation: >-
+      Carella et al. (2026). Large-scale orange fruit dataset for
+      localization, classification and ripening assessment under varying
+      environments. Computers and Electronics in Agriculture 248, 111833.
   manual_full_val:
     landing_page: null
     license: interno (coleta própria do projeto)
