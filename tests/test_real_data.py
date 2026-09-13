@@ -84,6 +84,24 @@ def test_small_import_and_split_keep_unaugmented_records(
     assert split["counts"] == {"train": 1, "val": 1}
     assert not (tmp_path / "real_yolo_confirmatory" / "images" / "test").exists()
 
+    # A label can stay syntactically valid with the same box count and still
+    # diverge from the frozen annotation. Validation must detect that change.
+    from fruit_pipeline.validation import validate_real
+
+    config = {
+        "paths": {"real_source": str(target), "artifacts": str(tmp_path / "artifacts")},
+        "real_dataset": {"expected_images": 2, "expected_boxes": 2,
+                         "train_images": 1, "val_images": 1,
+                         "output": str(tmp_path / "real_yolo_confirmatory"),
+                         "artifact": "real_split.json"},
+    }
+    _, before = validate_real(config)
+    label = next((tmp_path / "real_yolo_confirmatory" / "labels/train").glob("*.txt"))
+    label.write_text("0 0.6 0.5 0.25 0.25\n")
+    _, after = validate_real(config)
+    assert not any("anotação diverge" in error for error in before)
+    assert any("anotação diverge" in error for error in after)
+
 
 def test_materialize_controlled_dataset_derives_boxes_and_negatives(
     tmp_path: Path,

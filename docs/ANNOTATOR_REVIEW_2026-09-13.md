@@ -1,7 +1,10 @@
 # Revisão do anotador — 13/09/2026
 
 Decisões fornecidas pelo usuário sobre os painéis em
-`artifacts/annotator_review_cor_luz_2x/`. Referem-se ao detector da receita
+`artifacts/annotator_review_cor_luz_2x/`. Este é um registro histórico de decisões de anotação; parâmetros e escopo
+abaixo descrevem o momento da revisão, não a receita atual.
+
+Referem-se ao detector da receita
 original em synthetic-2x, semente 41, confiança 0,25. Não são classificações
 visuais inferidas automaticamente.
 

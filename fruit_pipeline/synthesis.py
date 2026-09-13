@@ -171,6 +171,15 @@ def validate_synthesis_config(config: dict) -> None:
     if width <= 0 or height <= 0:
         raise ValueError("canvas deve ser positivo")
     objects = config["objects"]
+    retired = []
+    if "depth_scale" in objects:
+        retired.append("objects.depth_scale")
+    if "scale_with_count" in objects.get("dense", {}):
+        retired.append("objects.dense.scale_with_count")
+    if "require_vegetation" in config["placement"]:
+        retired.append("placement.require_vegetation")
+    if retired:
+        raise ValueError(f"Opções aposentadas: {', '.join(retired)}; use a receita atual do Studio")
     if objects.get("scale_distribution", "uniform") not in ("uniform", "log-uniform"):
         raise ValueError("objects.scale_distribution deve ser uniform ou log-uniform")
     if any(isinstance(objects[k], bool) or not isinstance(objects[k], int)
@@ -189,10 +198,6 @@ def validate_synthesis_config(config: dict) -> None:
             raise ValueError("objects.dense.probability deve estar entre 0 e 1")
         if not 0 <= int(dense["min"]) <= int(dense["max"]):
             raise ValueError("objects.dense: intervalo inválido")
-        if not isinstance(dense.get("scale_with_count", False), bool):
-            raise ValueError("objects.dense.scale_with_count deve ser booleano")
-        if dense.get("scale_with_count", False) and int(objects["max"]) <= 0:
-            raise ValueError("scale_with_count requer objects.max positivo")
     if not 0 < float(objects["min_scale"]) <= float(objects["max_scale"]):
         raise ValueError("intervalo de escala inválido")
     scene_scale = objects.get("scene_scale")
@@ -200,17 +205,6 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("objects.scene_scale.spread deve ser >= 1")
     if not 0 <= float(objects.get("empty_probability", 0.0)) <= 1:
         raise ValueError("objects.empty_probability deve estar entre 0 e 1")
-    depth_scale = objects.get("depth_scale")
-    if (
-        depth_scale
-        and not (
-            0 < float(depth_scale["far_scale"]) <= float(depth_scale["near_scale"])
-        )
-    ):
-        raise ValueError(
-            "depth_scale requer 0 < far_scale <= near_scale (objetos mais "
-            "próximos não podem ficar menores que os mais distantes)"
-        )
     if config["annotation"]["mode"] not in {"visible", "amodal", "rect"}:
         raise ValueError("annotation.mode deve ser visible, amodal ou rect")
     if int(config["placement"].get("min_visible_pixels", 0)) < 0:
@@ -221,8 +215,6 @@ def validate_synthesis_config(config: dict) -> None:
         raise ValueError("placement.min_box_fill deve estar entre 0 e 1")
     if not 0 <= float(config["placement"]["min_visibility"]) <= 1:
         raise ValueError("min_visibility deve estar entre 0 e 1")
-    if not isinstance(config["placement"].get("require_vegetation", False), bool):
-        raise ValueError("placement.require_vegetation deve ser booleano")
     patch_fraction = float(config["placement"].get("z_patch_fraction", 0.2))
     if not 0 < patch_fraction <= 1:
         raise ValueError(
@@ -426,24 +418,6 @@ def _trim_alpha(image: Image.Image, threshold: int = 1) -> Image.Image:
     return image.crop(
         (int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1)
     )
-
-
-def _count_adjusted_scale(objects: dict, requested: int) -> dict:
-    """Limita o crescimento da área projetada em cenas acima do regime esparso.
-
-    Não é uma lei física: é uma hipótese de câmera mais distante, ativada
-    explicitamente. Não altera a contagem nem consome aleatoriedade.
-    """
-    if not objects.get("dense", {}).get("scale_with_count", False):
-        return objects
-    if requested <= int(objects["max"]):
-        return objects
-    factor = math.sqrt(float(objects["max"]) / requested)
-    return {
-        **objects,
-        "min_scale": float(objects["min_scale"]) * factor,
-        "max_scale": float(objects["max_scale"]) * factor,
-    }
 
 
 def _scene_scale_center(objects: dict, seed) -> float | None:
@@ -1037,32 +1011,12 @@ def _finish_placement(
     }
 
 
-def _vegetation_support(canvas: Image.Image) -> np.ndarray:
-    """Indício cromático de vegetação, sem rótulos nem limiar ajustável.
-
-    Excesso de verde normalizado e separação por variância entre classes
-    (Otsu). Não distingue grama de copa nem certifica suporte em um galho.
-    """
-    rgb = np.asarray(canvas.convert("RGB"), dtype=np.float32)
-    red, green, blue = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    excess = (2 * green - red - blue) / np.maximum(rgb.sum(axis=2), 1)
-    signal = np.rint(np.clip(excess, 0, 1) * 255).astype(np.uint8)
-    histogram = np.bincount(signal.ravel(), minlength=256).astype(np.float64)
-    probabilities = histogram / histogram.sum()
-    mass = np.cumsum(probabilities)
-    moment = np.cumsum(probabilities * np.arange(256))
-    variance = (moment[-1] * mass - moment) ** 2 / np.maximum(mass * (1 - mass), 1e-12)
-    threshold = int(np.argmax(variance))
-    return signal > threshold
-
-
 def _placement(
     canvas: Image.Image,
     depth: np.ndarray,
     fruit: Image.Image,
     config: dict,
     rng: random.Random,
-    support: np.ndarray | None = None,
 ) -> dict | None:
     width, height = canvas.size
     if fruit.width > width or fruit.height > height:
@@ -1078,8 +1032,6 @@ def _placement(
     for _ in range(int(placement["max_attempts_per_object"])):
         x = rng.randint(0, width - fruit.width)
         y = rng.randint(0, height - fruit.height)
-        if support is not None and not support[y + fruit.height // 2, x + fruit.width // 2]:
-            continue
         if exclude_bottom > 0 and (y + fruit.height / 2) > height * (
             1 - exclude_bottom
         ):
@@ -1120,72 +1072,6 @@ def _z_advance_ladder(placement: dict) -> list[float]:
         return [0.0]
     size = float(placement.get("z_advance_step", 20.0))
     return [0.0] + [size * (i + 1) for i in range(steps)]
-
-
-def _resolve_depth_scale(proximity: float, depth_scale: dict) -> float:
-    near = float(depth_scale["near_scale"])
-    far = float(depth_scale["far_scale"])
-    return far + (near - far) * proximity
-
-
-def _placement_with_depth_scale(
-    canvas: Image.Image,
-    depth: np.ndarray,
-    fruit: Image.Image,
-    config: dict,
-    rng: random.Random,
-    depth_scale: dict,
-    support: np.ndarray | None = None,
-) -> dict | None:
-    # A escala de referência (`_scale_cutout`) já fixou uma fração
-    # aleatória; aqui essa fração é modulada pela profundidade local do
-    # ponto de inserção escolhido, então o tamanho final só é conhecido
-    # depois de sortear x,y — ao contrário de `_placement`, que recebe um
-    # tamanho fixo e só sorteia a posição.
-    width, height = canvas.size
-    placement = config["placement"]
-    exclude_bottom = float(placement.get("exclude_bottom_fraction", 0.0))
-    for _ in range(int(placement["max_attempts_per_object"])):
-        cx = rng.randint(0, width - 1)
-        cy = rng.randint(0, height - 1)
-        if support is not None and not support[cy, cx]:
-            continue
-        if exclude_bottom > 0 and cy > height * (1 - exclude_bottom):
-            continue
-        proximity = float(depth[cy, cx]) / 255.0
-        factor = _resolve_depth_scale(proximity, depth_scale)
-        scaled_width = max(1, round(fruit.width * factor))
-        scaled_height = max(1, round(fruit.height * factor))
-        if scaled_width > width or scaled_height > height:
-            continue
-        attempt = fruit.resize((scaled_width, scaled_height), Image.Resampling.LANCZOS)
-        x = min(max(cx - scaled_width // 2, 0), width - scaled_width)
-        y = min(max(cy - scaled_height // 2, 0), height - scaled_height)
-        alpha_original = np.asarray(attempt.getchannel("A"), dtype=np.uint8)
-        alpha_float = alpha_original.astype(np.float32)
-        opaque = alpha_original > 8
-        original_pixels = int(opaque.sum())
-        if original_pixels == 0:
-            continue
-        for z_bonus in _z_advance_ladder(placement):
-            result = _finish_placement(
-                attempt,
-                x,
-                y,
-                alpha_original,
-                alpha_float,
-                opaque,
-                original_pixels,
-                canvas,
-                depth,
-                config,
-                anchor=(cx - x, cy - y),
-                rng=rng,
-                z_bonus=z_bonus,
-            )
-            if result is not None:
-                return result
-    return None
 
 
 def _occlude_prior_instances(instances: list[dict], new_instance: dict) -> None:
@@ -1589,11 +1475,6 @@ def _render_one(task: dict) -> dict:
         grading_factors = _grading_factors(grading, task["sample_seed"])
         canvas = _apply_scene_grading(canvas, grading, grading_factors)
     base_canvas = canvas.copy()
-    support = (
-        _vegetation_support(canvas)
-        if config["placement"].get("require_vegetation", False)
-        else None
-    )
     depth_smooth_radius = float(config["occlusion"].get("depth_smooth_radius", 0.0))
     if depth_smooth_radius > 0:
         # Estimadores de profundidade de alta resolução (ex. DepthPro)
@@ -1615,7 +1496,7 @@ def _render_one(task: dict) -> dict:
         ]
     instances = []
     rejected = Counter()
-    scale_config = _count_adjusted_scale(config["objects"], requested)
+    scale_config = config["objects"]
     centro_da_cena = _scene_scale_center(scale_config, task["sample_seed"])
     if centro_da_cena:
         scale_config = {**scale_config, "scene_scale_center": centro_da_cena}
@@ -1641,13 +1522,7 @@ def _render_one(task: dict) -> dict:
         if fruit.width > canvas.width or fruit.height > canvas.height:
             rejected["larger_than_canvas"] += 1
             continue
-        depth_scale = config["objects"].get("depth_scale")
-        if depth_scale:
-            instance = _placement_with_depth_scale(
-                canvas, depth, fruit, config, rng, depth_scale, support=support
-            )
-        else:
-            instance = _placement(canvas, depth, fruit, config, rng, support=support)
+        instance = _placement(canvas, depth, fruit, config, rng)
         if instance is None:
             rejected["placement_or_visibility"] += 1
             continue

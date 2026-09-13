@@ -1,0 +1,43 @@
+{
+  "previous_generator_sha256": "fc72ebfbb7920a72e47c82d0adac8fb888239e2b9731c278f9a1c16514be3b15",
+  "current_generator_sha256": "c815256926dcac77a05062d334b6df69464da1254c96d465982ef492b0869b3d",
+  "checks": [
+    {
+      "id": "train_000014",
+      "boxes": 0,
+      "image_identical": true,
+      "label_identical": true
+    },
+    {
+      "id": "train_000324",
+      "boxes": 8,
+      "image_identical": true,
+      "label_identical": true
+    },
+    {
+      "id": "train_000492",
+      "boxes": 16,
+      "image_identical": true,
+      "label_identical": true
+    },
+    {
+      "id": "train_000355",
+      "boxes": 42,
+      "image_identical": true,
+      "label_identical": true
+    },
+    {
+      "id": "val_000168",
+      "boxes": 76,
+      "image_identical": true,
+      "label_identical": true
+    },
+    {
+      "id": "train_000022",
+      "boxes": 105,
+      "image_identical": true,
+      "label_identical": true
+    }
+  ],
+  "scope": "6 scenes selected by annotation-count quantiles; not a full pool regeneration"
+}

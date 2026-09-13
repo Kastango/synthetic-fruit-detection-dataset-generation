@@ -36,16 +36,22 @@ em `data/assets/regenerated` quando ele existe.
 
 Ajuste somente o mínimo e o máximo de frutas. A curva em U favorece
 quantidades próximas dos extremos e mantém todos os valores possíveis.
-Entre 10 e 100, a menor probabilidade fica no centro, em 55. Limites iguais
+O padrão é 10–110, com menor probabilidade no centro, em 60. Limites iguais
 fixam a quantidade solicitada. Rejeições e oclusões podem reduzir as caixas.
 
 O gerador sorteia um fundo por cena, com reposição. Fundos e frutas têm
 50% de chance de espelhamento horizontal, com sorteios independentes.
 O mapa de profundidade acompanha o fundo. A receita exporta
-`augmentation.horizontal_flip: true`; use `false` no YAML para desativar.
+`augmentation.horizontal_flip: 0.5`; use `0` no YAML para desativar.
 
-A receita inicial está em `configs/synthesis/studio.yaml`. As receitas
-antigas com `objects.dense` conservam a amostragem anterior.
+A receita inicial está em `configs/synthesis/studio.yaml`, a mesma composição
+aprovada para o pool oficial. Os sliders leem seus valores desse arquivo.
+O padrão inclui 7% de cenas vazias, centro de escala 0,012–0,055, dispersão
+por cena 2,24, visibilidade 20% e piso de 90 pixels.
+
+Receitas antigas com `objects.dense` conservam a amostragem anterior, mas
+`depth_scale`, `dense.scale_with_count` e `require_vegetation` foram aposentados
+e precisam ser removidos antes de usar o gerador atual.
 
 ## Sementes e reprodução
 

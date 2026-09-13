@@ -12,9 +12,7 @@ from PIL import Image, ImageOps
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
     _apply_appearance_hsv_cast,
-    _count_adjusted_scale,
     _sample_object_count,
-    _vegetation_support,
     _finish_placement,
     create_asset_catalog,
     create_scene_split,
@@ -158,74 +156,6 @@ def test_exclude_bottom_fraction_validates_bounds() -> None:
     config = tiny_config()
     config["placement"]["exclude_bottom_fraction"] = 1.5
     with pytest.raises(ValueError, match="exclude_bottom_fraction"):
-        validate_synthesis_config(config)
-
-
-def test_count_scale_preserves_sparse_scenes_and_projected_area():
-    objects = {
-        "max": 30,
-        "min_scale": 0.01,
-        "max_scale": 0.065,
-        "dense": {"scale_with_count": True},
-    }
-    assert _count_adjusted_scale(objects, 0) == objects
-    assert _count_adjusted_scale(objects, 30) == objects
-    for count in (60, 90, 110):
-        adjusted = _count_adjusted_scale(objects, count)
-        for key in ("min_scale", "max_scale"):
-            assert count * adjusted[key] ** 2 == pytest.approx(30 * objects[key] ** 2)
-    assert objects["max_scale"] == 0.065
-    disabled = {**objects, "dense": {"scale_with_count": False}}
-    assert _count_adjusted_scale(disabled, 110) == disabled
-
-
-def test_vegetation_support_rejects_sky_and_wood_without_rejecting_dark_leaves():
-    colors = [
-        (30, 100, 35),
-        (3, 10, 4),
-        (100, 160, 240),
-        (220, 220, 220),
-        (110, 65, 30),
-    ]
-    canvas = Image.fromarray(np.array([colors] * 4, dtype=np.uint8))
-    support = _vegetation_support(canvas)
-    assert support[0].tolist() == [True, True, False, False, False]
-    assert not _vegetation_support(Image.new("RGB", (8, 8), "white")).any()
-    assert _vegetation_support(Image.new("RGB", (8, 8), (20, 100, 30))).all()
-
-
-@pytest.mark.parametrize("depth_scale", [False, True])
-def test_vegetation_placement_does_not_insert_fruit_into_empty_sky(
-    tmp_path, depth_scale
-):
-    assets = tmp_path / "assets"
-    build_assets(assets)
-    for path in (assets / "backgrounds").glob("*.jpg"):
-        Image.new("RGB", (64, 64), "white").save(path)
-    config = tiny_config()
-    config["sampling"] = {"mode": "paired-v1"}
-    if depth_scale:
-        config["objects"]["depth_scale"] = {"near_scale": 1.0, "far_scale": 1.0}
-    for required in (False, True):
-        config["placement"]["require_vegetation"] = required
-        output = tmp_path / str(required)
-        generate_dataset(
-            assets, output, config, train_ratio=0.5, split_seed=42, workers=1
-        )
-        rows = [
-            json.loads(line)
-            for line in (output / "manifest.jsonl").read_text().splitlines()
-        ]
-        assert sum(row["annotations"] for row in rows) == (0 if required else 3)
-
-
-@pytest.mark.parametrize("value,max_count", [("false", 1), (True, 0)])
-def test_count_scale_rejects_ambiguous_configuration(value, max_count):
-    config = tiny_config()
-    config["objects"].update(
-        min=0, max=max_count, dense={"min": 4, "max": 4, "scale_with_count": value}
-    )
-    with pytest.raises(ValueError, match="scale_with_count"):
         validate_synthesis_config(config)
 
 
@@ -819,42 +749,6 @@ def test_scene_grading_generation_is_deterministic_and_labels_are_valid(
         assert validate_yolo_text(label.read_text(), str(label)) == 1
 
 
-def test_depth_scale_config_validates_scale_bounds() -> None:
-    config = tiny_config()
-    config["objects"]["depth_scale"] = {
-        "enabled": True,
-        "near_scale": 0.5,
-        "far_scale": 1.5,
-    }
-    with pytest.raises(ValueError, match="depth_scale"):
-        validate_synthesis_config(config)
-
-
-def test_depth_scale_generation_is_deterministic_and_labels_are_valid(
-    tmp_path: Path,
-) -> None:
-    assets = tmp_path / "assets"
-    output = tmp_path / "generated"
-    build_assets(assets)
-    config = tiny_config()
-    config["objects"]["depth_scale"] = {
-        "enabled": True,
-        "near_scale": 1.4,
-        "far_scale": 0.6,
-    }
-    first = generate_dataset(
-        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
-    )
-    manifest_before = (output / "manifest.jsonl").read_bytes()
-    second = generate_dataset(
-        assets, output, config, train_ratio=0.5, split_seed=42, workers=1
-    )
-    assert first["manifest_sha256"] == second["manifest_sha256"]
-    assert (output / "manifest.jsonl").read_bytes() == manifest_before
-    for label in (output / "labels").rglob("*.txt"):
-        assert validate_yolo_text(label.read_text(), str(label)) == 1
-
-
 def test_z_offset_jitter_validates_non_negative() -> None:
     config = tiny_config()
     config["placement"]["z_offset_jitter"] = -1.0
@@ -960,23 +854,21 @@ def test_debug_panel_is_generated_without_changing_main_output(
         assert panel.width == config["canvas"][0] * 2 + 4
 
 
-@pytest.mark.parametrize("count_scale", [False, True])
+@pytest.mark.parametrize("paired", [False, True])
 def test_parallel_generation_matches_single_worker(
-    tmp_path: Path, count_scale: bool
+    tmp_path: Path, paired: bool
 ) -> None:
     assets = tmp_path / "assets"
     single = tmp_path / "single"
     parallel = tmp_path / "parallel"
     build_assets(assets)
     config = tiny_config()
-    if count_scale:
+    if paired:
         config["sampling"] = {"mode": "paired-v1"}
-        config["placement"]["require_vegetation"] = True
         config["objects"]["dense"] = {
             "probability": 1.0,
             "min": 4,
             "max": 4,
-            "scale_with_count": True,
         }
     generate_dataset(
         assets,
@@ -1078,7 +970,7 @@ def test_every_composed_fruit_yields_a_label(tmp_path):
 
     linhas = (output / "manifest.jsonl").read_text().splitlines()
     total = 0
-    for row in (json.loads(l) for l in linhas):
+    for row in (json.loads(line) for line in linhas):
         caixas = [
             linha
             for linha in (output / row["label"]).read_text().splitlines()
@@ -1248,4 +1140,16 @@ def test_probabilidade_de_cena_vazia_e_validada() -> None:
     config = tiny_config()
     config["objects"]["empty_probability"] = 1.4
     with pytest.raises(ValueError, match="empty_probability"):
+        validate_synthesis_config(config)
+
+
+@pytest.mark.parametrize("section,option", [
+    ("objects", "depth_scale"), ("placement", "require_vegetation"),
+    ("dense", "scale_with_count"),
+])
+def test_retired_recipe_options_are_not_silently_ignored(section, option):
+    config = tiny_config()
+    target = config["objects"].setdefault("dense", {}) if section == "dense" else config[section]
+    target[option] = False
+    with pytest.raises(ValueError, match="Opções aposentadas"):
         validate_synthesis_config(config)

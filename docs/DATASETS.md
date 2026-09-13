@@ -3,8 +3,8 @@
 Este documento descreve somente os dados que participam do protocolo atual:
 a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e a
 coleta externa de avaliação. As contagens de imagens vêm da
-configuração; as caixas sintéticas totais são as publicadas em
-[RESULTS.md](RESULTS.md).
+configuração; as caixas sintéticas foram contadas no pool de 13/09/2026.
+As medições completas estão em [DATASET_PROFILES.md](DATASET_PROFILES.md).
 
 ## Visão geral
 
@@ -12,24 +12,30 @@ configuração; as caixas sintéticas totais são as publicadas em
 |---|---|---:|---:|---:|---:|
 | `manual-full` | referência com anotação humana | 104 | 26 | — | 2.093 |
 | `controlled` | controle sem composição | 284 | 71 | — | 127 |
-| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 3.981 |
-| `synthetic-2x` | síntese | 208 | 52 | — | 8.242 |
-| `synthetic-3x` | síntese | 312 | 78 | — | 12.526 |
-| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 21.242 |
-| `synthetic-10x` | maior volume sintético avaliado | 1.040 | 260 | — | 41.583 |
-| `oranges_field` | teste externo comum | — | — | 1.243 | 15.893 |
+| `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | 6.612 |
+| `synthetic-2x` | síntese | 208 | 52 | — | 11.620 |
+| `synthetic-3x` | síntese | 312 | 78 | — | 17.790 |
+| `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 29.966 |
+| `synthetic-10x` | maior volume sintético previsto | 1.040 | 260 | — | 61.425 |
+| `oranges_field` | avaliação externa/desenvolvimento | — | — | 1.243 | 15.893 |
 
-**Protocolo de treino.** As 42 execuções — 7 condições × 3 detectores ×
-2 sementes — compartilham exatamente o mesmo protocolo: 50 épocas, `imgsz` 960,
-`batch` 8, SGD com `lr0` 0,01, `mosaic` 1.0 com `close_mosaic` 5 e as mesmas
-augmentações de cor e geometria, sem congelamento de camadas. Nenhum
-hiperparâmetro varia por condição ou por detector, inclusive nas condições de
-dados reais.
+**Protocolo de treino.** São 42 execuções: 7 condições × 3 detectores ×
+2 sementes. Todas usam até 50 épocas, `patience: 30`, `imgsz: 960`,
+`mosaic: 1.0`, `close_mosaic: 5` e as mesmas augmentações, sem congelamento.
+YOLOv8s e YOLO26s usam SGD, `lr0: 0.01`, batch 8. RT-DETR-L usa AdamW,
+`lr0: 0.0001`, batch 2 por limite de memória. Os ajustes são constantes entre
+condições dentro de cada arquitetura; diferem entre arquiteturas.
+A grade permanece interrompida durante a revisão dos dados.
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
 de cada execução é escolhido sem consultar o teste externo; somente após a
 seleção ser congelada em `model_selection.json` o teste externo é preparado e
-avaliado. Nenhuma imagem da coleta externa entra no treinamento.
+avaliado. Nenhuma imagem da coleta externa entra no treinamento. Entretanto, seu
+protocolo de anotação, erros de detector e estatísticas já orientaram o
+gerador. A comparação 50/50 solicitada em 13/09/2026 formaliza esse uso como
+desenvolvimento. Congelar checkpoints antes de avaliar não torna essa coleta
+um teste independente. Uma avaliação confirmatória exige outra coleta
+intocada; dividir agora recortes já consultados não desfaz esse uso.
 
 Todas as condições são convertidas para detecção YOLO com uma única classe,
 `poncan`. Na coleta externa isso significa uma classe genérica de fruto
@@ -145,9 +151,10 @@ O gerador cria primeiro um pool único de 1.300 identidades de cena em resoluç�
 
 1. escolhe um par fundo/mapa de profundidade do catálogo;
 2. corrige contraste, brilho e nitidez do fundo antes de inserir frutas;
-3. em 15% das cenas para aqui, e a copa fica sem fruta nenhuma;
-4. nas demais, solicita 1–30 frutas ou, com probabilidade de 25%, 60–110;
-5. sorteia escala-base e rotação do recorte;
+3. em 7% das cenas para aqui, e a copa fica sem fruta nenhuma;
+4. nas demais, solicita 10–110 frutas com distribuição em U;
+5. sorteia um centro de escala log-uniforme por cena, varia cada fruta
+   em torno dele (`spread: 2.24`) e sorteia sua rotação;
 6. tenta posições, define a oclusão pelo eixo z e verifica a visibilidade
    mínima na inserção;
 7. ajusta matiz, HSV cast e exposição, aplica sombras e compõe a cena em
@@ -161,20 +168,19 @@ Parâmetros que definem o pool confirmatório:
 | Propriedade | Valor atual |
 |---|---|
 | resolução gerada | 720×960, retrato |
-| cenas sem fruta | 15% |
-| objetos solicitados nas demais | 1–30 em 75% delas, 60–110 em 25% |
-| escala-base | maior lado do recorte = 0,018–0,1 do menor lado do canvas, log-uniforme |
+| cenas sem fruta | probabilidade 7%; observado 84/1.300 = 6,46% |
+| objetos solicitados nas demais | 10–110, curva em U, sem bloco `dense` |
+| escala por cena | centro 0,012–0,055 do menor lado do canvas, log-uniforme; dispersão 2,24 |
 | rotação | até ±180° |
 | visibilidade mínima da fruta | 20%, verificada sobre a cena final |
-| piso de fruta visível | 100 px |
+| piso de fruta visível | 90 pixels de máscara |
 | região inferior excluída da colocação | nenhuma |
 | caixas | parte visível final, largura e altura mínimas de 2 px |
 | split do pool | 80/20, semente 42 |
 | qualidade JPEG | 95, sem subamostragem de croma |
 
 A configuração integral e versionável está em
-`configs/synthesis/confirmatory_pool.yaml`. As contagens de caixas por
-condição só valem depois que o pool for regerado com a receita vigente; a
+`configs/synthesis/confirmatory_pool.yaml`. As contagens descrevem o pool medido, gerado antes da simplificação do código; a
 divisão por split e a cobertura dos ativos precisam ser consultadas nos
 manifestos da execução, não inferidas da proporção de imagens.
 
@@ -185,11 +191,11 @@ Depois disso, cada condição toma prefixos crescentes de ambas as partições:
 
 | Condição | Imagens treino | Imagens validação | Caixas totais publicadas |
 |---|---:|---:|---:|
-| `synthetic-1x` | 104 | 26 | 3.981 |
-| `synthetic-2x` | 208 | 52 | 8.242 |
-| `synthetic-3x` | 312 | 78 | 12.526 |
-| `synthetic-5x` | 520 | 130 | 21.242 |
-| `synthetic-10x` | 1.040 | 260 | 41.583 |
+| `synthetic-1x` | 104 | 26 | 6.612 |
+| `synthetic-2x` | 208 | 52 | 11.620 |
+| `synthetic-3x` | 312 | 78 | 17.790 |
+| `synthetic-5x` | 520 | 130 | 29.966 |
+| `synthetic-10x` | 1.040 | 260 | 61.425 |
 
 Os conjuntos são estritamente aninhados: `2x` contém todas as cenas de `1x`,
 `3x` contém todas as de `2x` e assim por diante, tanto no treino quanto na
@@ -276,8 +282,8 @@ recorte de aproximação.
 `scripts/curate_oranges_field.py` aplica dois critérios, nenhum deles olhando
 para a distribuição da coleta própria:
 
-1. descarta o recorte que contenha qualquer caixa com lado acima de 1/4 da
-   imagem;
+1. descarta o recorte sem caixas ou que contenha qualquer caixa com lado
+   acima de 1/4 da imagem;
 2. limita cada condição a 250 recortes, percorrendo as fotos de origem em
    rodadas para não pegar 250 recortes da mesma árvore;
 3. exclui a condição de interior, que não é pomar.
@@ -294,8 +300,8 @@ para a distribuição da coleta própria:
 | formato original das caixas | YOLO (COCO também disponível) |
 | licença | CC BY-NC 3.0 |
 
-O resultado fica próximo da coleta própria em tamanho de caixa e densidade sem
-ter sido ajustado a ela:
+A curadoria foi definida antes da comparação com a coleta própria. As
+extensões normalizadas das caixas e a densidade medidas são:
 
 | | p5 | mediana | p95 | caixas/imagem |
 |---|---:|---:|---:|---:|
@@ -304,9 +310,9 @@ ter sido ajustado a ela:
 
 ### Como interpretar o resultado externo
 
-Nenhuma imagem nem estatística desta coleta entrou em qualquer ajuste do
-gerador, e ela é de outra equipe, outro país e outra espécie de citros. Isso a
-torna a única avaliação do protocolo que não foi tocada pelo desenvolvimento.
+Esta coleta é de outra equipe, outro país e outra espécie de citros, mas
+seu protocolo, erros e estatísticas foram consultados durante o desenvolvimento.
+Ela mede desempenho em um domínio externo conhecido; não é um teste intocado.
 
 Três limites precisam acompanhar qualquer número dela:
 
@@ -319,7 +325,10 @@ Três limites precisam acompanhar qualquer número dela:
   aqui não há categoria separada, então a fração não é mensurável a partir do
   gabarito e não é possível filtrá-la. A inspeção visual indica que é bem menor
   que os 62% da coleta anterior, mas não é zero.
-- **Os recortes são correlacionados.** As 1.243 imagens vêm de 655 fotos, então
+- **Os recortes são correlacionados.** A medição atual também encontrou dez
+  repetições exatas por SHA-256 e cinco caixas duplicadas. Os casos estão no
+  relatório de perfis; nada foi removido silenciosamente do gabarito.
+  As 1.243 imagens vêm de 655 fotos, então
   o tamanho efetivo da amostra é menor que a contagem de imagens sugere.
 
 Após o colapso de classes, a métrica é detecção genérica de fruto cítrico, não
@@ -330,56 +339,35 @@ reconhecimento taxonômico de poncã.
 A receita é [`configs/synthesis/confirmatory_pool.yaml`](../configs/synthesis/confirmatory_pool.yaml),
 única fonte dos conjuntos sintéticos.
 
-### Por que 25% de cenas densas
+### Receita oficial e Studio
 
-A proporção vem da distribuição de caixas por imagem das coletas reais:
+A receita calibrada pelo usuário é o padrão de ambos. Os YAMLs diferem somente
+no nome e no total de imagens: Studio 390, pool 1.300. Os sliders leem o YAML;
+um teste verifica que abrir/exportar os padrões preserva todos os parâmetros.
+Foram preservados 25% de maturação, 12% de podridão, visibilidade 20%, piso de
+90 pixels, z −7, chão liberado, luz por cena, espelhamento 50% e gradação com
+variação por cena. A mistura 50/50 é um alvo de análise, ainda não uma nova
+receita promovida. Consulte [DATASET_PROFILES.md](DATASET_PROFILES.md).
 
-| conjunto | imagens | média | p25 | mediana | p75 | p95 | máximo |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| `manual-full` (treino) | 104 | 15,8 | 9 | 14 | 22 | 31 | 40 |
-| `manual-full` (validação) | 26 | 17,3 | 11 | 18 | 24 | 28 | 31 |
-| pool sintético (25%) | 312 | 33,1 | 10 | 21 | 61 | 97 | 109 |
+Foram removidas as opções experimentais `objects.depth_scale`,
+`objects.dense.scale_with_count` e `placement.require_vegetation`. Receitas
+que as contenham agora falham com orientação de migração, em vez de serem
+interpretadas silenciosamente de outra forma. `scene_scale` continua ativo.
 
-A cauda densa do pool cobria o regime da coleta externa anterior, que tinha
-mediana 78 caixas por imagem contra 14 do `manual-full`. Com a troca do
-conjunto de avaliação, **essa proporção precisa ser rederivada**: enquanto isso
-não for feito, os 25% são um valor herdado, não um valor justificado pela
-distribuição que estamos medindo.
+### Reprodutibilidade
 
-### Sem congelamento de camadas
+O pool medido tem 1.300 imagens, 61.425 caixas e 84 negativos. Os manifestos
+conservam a receita e o hash do gerador que realmente o produziu. A simplificação
+altera o hash do código; a pipeline recusará retomar esse diretório sem
+regeneração explícita. Não se deve reescrever o hash antigo para simular uma
+nova geração. Seis cenas selecionadas por quantis, incluindo negativa e densa,
+saíram com pixels e rótulos idênticos antes/depois da simplificação. Essa
+verificação é amostral; não equivale à regeneração integral do pool.
 
-A grade treina todos os pesos, em todas as condições e todos os modelos.
-
-Congelar os blocos iniciais (`freeze: 5`) rende de +0,009 a +0,016 mAP no
-treino sintético, replicado em três conjuntos e duas arquiteturas. Esse ganho,
-porém, foi medido inteiramente contra a coleta externa que não faz mais parte
-do protocolo — aquela em que 62% do gabarito era fruta no chão. Contra a
-coleta atual ele não está verificado.
-
-O custo, esse continua medido no conjunto local e é grande: `manual-full` sem
-congelamento obtém 0,5459 e com `freeze: 5` obtém 0,5062, uma perda de 0,0346,
-com as duas sementes abaixo das do controle. Manter um congelamento que
-comprovadamente prejudica a linha de base real, sustentado por um ganho que
-não se pode mais verificar, é o tipo de escolha que a troca de conjunto existe
-para evitar.
-
-A interpretação causal que motivava o congelamento continua plausível e
-continua testável: congelar remove a capacidade de adaptar filtros de baixo
-nível à estatística do domínio de treino, o que penaliza quem treina no mesmo
-domínio em que testa e pode beneficiar quem treina em cena composta. Se valer
-a pena, é um experimento a refazer contra a coleta atual — não um padrão a
-herdar.
-
-### Reprodutibilidade verificada
-
-O gerador foi regerado a partir da receita oficial em diretório separado:
-390 imagens idênticas byte a byte, nenhum rótulo divergente, e `config_hash`,
-`asset_catalog_fingerprint`, `generator_sha256` e `generator_schema_version`
-coincidentes. O marcador de geração recusa retomar um diretório produzido por
-outra configuração, código, catálogo ou split, o que impede que uma pasta seja
-sobrescrita depois de as corridas a referenciarem. Reprodução byte a byte
-também depende das mesmas versões de Python, NumPy e Pillow; treino
-determinístico de GPU tem limites próprios de hardware e bibliotecas.
+O treino continua sem congelamento. As rodadas exploratórias e a grade
+aposentada foram apagadas a pedido do usuário; seus números não constituem
+resultados atuais. Foram preservadas as fontes, o pool oficial e a revisão
+humana de anotações.
 
 ## Rastreabilidade
 

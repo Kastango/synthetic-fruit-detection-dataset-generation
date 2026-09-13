@@ -82,6 +82,22 @@ def validate_real(config: dict) -> tuple[dict, list[str]]:
     }
     if materialized_counts != expected_counts:
         errors.append("contagens materializadas do split real incorretas")
+    if sum(tree[name]["boxes"] for name in expected_counts) != int(expected["expected_boxes"]):
+        errors.append("contagem materializada de caixas reais diferente do protocolo")
+    records = {item["id"]: item for item in imported["records"]}
+    for split, expected_ids in split_sets.items():
+        paths = image_files(output / "images" / split)
+        if {path.stem for path in paths} != expected_ids:
+            errors.append(f"{split}: imagens não correspondem aos IDs congelados")
+        for path in paths:
+            record = records.get(path.stem)
+            if record is None:
+                continue
+            label = output / "labels" / split / f"{path.stem}.txt"
+            if sha256_file(path) != record["image_sha256"]:
+                errors.append(f"{path}: imagem diverge da fonte importada")
+            if label.exists() and sha256_file(label) != record["label_sha256"]:
+                errors.append(f"{label}: anotação diverge da fonte importada")
     return {
         "ready": not errors,
         "source_sha256": summary.get("source", {}).get("sha256"),

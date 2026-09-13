@@ -84,11 +84,15 @@ def test_recipe_limits_and_removes_effects():
     assert "cast_shadow" not in c["occlusion"]
     assert "exposure_jitter" not in c["appearance"]
     assert "dense" not in c["objects"]
-    assert (c["objects"]["min"], c["objects"]["max"]) == (10, 100)
+    # sem controle explícito, o slider parte da receita base
+    assert (c["objects"]["min"], c["objects"]["max"]) == (
+        base["objects"]["min"],
+        base["objects"]["max"],
+    )
     assert c["augmentation"]["horizontal_flip"] == 0.5
     # resolve_recipe não pode mexer na receita de origem
-    assert base["objects"]["max"] != c["objects"]["max"]
     assert "cast_shadow" in base["occlusion"]
+    assert "exposure_jitter" in base["appearance"]
     for invalid in [
         {"max_scale": float("nan")},
         {"min_scale": 7, "max_scale": 6},
@@ -143,7 +147,9 @@ def test_content_hash_catches_same_size_asset_change(tmp_path):
 
 
 def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
-    import time, zipfile, yaml
+    import time
+    import zipfile
+    import yaml
 
     assets = tmp_path / "assets"
     build_assets(assets)
@@ -326,3 +332,25 @@ def test_cenas_vazias_aparecem_no_studio_e_voltam_da_receita():
     receita = resolve_recipe(base, {"empty_probability": 22}, "reference", 42)
     assert receita["objects"]["empty_probability"] == 0.22
     assert controls_from_recipe(receita)["empty_probability"] == 22
+
+
+def test_sliders_partem_da_receita_base():
+    """A posição inicial do slider tem de ser a da receita, não um número fixo.
+
+    Enquanto o default era escrito à mão em CONTROLS, 18 dos 24 controles
+    abriam num valor que a receita base não tinha.
+    """
+    from fruit_pipeline.studio import BASE_RECIPE, DEFAULTS, controls_from_recipe
+
+    assert DEFAULTS == controls_from_recipe(BASE_RECIPE)
+    assert DEFAULTS["empty_probability"] == 7
+    assert len(DEFAULTS) == 24
+
+
+def test_default_studio_preserves_official_recipe():
+    from fruit_pipeline.studio import BASE_RECIPE, DEFAULTS
+    result = resolve_recipe(BASE_RECIPE, DEFAULTS, "reference", BASE_RECIPE["seed"])
+    official = load_yaml(Path("configs/synthesis/confirmatory_pool.yaml"))
+    for key in BASE_RECIPE.keys() - {"name", "images"}:
+        assert result[key] == BASE_RECIPE[key]
+        assert result[key] == official[key]

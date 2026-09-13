@@ -22,7 +22,6 @@ from PIL import Image, ImageDraw, ImageOps
 from .common import ROOT, load_yaml, stable_hash, sha256_file, atomic_write_json
 from .synthesis import (
     create_asset_catalog,
-    _render_compact,
     _render_preview,
     _initialize_worker,
     scene_seed,
@@ -47,7 +46,6 @@ CONTROLS = [
         0,
         150,
         1,
-        10,
         "Quantidades próximas dos extremos aparecem mais que as do centro.",
     ),
     (
@@ -57,7 +55,6 @@ CONTROLS = [
         0,
         150,
         1,
-        100,
         "Frutas solicitadas; rejeições e oclusões podem reduzir o total visível.",
     ),
     (
@@ -67,7 +64,6 @@ CONTROLS = [
         0.5,
         8,
         0.1,
-        1,
         "Maior lado do recorte em relação ao menor lado da imagem, antes da profundidade.",
     ),
     (
@@ -77,7 +73,6 @@ CONTROLS = [
         1,
         15,
         0.1,
-        6.5,
         "Não equivale diretamente ao tamanho da caixa visível.",
     ),
     (
@@ -87,7 +82,6 @@ CONTROLS = [
         -30,
         30,
         1,
-        -5,
         "Valores negativos colocam a fruta atrás da folhagem.",
     ),
     (
@@ -97,7 +91,6 @@ CONTROLS = [
         0,
         400,
         10,
-        100,
         "Piso absoluto de pixels de fruta. Sem ele, sobram caixas onde não há fruta visível.",
     ),
     (
@@ -107,7 +100,6 @@ CONTROLS = [
         5,
         80,
         1,
-        20,
         "Limiar na inserção; frutas posteriores ainda podem ocluir.",
     ),
     (
@@ -117,7 +109,6 @@ CONTROLS = [
         0,
         50,
         1,
-        15,
         "Copa sem fruta nenhuma. Sem negativos o detector responde à folha.",
     ),
     (
@@ -127,7 +118,6 @@ CONTROLS = [
         0,
         50,
         1,
-        18,
         "Recoloração aproximada de recortes maduros; revise os detalhes.",
     ),
     (
@@ -137,7 +127,6 @@ CONTROLS = [
         0,
         100,
         1,
-        75,
         "Teto do verde. Cada fruta em maturação sorteia entre zero e esse teto.",
     ),
     (
@@ -147,7 +136,6 @@ CONTROLS = [
         0,
         90,
         1,
-        45,
         "Adoção da luminância do alvo ambiental no HSV cast.",
     ),
     (
@@ -157,7 +145,6 @@ CONTROLS = [
         0,
         100,
         1,
-        100,
         "Zero remove a exposição aleatória independente da cena.",
     ),
     (
@@ -167,7 +154,6 @@ CONTROLS = [
         0,
         80,
         1,
-        45,
         "Escurecimento próximo à borda de oclusão.",
     ),
     (
@@ -177,7 +163,6 @@ CONTROLS = [
         0,
         100,
         1,
-        50,
         "Chance de espelhar o fundo e cada fruta; cria composições novas a partir do mesmo catálogo.",
     ),
     (
@@ -187,7 +172,6 @@ CONTROLS = [
         0,
         359,
         1,
-        315,
         "Ângulo do sol na cena. As sombras caem do lado oposto.",
     ),
     (
@@ -197,7 +181,6 @@ CONTROLS = [
         0,
         180,
         1,
-        20,
         "Quanto a direção muda entre cenas. O ângulo é único dentro de cada cena.",
     ),
     (
@@ -207,7 +190,6 @@ CONTROLS = [
         0,
         40,
         1,
-        0,
         "Faixa em torno do brilho do fundo, sorteada por cena.",
     ),
     (
@@ -217,7 +199,6 @@ CONTROLS = [
         0,
         60,
         1,
-        0,
         "Faixa em torno do contraste do fundo. Valores baixos achatam a cena.",
     ),
     (
@@ -227,7 +208,6 @@ CONTROLS = [
         0,
         40,
         1,
-        0,
         "Faixa em torno da saturação do fundo, sorteada por cena.",
     ),
     (
@@ -237,7 +217,6 @@ CONTROLS = [
         0,
         100,
         1,
-        25,
         "Realce de bordas aplicado ao fundo antes de inserir as frutas.",
     ),
     (
@@ -247,7 +226,6 @@ CONTROLS = [
         0,
         100,
         1,
-        0,
         "Faixa em torno da nitidez, sorteada por cena.",
     ),
     (
@@ -257,7 +235,6 @@ CONTROLS = [
         60,
         130,
         1,
-        82,
         "Ajuste somente do fundo, antes da composição.",
     ),
     (
@@ -267,7 +244,6 @@ CONTROLS = [
         50,
         150,
         1,
-        100,
         "Intensidade de cor da cena antes de inserir as frutas.",
     ),
     (
@@ -277,7 +253,6 @@ CONTROLS = [
         80,
         140,
         1,
-        120,
         "Ajuste somente do fundo, antes da composição.",
     ),
 ]
@@ -301,8 +276,6 @@ SPREAD_PAIRS = [
 # frutas entram no efeito, o outro diz até onde ele vai.
 LINKED_PAIRS = [("green_fraction", "ripeness_strength")]
 
-DEFAULTS = {row[0]: row[6] for row in CONTROLS}
-SIMPLE = {**DEFAULTS, "exposure_spread": 0}
 
 
 def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
@@ -311,7 +284,7 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     if set(controls) - set(DEFAULTS):
         raise ValueError("Controle desconhecido")
     values = {**(SIMPLE if preset == "essential" else DEFAULTS), **controls}
-    for key, _, _, lo, hi, step, _, _ in CONTROLS:
+    for key, _, _, lo, hi, step, _ in CONTROLS:
         value = values[key]
         if (
             isinstance(value, bool)
@@ -358,8 +331,8 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     spread = values["exposure_spread"] / 100
     if spread:
         c["appearance"]["exposure_jitter"]["range"] = [
-            1 - 0.6 * spread,
-            1 + 0.9 * spread,
+            round(1 - 0.6 * spread, 4),
+            round(1 + 0.9 * spread, 4),
         ]
     else:
         c["appearance"].pop("exposure_jitter", None)
@@ -402,6 +375,10 @@ def resolve_recipe(base: dict, controls: dict, preset: str, seed: int) -> dict:
     )
     validate_synthesis_config(c)
     return c
+
+
+def _maybe(value, factor):
+    return None if value is None else float(value) * factor
 
 
 def controls_from_recipe(recipe: dict) -> dict:
@@ -478,8 +455,11 @@ def controls_from_recipe(recipe: dict) -> dict:
     return saida
 
 
-def _maybe(value, factor):
-    return None if value is None else float(value) * factor
+BASE_RECIPE = load_yaml(ROOT / "configs/synthesis/studio.yaml")
+# A posição inicial de cada slider é lida da receita base, não escrita duas
+# vezes: um default fixo aqui envelheceria em silêncio a cada ajuste da receita.
+DEFAULTS = controls_from_recipe(BASE_RECIPE)
+SIMPLE = {**DEFAULTS, "exposure_spread": 0}
 
 
 def picture(image: Image.Image, max_side: int = 720, quality: int = 82) -> str:
@@ -549,7 +529,7 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
 
 class Studio:
     def __init__(self, asset_root: Path, output: Path, preview_workers: int | None = None):
-        self.base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
+        self.base = deepcopy(BASE_RECIPE)
         self.output = output
         catalog = create_asset_catalog(asset_root)
         self.fingerprint = catalog["source_fingerprint"]
@@ -863,7 +843,6 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                                     "min",
                                     "max",
                                     "step",
-                                    "default",
                                     "help",
                                 ],
                                 r,

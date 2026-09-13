@@ -29,7 +29,7 @@ diagrams = ["fonttools==4.63.0", "matplotlib==3.11.1"]
 packages = ["fruit_pipeline"]
 
 [tool.setuptools.package-data]
-fruit_pipeline = ["studio_static/*"]
+fruit_pipeline = ["studio_static/*", "audit_static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -11,7 +11,8 @@ buscando desempenho próximo ao real e cenas verossímeis.
 ## Como as cenas são geradas
 
 O DepthPro estima a profundidade das árvores. O compositor usa esses mapas
-para ajustar o tamanho das frutas e esconder parte delas atrás da vegetação.
+para esconder parte das frutas atrás da vegetação. O tamanho varia ao redor de
+um centro sorteado por cena, representando a distância da câmera.
 Depois de todas as inserções, calcula as caixas das partes visíveis.
 
 [![Processo de preparação dos ativos, composição e divisão dos dados](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)
@@ -58,18 +59,18 @@ A configuração completa está em
 | YOLOs | SGD, taxa inicial 0,01, batch 8 |
 | RT-DETR | AdamW, taxa inicial 0,0001, batch 2 |
 
-Todos partem de pesos pré-treinados. O congelamento reduz os parâmetros
-ajustados, mas não o tamanho do detector. Os cinco módulos não representam
-a mesma estrutura nas três arquiteturas.
+Todos partem de pesos pré-treinados e ajustam todas as camadas, sem congelamento.
 
 Cada treino escolhe seu checkpoint pela validação da própria condição.
 Depois, o relatório mede mAP, precision, recall e F1 nos dois conjuntos reais.
 `manual-full.val` também participa da seleção de `manual-full`, por isso a
-avaliação externa é o que sustenta a comparação entre condições.
+avaliação externa descreve o desempenho entre condições em outro domínio.
+Como esse domínio já orientou o gerador, uma conclusão confirmatória exige
+outra coleta intocada.
 
 ## Resultados e limites da interpretação
 
-**A grade está sendo regerada.** O gerador passou a exigir que toda fruta
+**A grade está interrompida para revisão do dataset.** O gerador passou a exigir que toda fruta
 composta renda um rótulo que uma pessoa consiga verificar na imagem: nenhuma
 fruta é desenhada sem anotação, e nenhum rótulo fica abaixo dos pisos que a
 receita declara. A verificação vale sobre a cena final, depois de todas as
@@ -83,10 +84,10 @@ Os detalhes do protocolo e dos conjuntos de avaliação seguem em
 
 - O gerador foi calibrado com estatísticas de caixas e aparência da coleta
   própria. O conjunto externo é de outra equipe, outro país e outra espécie de
-  citros, e não participou de nenhum ajuste do gerador.
+  citros. Seu protocolo, erros e estatísticas passaram a orientar o gerador;
+  ela é referência de desenvolvimento, sem independência confirmatória.
 - `manual_full_val` reutiliza 26 imagens de validação de `manual-full`. Isso
-  favorece a avaliação dessa condição por seleção de checkpoint; o viés foi
-  medido em +0,0039 de mAP@.50:.95, contra +0,0004 nas condições sintéticas.
+  favorece a avaliação dessa condição por seleção de checkpoint.
 - O split sintético separa cenas, permitindo compartilhar fundos e recortes.
   A validação mede novas composições de ativos conhecidos.
 - Há duas sementes de treinamento e um único pool sintético. As médias não
@@ -189,13 +190,13 @@ Os caminhos abaixo identificam os campos do YAML.
 | Mudar o formato | `canvas` | Define largura e altura em pixels. `[720, 960]` produz retratos. |
 | Mudar a quantidade de frutas | `objects.min`, `objects.max` | Sorteia em uma curva em U. Quantidades próximas dos limites aparecem mais; próximas do centro, menos. Rejeições e oclusões podem reduzir o total visível. |
 | Espelhar os ativos | `augmentation.horizontal_flip` | Ativa 50% de chance de espelhamento horizontal por fundo e por fruta. O mapa acompanha o fundo. |
-| Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.depth_scale` | Controla o tamanho inicial do recorte e sua correção pela profundidade. |
+| Aproximar ou afastar as frutas | `objects.min_scale`, `objects.max_scale`, `objects.scene_scale.spread` | Sorteia o centro de escala por cena e a dispersão dos recortes ao redor dele. |
 | Esconder mais fruta atrás das folhas | `placement.z_offset` | Valores mais negativos colocam a fruta atrás de regiões próximas do fundo. O mapa usa unidades de 0 a 255, não metros. |
-| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige uma fração visível na inserção. O valor oficial é 0,15. Outras frutas ainda podem cobri-la depois. |
-| Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | Exclui os 15% inferiores do sorteio de posições. Não identifica o chão por segmentação. |
+| Rejeitar frutas quase ocultas | `placement.min_visibility` | Exige 20% de superfície visível, também verificados depois das oclusões finais. |
+| Evitar a parte inferior da foto | `placement.exclude_bottom_fraction` | O padrão é 0: toda a altura está liberada. Não identifica o chão por segmentação. |
 | Variar a maturação | `appearance.ripeness` | Altera o matiz de parte dos recortes maduros para verde-amarelado. |
 | Combinar a fruta com a luz local | `appearance.hsv_cast` | Aproxima cor e luminosidade da fruta das do fundo. |
-| Variar sol e sombra entre frutas | `appearance.exposure_jitter` | Multiplica a intensidade por um fator entre 0,40 e 1,90 nas instâncias afetadas. |
+| Variar sol e sombra entre frutas | `appearance.exposure_jitter` | Multiplica a intensidade por um fator entre 0,82 e 1,27 nas instâncias afetadas. |
 | Suavizar o encontro com as folhas | `occlusion.edge_blur`, `occlusion.edge_feather_radius` | Suaviza a máscara de oclusão e o contorno do recorte. |
 | Escolher o que a caixa cobre | `annotation.mode` | `visible` cobre a parte visível. `amodal` inclui a parte oculta. A receita usa `visible`. |
 
@@ -204,7 +205,8 @@ preserva os sorteios de geometria. Fundos são sorteados com reposição.
 Os espelhamentos também usam a semente.
 Mudar quantidade, escala ou catálogo pode alterar posições e caixas.
 Os manifestos registram sementes e hashes para identificar cada geração.
-A receita histórica `confirmatory_pool.yaml` conserva os dois grupos usados
-nos experimentos publicados. Esses resultados não avaliam a nova curva em U.
+A receita oficial `confirmatory_pool.yaml` usa a mesma composição do Studio,
+com total de 1.300 imagens. As medições reais e os alvos 50/50 estão em
+[DATASET_PROFILES.md](docs/DATASET_PROFILES.md).
 
 </details>

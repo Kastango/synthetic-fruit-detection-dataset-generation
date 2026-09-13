@@ -1,0 +1,43 @@
+{
+  "stage": "real",
+  "errors": [],
+  "real": {
+    "ready": true,
+    "source_sha256": "28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3",
+    "images": 130,
+    "boxes": 2093,
+    "devices": {
+      "iphone": 82,
+      "pixel": 48
+    },
+    "splits": {
+      "train": {
+        "images": 104,
+        "labels": 104,
+        "boxes": 1642
+      },
+      "val": {
+        "images": 26,
+        "labels": 26,
+        "boxes": 451
+      }
+    },
+    "split_devices": {
+      "train": {
+        "iphone": 66,
+        "pixel": 38
+      },
+      "val": {
+        "iphone": 16,
+        "pixel": 10
+      }
+    },
+    "augmentation_signals": {
+      "exact_duplicates": 0,
+      "images_below_original_camera_resolution": 0,
+      "passed": true,
+      "processed_filenames": 0
+    }
+  },
+  "ready": true
+}
