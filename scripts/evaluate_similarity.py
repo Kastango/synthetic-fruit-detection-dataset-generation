@@ -28,7 +28,7 @@ if __name__ == "__main__":
     for result in selected:
         for name, test in [
             ("manual_full_val", ROOT / "data/real_yolo_confirmatory/images/val"),
-            ("citdet", ROOT / "data/external_tests/citdet/images/test"),
+            ("oranges_field", ROOT / "data/external_tests/oranges_field/images/test"),
         ]:
             evaluation = {
                 **result,

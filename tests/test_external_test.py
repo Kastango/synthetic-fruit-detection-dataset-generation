@@ -24,7 +24,7 @@ def test_nested_coco_archive_is_imported_without_reencoding(tmp_path: Path) -> N
         "categories": [{"id": 2, "name": "fruit"}],
     }
     (inner_root / "test" / "annotations.json").write_text(json.dumps(annotations))
-    inner_zip = tmp_path / "CitDet-test.zip"
+    inner_zip = tmp_path / "conjunto-test.zip"
     with zipfile.ZipFile(inner_zip, "w") as archive:
         for path in sorted((inner_root / "test").rglob("*")):
             if path.is_file():
@@ -34,17 +34,17 @@ def test_nested_coco_archive_is_imported_without_reencoding(tmp_path: Path) -> N
         archive.write(inner_zip, inner_zip.name)
 
     summary = import_external_test(
-        "citdet",
+        "externo",
         outer_zip,
         tmp_path / "external",
         ["poncan"],
         annotation_format="coco",
-        nested_archive="CitDet-test.zip",
+        nested_archive="conjunto-test.zip",
         expected_images=1,
         expected_boxes=1,
     )
 
-    target = tmp_path / "external" / "citdet"
+    target = tmp_path / "external" / "externo"
     assert summary["images"] == 1
     assert summary["boxes"] == 1
     assert (target / "images" / "test" / "sample.jpg").read_bytes() == original_bytes

@@ -109,7 +109,7 @@ CONDITIONS = [
     ],
 ]
 
-TEST_IMAGES = PIPELINE["external_datasets"]["citdet"]["expected_images"]
+TEST_IMAGES = PIPELINE["external_datasets"]["oranges_field"]["expected_images"]
 
 # O teste usa a mesma escala de cartas e permanece igual nas sete condições.
 TEST_CARDS = round(2 * TEST_IMAGES / 26)
@@ -212,7 +212,7 @@ def build(name: str, train: int, val: int, slug: str) -> tuple[str, set[str]]:
     title = f"Training, validation and test sets for {name}"
     desc = (
         f"From left to right: {thousands(train)} training images, {val} validation "
-        f"images and the same {TEST_IMAGES} CitDet test images for every condition. "
+        f"images and the same {TEST_IMAGES} external test images for every condition. "
         "Each group uses two cards per 26 images, rounded to the nearest integer. "
         "Photos illustrate data types. Card spacing compresses in larger groups. "
         "All diagrams have equal width and fixed group starting positions."

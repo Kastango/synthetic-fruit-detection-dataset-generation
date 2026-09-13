@@ -19,9 +19,6 @@ CONDITION_ORDER = [
     "synthetic-5x",
     "synthetic-10x",
 ]
-CITDET_STEM = "ftp-6-60-43_fruit-drop-back-picture_1_2021-11-09-01-57-07_jpg"
-
-
 def resize(image, max_side=1440):
     image = image.copy()
     image.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
@@ -54,7 +51,9 @@ def read_boxes(path):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--dataset", choices=["citdet", "manual_full_val"], default="citdet")
+    p.add_argument(
+        "--dataset", choices=["oranges_field", "manual_full_val"], default="oranges_field"
+    )
     p.add_argument(
         "--model", choices=["yolov8s", "yolo26s", "rtdetr-l"], default="yolo26s"
     )
@@ -62,17 +61,19 @@ def main():
     p.add_argument("--image-stem")
     p.add_argument(
         "--output-name",
-        help="Subpasta de saída para o CitDet; permite mais de uma cena.",
+        help="Subpasta de saída do conjunto externo; permite mais de uma cena.",
     )
     p.add_argument("--condition", action="append", choices=CONDITION_ORDER)
     p.add_argument("--device", default="0")
     args = p.parse_args()
     from ultralytics import YOLO
 
-    if args.dataset == "citdet":
-        root = ROOT / "data/external_tests/citdet"
+    if args.dataset == "oranges_field":
+        root = ROOT / "data/external_tests/oranges_field"
         split = "test"
-        stem = args.image_stem or CITDET_STEM
+        stem = args.image_stem or sorted(
+            p.stem for p in (root / "images" / split).glob("*.jpg")
+        )[0]
         output = ROOT / "docs/figures/results/examples"
         if args.output_name:
             output = output / args.output_name

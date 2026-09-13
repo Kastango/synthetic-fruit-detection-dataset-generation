@@ -92,7 +92,7 @@ def heatmap_sheet(folder: Path, columns: int, cell_width: int):
         ("synthetic-3x", "synthetic-3x"),
         ("synthetic-5x", "synthetic-5x"),
         ("synthetic-10x", "synthetic-10x"),
-        ("citdet", "CitDet (teste)"),
+        ("oranges_field", "coleta externa"),
         ("manual_full_val", "manual-full · val"),
     ]
     tiles = [
@@ -117,11 +117,11 @@ def main():
 
     save(
         detection_sheet(base / "examples", 4, args.cell_width),
-        base / "sheets/citdet-cena-esparsa.jpg",
+        base / "sheets/externo-cena-esparsa.jpg",
     )
     save(
         detection_sheet(base / "examples/cena-mediana", 4, args.cell_width),
-        base / "sheets/citdet-cena-mediana.jpg",
+        base / "sheets/externo-cena-mediana.jpg",
     )
     for model in ("yolov8s", "yolo26s", "rtdetr-l"):
         folder = base / "examples/manual-full-val" / model

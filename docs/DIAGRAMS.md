@@ -79,7 +79,7 @@ Para atualizar os microfluxogramas a partir dos splits materializados:
   --dataset manual=data/real_yolo_confirmatory \
   --dataset controlled=data/real_controlled \
   --dataset synthetic=data/generated/confirmatory_pool \
-  --dataset test=data/external_tests/citdet
+  --dataset test=data/external_tests/oranges_field
 ```
 
 Cada `--dataset` é independente. O script amostra arquivos em ordem estável,
@@ -117,18 +117,20 @@ PY
   --dataset synthetic=artifacts/diagrams/preview-80
 ```
 
-As miniaturas manuais, controladas e do CitDet foram preservadas da versão
-anterior. Na thread, as primeiras foram obtidas de `data/real_yolo` e dos
+As miniaturas manuais e controladas foram obtidas de `data/real_yolo` e dos
 ativos de campo, antes da materialização dos splits confirmatórios. As do
-CitDet vieram do arquivo oficial de teste. Elas representam tipos de dados;
-não certificam a identidade dos arquivos de cada split. Para atualizar essa
-proveniência, regenere-as dos datasets materializados com o comando acima.
+teste externo ainda vêm da coleta que saiu do protocolo e **precisam ser
+regeneradas** com o comando acima. Elas representam tipos de dados; não
+certificam a identidade dos arquivos de cada split.
 
 As imagens de campo seguem os termos registrados em [DATASETS.md](DATASETS.md).
-As miniaturas do CitDet são recortes e redimensionamentos do dataset de
+As miniaturas de teste externo ainda em disco são recortes e
+redimensionamentos do dataset de
 [James et al.](https://robotic-vision-lab.github.io/citdet/), sob
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/).
-Essa licença se aplica também aos exemplos e mapas derivados do CitDet.
+[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), e a
+licença vale enquanto elas existirem. Depois de regeneradas, passam a vir da
+coleta de [Carella et al.](https://data.mendeley.com/datasets/93f32zgkxz/1),
+sob [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/).
 As fontes vieram de [Google Fonts](https://github.com/google/fonts/tree/main/ofl),
 nos diretórios `geist`, `geistmono` e `instrumentserif`; as licenças acompanham
 os arquivos. A licença do código não substitui os termos desses recursos.

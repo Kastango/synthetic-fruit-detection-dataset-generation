@@ -1,8 +1,8 @@
 # Conjuntos de dados e protocolo experimental
 
 Este documento descreve somente os dados que participam do protocolo atual:
-a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e o
-CitDet como avaliação em coleta externa. As contagens de imagens vêm da
+a base real anotada, a condição `controlled`, os cinco conjuntos sintéticos e a
+coleta externa de avaliação. As contagens de imagens vêm da
 configuração; as caixas sintéticas totais são as publicadas em
 [RESULTS.md](RESULTS.md).
 
@@ -17,7 +17,7 @@ configuração; as caixas sintéticas totais são as publicadas em
 | `synthetic-3x` | síntese | 312 | 78 | — | 12.526 |
 | `synthetic-5x` | síntese, volume intermediário | 520 | 130 | — | 21.242 |
 | `synthetic-10x` | maior volume sintético avaliado | 1.040 | 260 | — | 41.583 |
-| CitDet | teste externo comum | — | — | 119 | 10.082 |
+| `oranges_field` | teste externo comum | — | — | 1.243 | 15.893 |
 
 **Protocolo de treino.** As 42 execuções — 7 condições × 3 detectores ×
 2 sementes — compartilham exatamente o mesmo protocolo: 50 épocas, `imgsz` 960,
@@ -28,16 +28,13 @@ escolha do congelamento, e seu custo medido para a linha de base real, estão
 em [Congelamento uniforme do backbone](#congelamento-uniforme-do-backbone).
 
 Cada condição de treinamento possui sua própria validação. O melhor checkpoint
-de cada execução é escolhido sem consultar o CitDet; somente após a seleção ser
-congelada em `model_selection.json` o teste externo é preparado e avaliado. O
-split de treino do CitDet não é usado no treinamento dos detectores. Esse
-controle não impede calibração do gerador com estatísticas da avaliação,
-limitação presente nesta versão.
+de cada execução é escolhido sem consultar o teste externo; somente após a
+seleção ser congelada em `model_selection.json` o teste externo é preparado e
+avaliado. Nenhuma imagem da coleta externa entra no treinamento.
 
 Todas as condições são convertidas para detecção YOLO com uma única classe,
-`poncan`. No CitDet, isso significa colapsar as categorias de localização do
-dataset original em uma classe genérica de fruto cítrico; não significa que as
-119 imagens contenham exclusivamente poncãs.
+`poncan`. Na coleta externa isso significa uma classe genérica de fruto
+cítrico; as imagens dela não contêm poncã.
 
 ## Base real anotada (`manual-full`)
 
@@ -134,7 +131,7 @@ o compositor. Ela também expõe o detector a uma proporção alta de negativos
 (228 de 355 imagens), útil para medir falsos positivos em folhagem e galhos.
 
 Ela não reproduz a tarefa final: as fotos positivas são close-ups com uma fruta,
-enquanto as fotos reais anotadas e o CitDet contêm cenas de copa com muitas
+enquanto as coletas reais contêm cenas de copa com muitas
 instâncias, oclusões e escalas. A comparação com os conjuntos sintéticos altera
 simultaneamente composição,
 escala, pose, densidade de objetos e número de caixas. Não permite atribuir
@@ -222,70 +219,109 @@ manifesto do pool.
   porém, não estimam a variância que seria obtida com pools sintéticos gerados
   independentemente.
 
-## CitDet como teste externo
+## Coleta externa de avaliação (`oranges_field`)
 
-O [CitDet](https://robotic-vision-lab.github.io/citdet/) é um benchmark de
-detecção de frutos cítricos em pomar publicado por James et al. no *IEEE
-Robotics and Automation Letters* ([artigo](https://doi.org/10.1109/LRA.2024.3474473),
-[dataset](https://doi.org/10.32855/dataset.2024.05.005)). A coleção completa
-possui 579 imagens de alta resolução e mais de 32 mil caixas.
+A avaliação externa vem de [Carella et al. (2026)](https://doi.org/10.1016/j.compag.2026.111833),
+publicada em [Mendeley Data](https://data.mendeley.com/datasets/93f32zgkxz/1)
+sob CC BY-NC 3.0. São 865 fotografias de laranja doce (*Citrus sinensis*) em
+pomares experimentais e comerciais da Sicília, tiradas com sete modelos de
+celular, sem pose, distância ou ângulo fixos, entre outubro e dezembro de 2024.
 
-### Por que ele é adequado para este projeto
+### Por que ela substituiu a coleta anterior
 
-- Foi capturado em um pomar real, em Fort Pierce, Flórida, entre outubro de 2021
-  e outubro de 2022.
-- Contém mais de 60 variedades de cítricos afetadas por Huanglongbing (HLB), em
-  diferentes estágios de maturação, cores e tamanhos.
-- As árvores foram fotografadas em orientação retrato, de ambos os lados da
-  fileira, em condições ensolaradas e sombreadas e ao longo de vários dias.
-- A câmera foi posicionada próxima ao solo para simular a observação por um robô
-  terrestre entre fileiras.
-- Frutos na árvore e no chão são anotados, produzindo cenas densas e oclusas.
+A coleta externa usada antes anotava fruta na árvore e fruta no chão. No split
+de teste, 6.263 das 10.082 caixas eram de chão — 62% do gabarito era uma
+categoria que a coleta própria não contém e que o gerador não produz. Filtrar
+o gabarito não resolve, porque as imagens continuam tendo fruta caída e uma
+detecção correta dela passaria a contar como falso positivo.
 
-Essas propriedades tornam o CitDet um teste de transferência de domínio muito
-mais exigente que uma separação aleatória das 130 fotos locais. Ele mede se as
-características aprendidas com poncãs e/ou síntese se transferem para outros
-cítricos, outra fazenda, outras condições ambientais e maior densidade de
-objetos.
+### O que ela traz
 
-### Uso exato pela pipeline
+- **Protocolo de anotação escrito.** Uma caixa por fruto; fruto com mais de
+  aproximadamente 80% de oclusão não é anotado; fruto pequeno ou borrado demais
+  para identificação segura é descartado. É o primeiro piso de visibilidade
+  documentado contra o qual calibrar o gerador.
+- **Nove condições de tempo e hora** — manhã, tarde e noite × sol, nublado e
+  chuva, mais noturno e interior — e cinco cultivares em estágios do verde ao
+  maduro.
+- **Sete aparelhos diferentes**, o que espalha nitidez, faixa dinâmica e
+  balanço de branco.
 
-A pipeline espera o pacote `UTA_CSE_Dataset.zip`, verifica sua identidade e
-abre somente o arquivo interno `CitDet-test.zip`:
+### O recorte que a pipeline usa
+
+O pacote publicado não é o conjunto de teste: são 5.025 sub-imagens 640×640
+extraídas das 865 fotos por um algoritmo de corte, e o corte introduz dois
+problemas.
+
+| condição | recortes | caixas | caixas com lado > 0,15 |
+|---|---:|---:|---:|
+| `MS` manhã ensolarada | 2.768 | 14.765 | 23,8% |
+| `AC` tarde nublada | 1.082 | 14.445 | 5,6% |
+| `AS` tarde ensolarada | 625 | 7.791 | 8,9% |
+| `ES` fim de tarde ensolarado | 224 | 1.980 | 2,3% |
+| `MC` manhã nublada | 126 | 2.784 | 0,0% |
+| `NI` noturna | 96 | 862 | 3,5% |
+| `IN` interior | 57 | 97 | 95,9% |
+| `EC` fim de tarde nublado | 34 | 150 | 6,7% |
+| `AR` tarde chuvosa | 13 | 164 | 1,2% |
+
+Primeiro, parte dos recortes fica tão perto que uma fruta ocupa o quadro
+inteiro: a pergunta ali não é "onde estão as frutas nesta copa", é "isto é uma
+fruta". Segundo, as condições estão muito desbalanceadas, e só a de manhã
+ensolarada responde por 55% dos recortes — justamente a mais contaminada por
+recorte de aproximação.
+
+`scripts/curate_oranges_field.py` aplica dois critérios, nenhum deles olhando
+para a distribuição da coleta própria:
+
+1. descarta o recorte que contenha qualquer caixa com lado acima de 1/4 da
+   imagem;
+2. limita cada condição a 250 recortes, percorrendo as fotos de origem em
+   rodadas para não pegar 250 recortes da mesma árvore;
+3. exclui a condição de interior, que não é pomar.
 
 | Verificação | Resultado esperado |
 |---|---:|
-| tamanho do pacote | 1.103.158.596 bytes |
-| SHA-256 | `15610a71de5540baf23f70b6c66123c30859ce42e0846dc843c21d277bfe71b1` |
-| imagens do split oficial de teste | 119 |
-| caixas do split oficial de teste | 10.082 |
-| média de caixas por imagem | 84,72 |
-| formato original das caixas | COCO JSON |
-| licença do pacote CitDet | CC BY-NC-SA 4.0 |
+| tamanho do pacote | 812.649.381 bytes |
+| SHA-256 | `5400227ae218eacd6f060b982f83c4d56258bef66779a46dc0ff8b770b298e35` |
+| recortes publicados | 5.025 |
+| recortes no teste após a curadoria | 1.243 |
+| fotos de origem representadas | 655 |
+| caixas no teste | 15.893 |
+| média de caixas por imagem | 12,8 |
+| formato original das caixas | YOLO (COCO também disponível) |
+| licença | CC BY-NC 3.0 |
 
-As imagens são copiadas sem resize, recompressão ou alteração geométrica. As
-caixas COCO são convertidas para YOLO e todas as categorias de fruto são
-colapsadas para a classe 0. As pseudo-máscaras PNG disponibilizadas pelos
-autores não são usadas, porque o protocolo avalia detecção por caixas.
+O resultado fica próximo da coleta própria em tamanho de caixa e densidade sem
+ter sido ajustado a ela:
 
-O portal pode impor um desafio WAF a downloads não interativos. Nesse caso,
-`--external-source` aceita uma cópia obtida manualmente, mas tamanho e SHA-256
-continuam obrigatórios. O arquivo e o teste materializado permanecem fora do
-Git por tamanho e licença.
+| | p5 | mediana | p95 | caixas/imagem |
+|---|---:|---:|---:|---:|
+| `oranges_field` | 0,0187 | 0,0437 | 0,1281 | 12,8 |
+| `manual-full` | 0,0201 | 0,0365 | 0,0893 | 16,1 |
 
 ### Como interpretar o resultado externo
 
-Nesta versão, estatísticas do CitDet orientaram ajustes do gerador. O conjunto
-é externo à coleta local, mas não foi mantido intocado durante o desenvolvimento.
-Esse uso limita conclusões confirmatórias mesmo que suas imagens não entrem
-no treinamento dos detectores.
+Nenhuma imagem nem estatística desta coleta entrou em qualquer ajuste do
+gerador, e ela é de outra equipe, outro país e outra espécie de citros. Isso a
+torna a única avaliação do protocolo que não foi tocada pelo desenvolvimento.
 
-O CitDet não mede reconhecimento taxonômico de poncã: após o colapso de classes,
-mede detecção genérica de fruto cítrico. Seu alto número de objetos pequenos por
-imagem também torna a métrica sensível a resolução de entrada, `max_det` e
-oclusão. Por isso, o resultado deve ser lido como robustez fora do domínio, não
-como substituto da validação local nem como estimativa direta de desempenho em
-qualquer pomar brasileiro.
+Três limites precisam acompanhar qualquer número dela:
+
+- **A anotação é semiautomática.** Pré-rotulagem por um YOLOv8n treinado
+  iterativamente, refinada à mão no Roboflow e filtrada por CLIP. Avaliar um
+  detector da família YOLO contra rótulos derivados de YOLO tem risco de viés a
+  favor da família. Auditar uma amostra com `scripts/audit_dataset.py` é o
+  contrapeso.
+- **Fruta caída é anotada na mesma classe.** Ao contrário da coleta anterior,
+  aqui não há categoria separada, então a fração não é mensurável a partir do
+  gabarito e não é possível filtrá-la. A inspeção visual indica que é bem menor
+  que os 62% da coleta anterior, mas não é zero.
+- **Os recortes são correlacionados.** As 1.243 imagens vêm de 655 fotos, então
+  o tamanho efetivo da amostra é menor que a contagem de imagens sugere.
+
+Após o colapso de classes, a métrica é detecção genérica de fruto cítrico, não
+reconhecimento taxonômico de poncã.
 
 ## Receita de síntese e protocolo de treino
 
@@ -298,18 +334,15 @@ A proporção vem da distribuição de caixas por imagem das coletas reais:
 
 | conjunto | imagens | média | p25 | mediana | p75 | p95 | máximo |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| CitDet (teste) | 119 | 84,7 | 43 | 78 | 121 | 174 | 233 |
 | `manual-full` (treino) | 104 | 15,8 | 9 | 14 | 22 | 31 | 40 |
 | `manual-full` (validação) | 26 | 17,3 | 11 | 18 | 24 | 28 | 31 |
 | pool sintético (25%) | 312 | 33,1 | 10 | 21 | 61 | 97 | 109 |
 
-As duas coletas reais são regimes opostos: mediana 14 e máximo 40 no
-`manual-full`, mediana 78 e máximo 233 no CitDet. Nenhuma distribuição
-sintética única é verossímil para as duas ao mesmo tempo. Com poucas cenas
-densas o gerador replica o `manual-full` e ignora o CitDet; a 25% ele cobre os
-dois, com a metade inferior no regime do `manual-full` e o quartil superior
-entrando na faixa central do CitDet. As cenas densas permanecem abaixo do
-máximo real observado, de 233 caixas.
+A cauda densa do pool cobria o regime da coleta externa anterior, que tinha
+mediana 78 caixas por imagem contra 14 do `manual-full`. Com a troca do
+conjunto de avaliação, **essa proporção precisa ser rederivada**: enquanto isso
+não for feito, os 25% são um valor herdado, não um valor justificado pela
+distribuição que estamos medindo.
 
 ### Congelamento uniforme do backbone
 
@@ -320,10 +353,9 @@ medido, e o custo fica registrado aqui em vez de omitido.
 Congelar os blocos iniciais prejudica o treino com dados reais. Medido com o
 mesmo protocolo e as mesmas sementes, `manual-full` sem congelamento obtém
 0,5459 no conjunto local e com `freeze: 5` obtém 0,5062, uma perda de 0,0346,
-com as duas sementes abaixo das do controle. No CitDet a diferença é nula, de
-0,2126 para 0,2130. No treino sintético o mesmo corte rende entre +0,0088 e
-+0,0161 no CitDet sem custo local, replicado em três conjuntos e duas
-arquiteturas.
+com as duas sementes abaixo das do controle. O ganho compensatório no treino
+sintético foi medido contra a coleta externa anterior e **precisa ser refeito**
+contra a atual antes de continuar sustentando a decisão.
 
 O motivo de aplicá-lo mesmo assim é a uniformidade: comparar condições exige
 que treino, épocas, augmentação e congelamento sejam os mesmos para todas
@@ -365,7 +397,7 @@ determinístico de GPU tem limites próprios de hardware e bibliotecas.
 | `data/assets/regenerated/asset_catalog.json` | pares fundo/profundidade e recortes elegíveis |
 | `data/generated/confirmatory_pool/manifest.jsonl` | proveniência de cada cena sintética |
 | `data/generated/*/summary.json` | tamanho e vínculo de cada subconjunto ao pool |
-| `data/external_tests/citdet/manifest.json` | origem, hashes e conversão do teste externo |
+| `data/external_tests/oranges_field/manifest.json` | origem, hashes e conversão do teste externo |
 
 Os diretórios `data/`, `artifacts/` e `runs/` são produtos locais ou dados
 restritos e não substituem os manifestos versionados/configurações que definem

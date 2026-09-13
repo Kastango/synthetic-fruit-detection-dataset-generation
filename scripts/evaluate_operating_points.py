@@ -31,7 +31,7 @@ def main():
     args = parser.parse_args()
     from ultralytics import YOLO
 
-    for dataset in ("citdet", "manual_full_val"):
+    for dataset in ("oranges_field", "manual_full_val"):
         report = json.loads((args.artifacts / f"test_results_{dataset}.json").read_text())
         images = Path(report["test_path"])
         if report["external_manifest_sha256"] != sha256_file(images.parents[1] / "manifest.json"):

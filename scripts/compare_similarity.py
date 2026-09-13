@@ -21,11 +21,11 @@ if __name__ == "__main__":
         "split": a.split,
         "images": len(synthetic["count"]),
         "boxes": len(synthetic["size"]),
-        "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. CitDet usado no desenvolvimento.",
+        "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. A coleta externa não participou do desenvolvimento.",
     }
     for name, root, split in [
         ("manual_train", ROOT / "data/real_yolo_confirmatory", "train"),
-        ("citdet", ROOT / "data/external_tests/citdet", "test"),
+        ("oranges_field", ROOT / "data/external_tests/oranges_field", "test"),
     ]:
         real = dataset_features(root / "images" / split, root / "labels" / split)
         report[name] = {

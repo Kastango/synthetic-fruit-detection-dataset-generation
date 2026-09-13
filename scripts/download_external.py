@@ -13,7 +13,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Baixa ou recebe e valida criptograficamente um teste externo."
     )
-    parser.add_argument("name", help="nome em external_datasets, ex.: citdet")
+    parser.add_argument("name", help="nome em external_datasets, ex.: oranges_field")
     parser.add_argument("--source", type=Path, help="arquivo já baixado")
     parser.add_argument("--config", default="configs/pipeline.yaml")
     parser.add_argument("--force", action="store_true")

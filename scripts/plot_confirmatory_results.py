@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Consolida test_results_{citdet,manual_full_val}.json num Markdown único
+"""Consolida test_results_{oranges_field,manual_full_val}.json num Markdown único
 com tabelas comparativas e um gráfico de tendência (volume de dados sintéticos
-x mAP), para CitDet e a validação manual reutilizada na avaliação.
+x mAP), para a coleta externa e a validação manual reutilizada na avaliação.
 
 Não participa do pipeline reprodutível (`run_pipeline.sh`); é um script de
 análise executado manualmente sobre artefatos já gerados.
@@ -25,7 +25,7 @@ FIGURES = ROOT / "docs" / "figures" / "results"
 HEATMAPS_OUT = FIGURES / "heatmaps"
 
 TESTS = {
-    "citdet": "CitDet · coleta externa usada na calibração",
+    "oranges_field": "Laranja em árvore · coleta externa",
     "manual_full_val": "Validação manual · reusada na seleção de manual-full",
 }
 
@@ -226,7 +226,7 @@ def build_trend_chart(
 
 def copy_heatmaps(directory: Path) -> list[str]:
     HEATMAPS_OUT.mkdir(parents=True, exist_ok=True)
-    keep = CONDITION_ORDER + ["citdet", "manual_full_val"]
+    keep = CONDITION_ORDER + ["oranges_field", "manual_full_val"]
     copied = []
     for name in keep:
         src = directory / "annotation_heatmaps" / f"{name}.png"

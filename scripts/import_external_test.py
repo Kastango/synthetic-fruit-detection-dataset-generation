@@ -16,7 +16,7 @@ def main() -> None:
             "detectado automaticamente) para avaliação fora do domínio sintético/real."
         )
     )
-    parser.add_argument("name", help="nome curto do conjunto, ex.: citdet")
+    parser.add_argument("name", help="nome curto do conjunto, ex.: oranges_field")
     parser.add_argument("--source", required=True, type=Path, help="diretório ou ZIP")
     parser.add_argument("--config", default="configs/pipeline.yaml")
     parser.add_argument("--force", action="store_true")

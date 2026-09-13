@@ -66,9 +66,19 @@ external_datasets:
     landing_page: https://data.mendeley.com/datasets/93f32zgkxz/1
     download_url: https://data.mendeley.com/public-api/zip/93f32zgkxz/download/1
     archive_name: oranges-in-the-field.zip
-    annotation_format: auto
+    expected_bytes: 812649381
+    sha256: 5400227ae218eacd6f060b982f83c4d56258bef66779a46dc0ff8b770b298e35
+    annotation_format: yolo
     collapse_to_single_class: true
     license: CC BY-NC 3.0
+    # O pacote traz 5.025 recortes 640x640 de 865 fotos. O teste usa o
+    # subconjunto de `scripts/curate_oranges_field.py`: fora os recortes em que
+    # uma fruta ocupa mais de 1/4 do quadro (não há copa para procurar nela) e
+    # no máximo 250 recortes por condição de luz, percorrendo as fotos de
+    # origem em rodadas. Nenhum critério olha para a coleta própria.
+    curation: scripts/curate_oranges_field.py --teto 0.25 --cap 250 --seed 42
+    expected_images: 1243
+    expected_boxes: 15893
     citation: >-
       Carella et al. (2026). Large-scale orange fruit dataset for
       localization, classification and ripening assessment under varying
