@@ -86,7 +86,9 @@ def test_recipe_limits_and_removes_effects():
     assert "dense" not in c["objects"]
     assert (c["objects"]["min"], c["objects"]["max"]) == (10, 100)
     assert c["augmentation"]["horizontal_flip"] == 0.5
-    assert "dense" in base["objects"]
+    # resolve_recipe não pode mexer na receita de origem
+    assert base["objects"]["max"] != c["objects"]["max"]
+    assert "cast_shadow" in base["occlusion"]
     for invalid in [
         {"max_scale": float("nan")},
         {"min_scale": 7, "max_scale": 6},

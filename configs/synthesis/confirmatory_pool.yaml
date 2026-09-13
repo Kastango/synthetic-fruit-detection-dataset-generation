@@ -5,27 +5,39 @@ images:
 canvas:
 - 720
 - 960
+
+sampling:
+  # Semente de cena derivada de (semente raiz, impressão dos ativos, índice da
+  # cena). Sem isso a semente depende do hash da configuração, e qualquer
+  # ajuste embaralharia todas as cenas — o que impede comparar duas receitas
+  # cena a cena.
+  mode: paired-v1
+
 objects:
-  min: 1
-  max: 30
-  min_scale: 0.018
-  max_scale: 0.1
-  # Calibrado contra a distribuição de caixas do `manual-full`: lado maior
-  # com p5 0,0201, mediana 0,0365 e p95 0,0893 da largura da imagem. O
-  # sorteio é log-uniforme porque a distribuição real é assimétrica — a
-  # mediana fica muito mais perto do p5 que do p95, e um sorteio uniforme
-  # produziria fruta grande demais no centro da distribuição.
+  min: 10
+  max: 110
+  # Cenas de copa sem fruta nenhuma. Sem negativos o detector nunca vê
+  # folhagem que não esconde nada e passa a responder à textura da folha: no
+  # gabarito externo foram 525 previsões sem par contra 1.473 caixas, quase
+  # todas sobre folha limpa.
+  empty_probability: 0.07
+  min_scale: 0.012
+  max_scale: 0.055
+  # Com scene_scale, min_scale e max_scale delimitam o CENTRO da cena, não
+  # cada fruta. O sorteio é log-uniforme porque a distribuição real de
+  # tamanhos é assimétrica: no `manual-full` a mediana (0,0365 da largura)
+  # fica muito mais perto do p5 (0,0201) que do p95 (0,0893).
   scale_distribution: log-uniform
+  scene_scale:
+    # Numa foto real todas as frutas estão à mesma distância da câmera: dentro
+    # do quadro o tamanho varia pouco (p90/p10 ≈ 1,8x no `manual-full` e 1,9x
+    # no gabarito externo) e entre quadros varia muito (2,6x entre as
+    # medianas). Sortear a escala fruta a fruta invertia isso — cada cena
+    # virava uma sopa de tamanhos e todas as cenas saíam com a mesma média.
+    # 2,24 é a razão máximo/mínimo dentro da cena que reproduz p90/p10 ≈ 1,9x.
+    spread: 2.24
   rotation_degrees: 180
-  dense:
-    probability: 0.25
-    min: 60
-    max: 110
-  # Cenas de copa sem fruta nenhuma. Sem elas o detector nunca vê folhagem
-  # que não esconde nada e passa a responder à textura de folha: na coleta
-  # externa foram 525 previsões sem par contra 1.473 caixas de gabarito,
-  # quase todas sobre folha limpa.
-  empty_probability: 0.15
+
 placement:
   min_depth: 20
   # O gabarito externo declara o critério: fruto com mais de ~80% de oclusão
@@ -34,89 +46,125 @@ placement:
   min_visibility: 0.2
   # Piso absoluto de fruta visível. A fração sozinha não basta: ela
   # correlaciona apenas 0,41 com a quantidade de fruta que sobrou, então
-  # deixava passar caixas de 20 px² em que não há fruta visível alguma —
-  # restos de fruta escondida atrás de outra. Cem pixels é o ponto em que
-  # a fruta volta a ser reconhecível na inspeção visual.
-  min_visible_pixels: 100
+  # deixava passar caixas em que não há fruta visível alguma — restos de fruta
+  # escondida atrás de outra.
+  min_visible_pixels: 90
   max_attempts_per_object: 100
   z_patch_fraction: 0.2
-  z_offset: -5
+  z_offset: -7
   z_offset_jitter: 30
-  # Sem trava na faixa inferior: fruta cai, e uma foto de copa costuma
-  # pegar o chão. Proibir a base da imagem impedia essa categoria.
-  # Justificativa a rever contra o gabarito de avaliação vigente.
+  # Sem trava na faixa inferior: fruta cai, e uma foto de copa costuma pegar o
+  # chão. Proibir a base da imagem impedia essa categoria.
   exclude_bottom_fraction: 0.0
+
+annotation:
+  mode: visible
+  min_box_pixels: 2
+
+augmentation:
+  # Os recortes-fonte são poucos e reaparecem muitas vezes no pool. Espelhar
+  # metade deles dobra o repertório de silhueta sem inventar fruta.
+  horizontal_flip: 0.5
+
 appearance:
   ripeness:
+    # Os recortes-fonte foram fotografados só em ponto de colheita. Sem esta
+    # etapa nenhuma fruta sintética fica verde, mesmo com o pomar real tendo
+    # fruto em vários estágios.
     enabled: true
-    fraction_affected: 0.18
+    fraction_affected: 0.25
     green_hue_degrees: 85
+    # Gradiente contínuo: a fruta sorteada se espalha entre nenhum verde e o
+    # teto, e saturação e brilho acompanham a mesma intensidade.
     strength_range:
-    - 0.25
-    - 0.75
+    - 0.0
+    - 0.8
+    scale_with_strength: true
     saturation_scale: 0.8
     gloss_reduction: 0.4
   rot:
     # Fruta apodrecida, que o gerador não produzia: matiz para o marrom,
-    # dessaturada e mais escura. Peso a rever contra o gabarito vigente.
-    # Um fruto tem um estado só, então quem entra aqui não entra em ripeness.
+    # dessaturada e mais escura. Um fruto tem um estado só, então quem entra
+    # aqui não entra em ripeness. Peso a rever contra o gabarito vigente.
     enabled: true
     fraction_affected: 0.12
     green_hue_degrees: 25
     strength_range:
     - 0.0
     - 0.9
+    scale_with_strength: true
     saturation_scale: 0.55
     value_scale: 0.6
     gloss_reduction: 0.8
-    scale_with_strength: true
-  exposure_jitter:
-    enabled: true
-    probability: 0.8
-    range:
-    - 0.4
-    - 1.9
-    saturation_pull: 0.35
   hsv_cast:
-    use_hardlight_target: true
+    # Puxa matiz e saturação da fruta na direção da cor do fundo local, sem
+    # apagar o relevo próprio dela.
     hue_power: 0.12
     saturation_power: 0.18
-    value_power: 0.45
+    value_power: 0.78
     value_power_jitter: 0.3
-    # Nem toda fruta adota a cor do ambiente na mesma medida: com o
-    # valor fixo, fruta sob copa escura sempre saía escura, e nas fotos
-    # reais há laranja nítida dentro de folhagem densa.
+    use_hardlight_target: true
+    bright_flatten_strength: 0.7
+    min_value_ratio: 0.15
+    # Multiplicador por instância: com influência fixa, toda fruta sob copa
+    # escura sai escura. Nas fotos reais há fruta laranja mesmo em folhagem
+    # densa, porque pegou um facho de luz.
     strength_range:
     - 0.35
     - 1.0
-    min_value_ratio: 0.15
-    bright_flatten_strength: 0.7
+  exposure_jitter:
+    # O hsv_cast só sabe REDUZIR o contraste entre fruta e cena. Um fator de
+    # exposição por instância é o único ponto capaz de abrir as duas caudas.
+    enabled: true
+    probability: 0.8
+    range:
+    - 0.82
+    - 1.27
+    saturation_pull: 0.35
+
 occlusion:
-  edge_blur: 1.5
-  depth_smooth_radius: 1.2
   mask_threshold: 0.5
+  edge_blur: 1.5
   edge_feather_radius: 0.8
+  depth_smooth_radius: 1.2
   contact_shadow:
-    strength: 0.45
     radius_fraction: 0.04
+    strength: 0.8
   cast_shadow:
     probability: 0.4
     strength: 0.4
+    blur_radius: 3.0
     min_coverage: 0.3
     max_coverage: 0.6
     offset_fraction: 0.35
-    light_angle_degrees: 315.0
-    light_angle_jitter_degrees: 20.0
-    blur_radius: 3.0
-annotation:
-  mode: visible
-  min_box_pixels: 2
+    light_angle_degrees: 270.0
+    light_angle_jitter_degrees: 90.0
+    # Uma direção de luz por cena, em vez de uma para o pool inteiro: dentro
+    # de uma foto o sol vem de um lado só, entre fotos ele muda.
+    light_angle_per_scene: true
+
 output:
   jpeg_quality: 95
   scene_grading:
-    contrast: 1.2
-    saturation: 1.0
-    brightness: 0.82
+    brightness: 1.08
+    contrast: 1.15
+    saturation: 1.06
     sharpen_radius: 2.0
-    sharpen_percent: 25
+    sharpen_percent: 6
     sharpen_threshold: 2
+    # Multiplicadores sorteados por cena, cada eixo no seu próprio fluxo. Os
+    # fundos foram fotografados sob luz difusa e saem quase uniformes: a
+    # amplitude p5-p95 do pool é 19,0 em brilho e 17,1 em contraste, contra
+    # 32,5/30,3 no treino manual.
+    brightness_jitter:
+    - 0.9
+    - 1.1
+    contrast_jitter:
+    - 0.85
+    - 1.15
+    saturation_jitter:
+    - 0.85
+    - 1.15
+    sharpen_percent_jitter:
+    - 0.2
+    - 1.8
