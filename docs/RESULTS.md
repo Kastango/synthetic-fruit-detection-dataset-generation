@@ -96,7 +96,9 @@ Negrito = maior média observada; não indica significância estatística.
 Cada painel tem escala própria: as duas avaliações vivem em faixas diferentes de
 mAP, e forçá-las ao mesmo eixo esconderia a forma das curvas. A faixa tracejada
 é `manual-full` com o desvio entre suas duas sementes; a faixa colorida é o
-mesmo desvio para cada curva sintética.
+mesmo desvio para cada curva sintética. `controlled` não aparece aqui — perto de
+zero, ele achataria as curvas contra o topo; nos rankings acima, onde cada
+condição tem linha própria, ele está.
 
 ![F1 por volume sintético](figures/results/synthetic-volume-vs-f1.svg)
 

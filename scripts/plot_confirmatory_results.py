@@ -49,8 +49,8 @@ TRAIN_IMAGES = {
 }
 SYNTHETIC_CONDITIONS = [c for c in CONDITION_ORDER if c.startswith("synthetic-")]
 # `controlled` existe para mostrar que fruta recortada sem cena não treina
-# detector: fica perto de zero e esmagaria a escala de qualquer gráfico. Ela
-# permanece nas tabelas, onde o número zero é lido sem distorcer os outros.
+# detector: fica perto de zero e esmagaria um eixo compartilhado. Sai só das
+# curvas por volume; no ranking cada condição tem linha própria e ele cabe.
 CHART_CONDITIONS = [c for c in CONDITION_ORDER if c != "controlled"]
 
 DETECTOR_ORDER = ["yolov8s", "rtdetr-l", "yolo26s"]
@@ -265,19 +265,23 @@ def build_ranking_chart(test_name: str, summary: dict) -> Path:
     responde "quem ficou na frente de quem", que é a pergunta da tese. A barra
     de erro é o desvio entre as duas sementes: onde ela cobre a barra vizinha,
     as duas condições não estão separadas.
+
+    Aqui `controlled` entra: cada condição ocupa uma linha própria, então a
+    barra quase nula dele não aperta a escala de ninguém — ao contrário do
+    gráfico por volume, onde as curvas dividem o mesmo eixo.
     """
     plt.rcParams["svg.hashsalt"] = "synthetic-fruit-results"
     linhas = sorted(
         (
             (summary[d][c], d, c)
             for d in detectores_presentes(summary)
-            for c in CHART_CONDITIONS
+            for c in CONDITION_ORDER
         ),
         key=lambda item: item[0]["map50_95_mean"],
     )
     altura = 0.34 * len(linhas) + 1.9
     fig, ax = plt.subplots(figsize=(11, altura), facecolor=SURFACE)
-    fig.subplots_adjust(left=0.30, right=0.78, top=1 - 1.15 / altura, bottom=0.9 / altura)
+    fig.subplots_adjust(left=0.30, right=0.77, top=1 - 1.15 / altura, bottom=0.9 / altura)
     ax.set_facecolor(SURFACE)
     teto = max(r["map50_95_mean"] + r["map50_95_std"] for r, _, _ in linhas)
     for i, (row, detector, condition) in enumerate(linhas):
@@ -303,7 +307,7 @@ def build_ranking_chart(test_name: str, summary: dict) -> Path:
             (row["map50_95_mean"], row["precision_mean"], row["recall_mean"], row["f1_mean"])
         ):
             ax.text(
-                1.035 + coluna * 0.075, i, f"{valor:.3f}",
+                1.05 + coluna * 0.075, i, f"{valor:.3f}",
                 ha="right", va="center", fontsize=9,
                 color=INK_PRIMARY if coluna == 0 else INK_SECONDARY,
                 fontweight="bold" if coluna == 0 else "normal",
@@ -311,12 +315,12 @@ def build_ranking_chart(test_name: str, summary: dict) -> Path:
             )
     for coluna, titulo in enumerate(("mAP", "P", "R", "F1")):
         ax.text(
-            1.035 + coluna * 0.075, len(linhas) - 0.35, titulo, ha="right", va="bottom",
+            1.05 + coluna * 0.075, len(linhas) - 0.35, titulo, ha="right", va="bottom",
             fontsize=8.5, color=INK_MUTED, transform=ax.get_yaxis_transform(),
         )
     ax.set_yticks([])
     ax.set_ylim(-0.7, len(linhas) - 0.3)
-    ax.set_xlim(0, teto * 1.04)
+    ax.set_xlim(0, teto * 1.12)
     ax.grid(axis="x", color=GRIDLINE, linewidth=0.8, zorder=0)
     for spine in ("top", "right", "left"):
         ax.spines[spine].set_visible(False)
@@ -334,8 +338,8 @@ def build_ranking_chart(test_name: str, summary: dict) -> Path:
     )
     fig.text(
         0.015, 0.32 / altura,
-        "Barra de erro: desvio entre as duas sementes. `controlled` fica fora — "
-        "perto de zero, comprimiria a escala.",
+        "Barra de erro: desvio entre as duas sementes. Onde ela alcança a barra "
+        "vizinha, as duas condições não estão separadas.",
         fontsize=8.5, color=INK_SECONDARY,
     )
     FIGURES.mkdir(parents=True, exist_ok=True)
