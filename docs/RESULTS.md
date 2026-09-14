@@ -147,6 +147,70 @@ em relação a este controle, mas não isola qual parte do compositor ajuda.
 erram de −6,8 a −9,9 frutas por imagem. `manual-full` erra de −5,5 a −6,1. O
 mesmo déficit aparece como recall mais baixo.
 
+## Diagnósticos
+
+As tabelas resumem cada execução num número por métrica. As três leituras abaixo
+usam os dados por imagem e por época, que já saem do pipeline em
+`artifacts/confirmatory/analysis_csv/`. Nenhuma delas precisa de inferência nova.
+
+### A vantagem sintética aparece quando a caixa precisa encaixar melhor
+
+![AP por limiar de IoU](figures/results/ap-por-iou.svg)
+
+O mAP@0.50:0.95 é a média de dez limiares de IoU. Separados, eles mostram onde a
+distância se forma. Em IoU 0,50, que aceita meia sobreposição, a melhor sintética
+vale de 0,99 a 1,16 vez o `manual-full`. Em IoU 0,75 vale de 1,34 a 1,64. A razão
+cresce a cada limiar, nas três arquiteturas. Os dois treinos encontram fruta em
+quantidade parecida. O treino sintético entrega a caixa que concorda melhor com o
+gabarito externo.
+
+A origem do rótulo é uma explicação possível. A caixa sintética vem da máscara
+visível do recorte, então ela é exata por construção. A caixa de `manual-full`
+vem de arrasto humano sobre fruta parcialmente escondida. Estes números não
+separam essa causa de outras.
+
+### O fator de correção de contagem depende do conjunto de treino
+
+![Contagem prevista contra contagem real](figures/results/contagem-prevista-x-real.svg)
+
+Cada ponto é uma foto da coleta externa. A nuvem inteira fica abaixo da
+diagonal, que marca a contagem exata. A reta colorida é o fator que melhor
+ajusta aquela condição pela origem.
+
+O fator vai de 0,23 em `synthetic-2x` a 0,59 em `manual-full`, e o R² acompanha,
+de 0,34 a 0,77. Um fator único corrigiria a contagem de `manual-full` com erro
+moderado. Não corrigiria a de `synthetic-2x`. O fator não transfere entre
+conjuntos de treino, então ele precisa ser medido para o modelo que for entrar em
+uso.
+
+A proporção se mantém acima de cinco frutas por foto. Abaixo disso ela quebra em
+todas as condições. Na faixa de uma a quatro frutas a razão mediana entre
+previsto e real cai para 0,33 em `manual-full`, e para zero em `synthetic-1x` e
+`synthetic-2x`. Foto de fruta esparsa é o pior caso da contagem.
+
+Duas ressalvas limitam a leitura. O limiar de confiança é o de melhor F1 de cada
+execução, entre 0,24 e 0,62, e não um valor comum entre condições. E o ajuste
+mede a coleta externa, que é laranja doce.
+
+### Mais volume sintético chega antes ao platô
+
+![Convergência por época](figures/results/convergencia-por-epoca.svg)
+
+Cada condição valida no próprio conjunto, com contagem de imagens diferente, então
+os valores absolutos não se comparam entre curvas. O eixo mostra cada execução
+relativa ao próprio pico, o que deixa uma pergunta só: quando o treino para de
+subir?
+
+A mediana da época em que a execução cruza 95% do próprio pico cai com o volume:
+22 em `manual-full`, 19,5 em 1x, 18 em 2x, 17 em 3x, 11 em 5x e 9 em 10x. Uma
+época de `synthetic-10x` tem dez vezes mais passos de otimização que uma de
+`manual-full`, o que explica parte da diferença.
+
+Na época 40 nenhuma execução está abaixo de 96% do próprio pico. As 50 épocas
+bastaram para esta receita, e `patience: 30` nunca precisou disparar. O RT-DETR-L
+é o mais lento dos três: com `manual-full` ele cruza os 95% na época 31,5, contra
+22,0 no YOLOv8s e 15,0 no YOLO26s.
+
 ## Ponderações
 
 **Os resultados sugerem diferenças de generalização.**
@@ -173,9 +237,11 @@ permite afirmar onde se concentra a perda de recall do conjunto inteiro.
 
 **O viés de contagem é sistemático, e isso muda quem pode usar o detector.**
 Nenhuma condição erra a contagem para cima na coleta externa. Todas erram para
-baixo. A média negativa não informa se um fator de correção funcionaria. Antes de
-usá-lo para estimar carga de árvore, avalie os erros por imagem e por densidade,
-e valide qualquer correção em dados separados.
+baixo. O gráfico de contagem acima mostra que o erro é quase proporcional acima
+de cinco frutas por foto, então um fator de correção tem forma. Só que o fator
+muda com o conjunto de treino, de 0,23 a 0,59, e nenhuma dessas medidas foi
+validada fora da coleta que a ajustou. Para estimar carga de árvore, meça o fator
+do modelo que for entrar em uso, em dados separados.
 
 **A comparação com `oranges_field` mede transferência, não acurácia na tarefa.**
 Ela é laranja doce na Sicília. O destino do projeto é poncã em pomar
