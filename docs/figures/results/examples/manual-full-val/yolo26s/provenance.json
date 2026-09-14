@@ -1,11 +1,11 @@
 {
   "confidence": 0.25,
   "dataset": "manual_full_val",
-  "ground_truth_boxes": 25,
-  "image": "data/real_yolo_confirmatory/images/val/img_2021.jpg",
-  "image_sha256": "0fa8065b48b8fb91cdcb0c09b6297fd832e6a4f0735cea14ab1598997b2b2819",
+  "ground_truth_boxes": 23,
+  "image": "data/real_yolo_confirmatory/images/val/img_2056.jpg",
+  "image_sha256": "43feeb36bb925e83bfdcc6549ac1a10558b82094ac92ab55240e9ba34bbdc8f8",
   "imgsz": 960,
-  "label_sha256": "98dfb1cf2751ecb0347b613074caf66f3dd615b2ed71a2d69e8f3a0ebe24c500",
+  "label_sha256": "79278b347a5f50c1c18b61c0580418915379412dd36c24b2c06e4d80b3f920bb",
   "max_det": 1000,
   "model": "yolo26s",
   "runs": [
@@ -24,31 +24,31 @@
     {
       "checkpoint_sha256": "86e57d636963783c51cc285f677347d6cb55e75b284b5eff849aff11f08fe188",
       "condition": "synthetic-1x",
-      "detections": 13,
+      "detections": 14,
       "run_id": "synthetic-1x__yolo26s__s41__07cc65f704"
     },
     {
       "checkpoint_sha256": "8b84e269be6072eae9f1c3f2920019ea07357f04d4fdb4d33e36155827901a9f",
       "condition": "synthetic-2x",
-      "detections": 14,
+      "detections": 12,
       "run_id": "synthetic-2x__yolo26s__s41__a0fd9331ee"
     },
     {
       "checkpoint_sha256": "fbcf5c255bf8fc66b28ea54dc495d85a2e3e07c3c0afdbe5e271402bbc8e6be0",
       "condition": "synthetic-3x",
-      "detections": 17,
+      "detections": 16,
       "run_id": "synthetic-3x__yolo26s__s41__1bcaab5438"
     },
     {
       "checkpoint_sha256": "0df56ffeaf4254a49e55abafd5bc8ccec899af18e5751f80edb8af83fcfbdb69",
       "condition": "synthetic-5x",
-      "detections": 21,
+      "detections": 16,
       "run_id": "synthetic-5x__yolo26s__s41__d700e85412"
     },
     {
       "checkpoint_sha256": "04aad0bba9790d0c0dbfe108b7da67a993201564182db68421e06525fa08ac27",
       "condition": "synthetic-10x",
-      "detections": 19,
+      "detections": 15,
       "run_id": "synthetic-10x__yolo26s__s41__d5f5bf3b25"
     }
   ],

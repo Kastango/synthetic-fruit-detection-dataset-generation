@@ -9,6 +9,7 @@ o que a torna menos sensível a falhas intermitentes da CDN.
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -159,6 +160,50 @@ def comparison_sheet(cell_width: int, por_lado: int = 4):
     return sheet(tiles, por_lado, cell_width)
 
 
+def zoom_sheet(imagem: Path, rotulo: Path, columns: int, cell: int, folga: float = 0.6):
+    """Cada caixa do gabarito recortada e ampliada, da maior para a menor.
+
+    Na copa contra a luz a fruta ocupa poucas dezenas de pixels e some no
+    tamanho de página. O recorte mostra o que o anotador viu, e a legenda diz
+    quanto da imagem cada caixa ocupa, que é a grandeza que a receita calibra.
+    """
+    img = Image.open(imagem).convert("RGB")
+    menor_lado = min(img.size)
+    caixas = []
+    for linha in rotulo.read_text().splitlines():
+        if not linha.strip():
+            continue
+        cx, cy, w, h = (float(v) for v in linha.split()[1:5])
+        caixas.append((cx, cy, w, h))
+    # Ordena pela mesma grandeza que a legenda mostra, o lado maior da caixa.
+    caixas.sort(key=lambda c: max(c[2] * img.width, c[3] * img.height), reverse=True)
+    tiles = []
+    for i, (cx, cy, w, h) in enumerate(caixas, 1):
+        lado = max(w * img.width, h * img.height) * (1 + folga)
+        x, y = cx * img.width, cy * img.height
+        caixa = (
+            round(max(0, min(x - lado / 2, img.width - lado))),
+            round(max(0, min(y - lado / 2, img.height - lado))),
+        )
+        lado = round(min(lado, menor_lado))
+        recorte = img.crop((caixa[0], caixa[1], caixa[0] + lado, caixa[1] + lado))
+        recorte = recorte.resize((cell, cell), Image.LANCZOS)
+        desenho = ImageDraw.Draw(recorte)
+        escala = cell / lado
+        desenho.rectangle(
+            [
+                (x - w * img.width / 2 - caixa[0]) * escala,
+                (y - h * img.height / 2 - caixa[1]) * escala,
+                (x + w * img.width / 2 - caixa[0]) * escala,
+                (y + h * img.height / 2 - caixa[1]) * escala,
+            ],
+            outline="#FFE600", width=3,
+        )
+        proporcao = max(w * img.width, h * img.height) / menor_lado
+        tiles.append((f"{i} · {proporcao:.3f}", recorte))
+    return sheet(tiles, columns, cell, label_height=28, pad=8)
+
+
 def save(image, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, "JPEG", quality=82, optimize=True, progressive=True, subsampling=1)
@@ -190,14 +235,25 @@ def main():
     save(comparison_sheet(args.cell_width), base / "sheets/real-x-sintetico.jpg")
 
     scenes = base / "synthetic-examples"
+    contagens = {
+        e["quantile"]: e["annotations"]
+        for e in json.loads((scenes / "provenance.json").read_text())["examples"]
+    }
     tiles = []
-    for i in (1, 2, 3, 4):
-        for suffix, caption in (("", "cena"), ("-boxes", "gabarito")):
-            path = scenes / f"scene-{i}{suffix}.jpg"
-            if path.exists():
-                tiles.append((f"{caption} {i}", Image.open(path).convert("RGB")))
+    for i, caixas in enumerate(contagens.values(), 1):
+        path = scenes / f"scene-{i}-boxes.jpg"
+        if path.exists():
+            tiles.append((f"{caixas} frutas", Image.open(path).convert("RGB")))
     if tiles:
         save(sheet(tiles, 4, 380), base / "sheets/cenas-sinteticas.jpg")
+
+    alvo = base / "examples/manual-full-val/yolo26s"
+    provenance = json.loads((alvo / "provenance.json").read_text())
+    save(
+        zoom_sheet(ROOT / provenance["image"], ROOT / provenance["image"].replace(
+            "/images/", "/labels/").replace(".jpg", ".txt"), 6, 210),
+        base / "sheets/manual-full-val-zoom.jpg",
+    )
 
 
 if __name__ == "__main__":

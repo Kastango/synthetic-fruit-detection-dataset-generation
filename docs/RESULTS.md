@@ -1,35 +1,37 @@
 # Resultados
 
-A pergunta do experimento é se cena composta por computador substitui foto
-anotada à mão no treino de um detector de poncã. Sete condições de treino, três
-arquiteturas e duas sementes fecham **42 execuções** de 50 épocas em 960 px, sem
-congelamento de camadas.
+O experimento pergunta se cena composta por computador substitui foto anotada à
+mão no treino de um detector de poncã. Sete condições de treino, três
+arquiteturas e duas sementes fecham 42 execuções de 50 épocas em 960 px. Nenhuma
+camada fica congelada.
 
 A avaliação usa dois conjuntos com papéis distintos. `oranges_field` é coleta
 externa: outro país, outra espécie de citro, outros sete celulares, nove
-condições de luz, protocolo de anotação escrito por terceiros. `manual_full_val`
-são as 26 fotos de validação da própria coleta — mesmo pomar, mesma câmera e
-mesmo anotador do treino de `manual-full`, que também as usa para escolher
-checkpoint. O primeiro mede transferência; o segundo mede desempenho dentro do
-domínio e é otimista para `manual-full` por construção.
+condições de luz e um protocolo de anotação escrito por terceiros.
+`manual_full_val` são as 26 fotos de validação da coleta própria, do mesmo
+pomar, dos mesmos tipos de dispositivo e do mesmo anotador usados no treino
+de `manual-full`. A
+condição `manual-full` também usa essas 26 fotos para escolher checkpoint. O
+primeiro conjunto mede transferência. O segundo mede desempenho dentro do
+domínio de origem, e favorece `manual-full` por construção.
 
 ## Procedência
 
 | Item | Valor |
 |---|---|
 | Pool sintético | `config_hash 65ab60add0904ccc5336fb59`, manifesto `96f19445076b69a3` |
-| Catálogo de ativos | `f3ad9117f88b460eeb98fb7c` |
+| Catálogo de ativos | `f3ad9117f88b460eeb98fb7c`, 228 fundos e 127 recortes |
 | Manifesto `oranges_field` | `414470445dc9ce46` |
 | Manifesto `manual_full_val` | `2be936523453bf5b` |
 | Seleção | `91d49504703da8ce`, 21 candidatos, 42 execuções |
 | Ultralytics | 8.4.121 |
 
-O teste foi aberto depois da seleção nos dois conjuntos, e a seleção olhou só
-para a validação de origem de cada condição. Cada condição carrega a própria
-impressão de manifesto: mudar um rótulo muda o identificador da execução, que
-deixa de casar com o plano e é refeita.
+A seleção olhou apenas para a validação de origem de cada condição. O teste foi
+aberto depois dela, nos dois conjuntos. Cada condição carrega a própria
+impressão de manifesto, então mudar um rótulo muda o identificador da execução.
+Uma execução cujo identificador deixa de casar com o plano é refeita.
 
-## Coleta externa
+## Coleta externa: o melhor volume sintético supera manual-full em mAP
 
 ![Ranking na coleta externa](figures/results/ranking-oranges-field.svg)
 
@@ -57,9 +59,12 @@ deixa de casar com o plano e é refeita.
 | yolo26s | **synthetic-5x** | 0.652 | 0.412 | 0.505 | 0.440 | 0.144 | **0.193** | 7.8 |
 | yolo26s | synthetic-10x | 0.633 | 0.424 | 0.508 | 0.448 | 0.140 | 0.193 | 7.0 |
 
-Negrito = maior média observada; não indica significância estatística.
+P é precision. R é recall. As métricas são médias das duas sementes. P e R
+usam o ponto selecionado pelo avaliador em cada avaliação, e não um limiar
+comum entre modelos. MAE cont. é o erro absoluto médio de contagem.
+Negrito marca a maior média observada, sem indicar significância estatística.
 
-## Validação da coleta própria
+## Validação da coleta própria: manual-full tem o maior mAP
 
 ![Ranking na validação própria](figures/results/ranking-manual-full-val.svg)
 
@@ -93,83 +98,138 @@ Negrito = maior média observada; não indica significância estatística.
 
 ![mAP por volume sintético](figures/results/synthetic-volume-vs-map.svg)
 
-Cada painel tem escala própria: as duas avaliações vivem em faixas diferentes de
-mAP, e forçá-las ao mesmo eixo esconderia a forma das curvas. A faixa tracejada
-é `manual-full` com o desvio entre suas duas sementes; a faixa colorida é o
-mesmo desvio para cada curva sintética. `controlled` não aparece aqui — perto de
-zero, ele achataria as curvas contra o topo; nos rankings acima, onde cada
-condição tem linha própria, ele está.
+Cada painel tem escala própria. As duas avaliações vivem em faixas diferentes de
+mAP, e um eixo comum esconderia a forma das curvas. A faixa tracejada é
+`manual-full` com o desvio entre suas duas sementes. A faixa colorida é o mesmo
+desvio para cada curva sintética. `controlled` não aparece aqui, porque um valor
+perto de zero achataria as curvas contra o topo. Nos rankings acima, onde cada
+condição ocupa uma linha, `controlled` está.
 
 ![F1 por volume sintético](figures/results/synthetic-volume-vs-f1.svg)
 
 As mesmas curvas para
 [precision](figures/results/synthetic-volume-vs-precision.svg) e
 [recall](figures/results/synthetic-volume-vs-recall.svg) mostram de onde vem o
-F1: a precisão sintética encosta na real desde 1x, e o que o volume compra é
-recall.
+F1. O efeito do volume depende da arquitetura e do conjunto. Por exemplo,
+na validação própria o recall do YOLO26s aumenta de 0,530 em 1x para 0,595
+em 10x. Na coleta externa a relação não é monotônica.
 
-## Leitura
+## O que os números dizem
 
-**Na coleta externa a receita sintética passa o gabarito manual, nas três
-arquiteturas.** O melhor volume sintético abre +0,044 de mAP@.50:.95 sobre
-`manual-full` no YOLOv8s (0,193 contra 0,149), +0,048 no RT-DETR-L (0,197 contra
-0,149) e +0,020 no YOLO26s (0,193 contra 0,174). O sinal é o mesmo nos três, o
-que não acontecia antes de a escala da fruta ser calibrada contra o pomar de
-poncã. Mil e quarenta cenas compostas transferem melhor para outro país, outra
-espécie e outras câmeras do que 104 fotos anotadas à mão de um pomar só.
+**Na coleta externa, o melhor volume sintético tem mAP maior que `manual-full`
+nas três arquiteturas.** O melhor volume sintético abre 0,044 de mAP@.50:.95 sobre
+`manual-full` no YOLOv8s, com 0,193 contra 0,149. No RT-DETR-L abre 0,048, com
+0,197 contra 0,149. No YOLO26s abre 0,020, com 0,193 contra 0,174. Os volumes com maior média usam 520 imagens de treino nos YOLOs e 312 no
+RT-DETR-L. `manual-full` usa 104 fotos. O resultado compara também diferentes
+quantidades de dados e passos de otimização. Ele não isola o efeito da origem
+sintética das imagens.
 
-**A vantagem do dado real é específica do domínio dele.** Na validação da
-própria coleta o quadro inverte e por margem muito maior: `manual-full` abre
-0,198 sobre a melhor sintética no YOLOv8s, 0,172 no RT-DETR-L e 0,161 no
-YOLO26s — avaliada nas mesmas árvores, mesma câmera e mesmo anotador do seu
-treino. As duas leituras não se contradizem: uma mede o domínio de origem, a
-outra mede o que sai dele.
+**Nesta avaliação, a vantagem de `manual-full` aparece na coleta própria.** Na validação da
+coleta própria o quadro inverte, e por margem maior. `manual-full` abre 0,198
+sobre a melhor sintética no YOLOv8s, 0,172 no RT-DETR-L e 0,161 no YOLO26s. As
+duas leituras não se contradizem. Uma mede o domínio de origem, a outra mede o
+que sai dele.
 
-**Volume sintético satura entre 3x e 5x.** De 1x ao pico o ganho externo é
-+0,010 (YOLOv8s, em 5x), +0,026 (RT-DETR-L, em 3x) e +0,036 (YOLO26s, em 5x).
-De 5x para 10x o saldo é −0,008, −0,005 e 0,000. Dobrar o volume acima de 520
-imagens não paga o custo de geração, e no RT-DETR-L chega a atrapalhar.
+**As maiores médias externas aparecem em 3x ou 5x.** De 1x ao pico, o ganho externo é
+0,010 no YOLOv8s em 5x, 0,026 no RT-DETR-L em 3x e 0,036 no YOLO26s em 5x. De 5x
+para 10x o saldo é −0,008, −0,005 e 0,000. Nesta rodada, dobrar de 520 para 1.040 imagens de treino não melhorou a média
+externa. Isso não demonstra um limite geral de volume, nem mede a relação
+entre custo de geração e benefício.
 
-**A condição de controle colapsa, e é o que justifica o compositor.**
+**A condição `controlled` tem desempenho próximo de zero.**
 `controlled` treina em fruta fotografada em ambiente controlado, com caixa vinda
-da máscara de segmentação, sem composição em copa: 0,002 a 0,005 de mAP externo,
-e 0,000 a 0,002 na validação própria. No YOLOv8s o viés de contagem chega a +487
-caixas por imagem com precisão 0,05 — o detector pulveriza caixa em folha. Fruta
-recortada sem cena não ensina a procurar fruta em cena.
+da máscara de segmentação e sem composição em copa. O resultado fica entre 0,002
+e 0,005 de mAP externo, e entre 0,000 e 0,002 na validação própria. No YOLOv8s o
+viés de contagem chega a 487 caixas por imagem, com precisão 0,05, e muitas previsões incorretas. O resultado favorece o uso de cenas compostas
+em relação a este controle, mas não isola qual parte do compositor ajuda.
 
-**Todas as condições subestimam a contagem na coleta externa**, de −6,8 a −9,9
-frutas por imagem nas sintéticas, contra −5,5 a −6,1 em `manual-full`. As
-sintéticas ainda perdem fruta pequena e muito ocluída — o mesmo déficit que
-aparece como recall mais baixo.
+**Todas as condições subestimam a contagem na coleta externa.** As sintéticas
+erram de −6,8 a −9,9 frutas por imagem. `manual-full` erra de −5,5 a −6,1. O
+mesmo déficit aparece como recall mais baixo.
+
+## Ponderações
+
+**Os resultados sugerem diferenças de generalização.**
+O melhor volume sintético supera `manual-full` em mAP na coleta externa,
+mas perde na validação própria. A recombinação de fundos e recortes pode
+contribuir para essa transferência. A tabela não mede cobertura visual nem
+fidelidade, então não identifica a causa da diferença. Também não há vantagem
+em todas as métricas: no YOLO26s externo, `manual-full` tem recall 0,439,
+contra 0,412 de `synthetic-5x`, apesar do mAP menor.
+
+**Ampliar o catálogo é uma hipótese a testar.** Em 1x, cada um
+dos 127 recortes aparece 13,5 vezes em média. Em 10x, aparece 114,4 vezes. As
+cenas novas acima de 5x reembaralham a mesma fruta sobre o mesmo fundo, sem melhorar a maior média externa desta rodada. A hipótese de limitação
+pelo catálogo ainda não foi testada: para testá-la, o próximo
+passo é ampliar o catálogo com o volume fixo, e não o volume com o catálogo
+fixo.
+
+**Oclusão e iluminação local merecem avaliação do anotador.**
+A receita aceita instâncias com pelo menos 15% de superfície e 60 pixels
+visíveis. Isso permite oclusão severa, mas não garante que sua frequência,
+forma e iluminação correspondam às fotos reais. Os recortes abaixo ajudam
+a revisar essa hipótese. Uma imagem escolhida por sua discrepância não
+permite afirmar onde se concentra a perda de recall do conjunto inteiro.
+
+**O viés de contagem é sistemático, e isso muda quem pode usar o detector.**
+Nenhuma condição erra a contagem para cima na coleta externa. Todas erram para
+baixo. A média negativa não informa se um fator de correção funcionaria. Antes de
+usá-lo para estimar carga de árvore, avalie os erros por imagem e por densidade,
+e valide qualquer correção em dados separados.
+
+**A comparação com `oranges_field` mede transferência, não acurácia na tarefa.**
+Ela é laranja doce na Sicília. O destino do projeto é poncã em pomar
+brasileiro. As estatísticas dela orientaram a calibração da receita, então
+proximidade com ela não é evidência independente. Para uma conclusão
+confirmatória seria preciso uma terceira coleta, intocada pelo desenvolvimento.
 
 ## Exemplos
 
-Quatro fotos do pomar de poncã ao lado de quatro cenas compostas, ambas com o
-gabarito desenhado e escolhidas pela densidade mediana do seu conjunto:
+Quatro fotos do pomar de poncã ao lado de quatro cenas compostas. As duas
+metades trazem o gabarito desenhado e foram escolhidas pela densidade mediana de
+cada coleção:
 
 ![Pomar real ao lado de cena composta](figures/results/sheets/real-x-sintetico.jpg)
 
-É esta comparação que a calibração de escala persegue: o centro de distância de
-câmera por cena sai da distribuição de lado de caixa do pomar de poncã, não da
+É esta comparação que a calibração de escala persegue. O centro de distância de
+câmera por cena sai da distribuição de lado de caixa do pomar de poncã, e não da
 coleta externa, que é laranja doce fotografada mais de perto.
 
-Mesma cena, mesmo detector, uma coluna por condição de treino. Cena de densidade
-mediana da coleta externa, 8 frutas no gabarito:
+Oito cenas diferentes, selecionadas por quantis de quantidade de caixas, com
+o gabarito desenhado. Estes exemplos contêm de uma a 37 frutas:
+
+![Cenas sintéticas](figures/results/sheets/cenas-sinteticas.jpg)
+
+Mesma cena, mesmo detector, uma coluna por condição de treino. A cena vem da
+coleta externa e tem densidade mediana, com 8 frutas no gabarito:
 
 ![Detecções por condição, cena mediana](figures/results/sheets/externo-cena-mediana.jpg)
 
-`controlled` não devolve nada; as sintéticas sobem com o volume; `manual-full`
-fecha as 8. A [cena densa](figures/results/sheets/externo-cena-densa.jpg)
-(41 frutas) mostra o mesmo ordenamento.
+`controlled` não devolve nada. As sintéticas sobem com o volume. `manual-full`
+fecha as 8. A [cena densa](figures/results/sheets/externo-cena-densa.jpg), com
+41 frutas, mostra o mesmo ordenamento.
 
-No pomar de poncã, onde `manual-full` joga em casa, dá para ver o que a
-sintética ainda não alcança:
+### O pior caso para a receita sintética
+
+Esta cena está entre as de maior diferença de acertos entre `manual-full` e as sintéticas.
+A seleção compara YOLO26s, semente 41, nas 26 imagens, pela diferença entre
+`manual-full` e a sintética com mais acertos em cada foto. É um caso extremo
+nessa comparação, não um exemplo típico nem o pior caso de todas as arquiteturas. O desempate usa o nome da imagem. Em `img_2056`, são 23 frutas no gabarito.
+Com confiança 0,25 e correspondência um a um a IoU 0,5, `manual-full` acerta
+20 e a melhor sintética acerta 13. Cada painel
+mostra as caixas que aquele detector devolveu:
 
 ![Detecções na validação própria](figures/results/sheets/manual-full-val-yolo26s.jpg)
 
-As cenas que o compositor produz, com e sem caixa:
+No tamanho de página essas caixas não revelam o que há dentro. Ampliadas, sim.
+Cada recorte abaixo traz uma fruta do gabarito, da maior para a menor. O número
+depois do ponto é o lado maior da caixa dividido pelo menor lado da imagem:
 
-![Cenas sintéticas](figures/results/sheets/cenas-sinteticas.jpg)
+![Frutas do gabarito ampliadas](figures/results/sheets/manual-full-val-zoom.jpg)
+
+Os recortes permitem conferir oclusão, iluminação e limites das caixas.
+A comparação numérica não identifica qual desses fatores causa cada erro.
+A revisão do anotador deve separar esses casos antes de orientar um novo treino.
 
 A distribuição espacial das anotações de cada conjunto:
 
@@ -177,8 +237,8 @@ A distribuição espacial das anotações de cada conjunto:
 
 ## Estabilidade e limites
 
-São **duas sementes por condição**, o que serve para triagem e não para promover
-uma condição sobre outra. O desvio entre as duas sementes, em mAP@.50:.95 na
+São duas sementes por condição. Duas sementes servem para triagem, e não para
+promover uma condição sobre outra. O desvio entre as duas, em mAP@.50:.95 na
 coleta externa:
 
 | Condição | YOLOv8s | RT-DETR-L | YOLO26s |
@@ -190,36 +250,30 @@ coleta externa:
 | synthetic-5x | 0.0012 | 0.0040 | 0.0055 |
 | synthetic-10x | 0.0089 | 0.0145 | 0.0047 |
 
-**Volume compra estabilidade.** Em 5x o desvio cai para 0,001–0,006 nas três
-arquiteturas, uma ordem de grandeza abaixo de `manual-full`, que fica entre as
-condições menos estáveis em dois dos três detectores: um pomar só, uma câmera,
-104 fotos.
+**Em 5x, o desvio observado entre as duas sementes é menor.**
+Os desvios ficam entre 0,001 e 0,006 nas três arquiteturas. Duas repetições não
+bastam para concluir que esse volume reduz a variância de forma consistente.
+A tabela tampouco mede a variação entre sorteios independentes do gerador.
 
-Isso delimita o que a tabela pode afirmar. A vantagem sintética na coleta
-externa (+0,020 a +0,048) supera o desvio de sementes de `manual-full` no
-YOLOv8s e no RT-DETR-L, mas não no YOLO26s, onde +0,020 fica dentro dos 0,030 de
-desvio da própria `manual-full`. O sinal é consistente nas três arquiteturas, o
-que é mais forte do que qualquer painel isolado, mas duas sementes triam e não
-promovem — a afirmação pede quatro.
-
-`oranges_field` é laranja doce na Sicília, não poncã em pomar brasileiro. Ela
-mede transferência entre domínios de citro, não acurácia na tarefa final. E suas
-estatísticas participaram da calibração da receita, então não é um teste
-confirmatório intocado — para isso seria preciso uma terceira coleta.
+As diferenças médias não constituem um teste de significância. Comparar uma
+diferença com o desvio de uma única condição também não estabelece superioridade.
+Mais sementes, gerações independentes e outra coleta permitiriam verificar
+se o resultado persiste. Escolher o melhor volume após olhar o teste torna
+essa escolha exploratória.
 
 ## Auditoria do gabarito
 
-A validação automática confere rótulos, contagens, IDs congelados e hashes de
-imagem e anotação contra o manifesto importado:
+A validação automática confere rótulos, contagens, identificadores congelados e
+hashes de imagem e anotação contra o manifesto importado. Para rodá-la:
 
 ```bash
 .venv/bin/python scripts/validate_data.py --stage real
 ```
 
-Passa para as 130 imagens e 2.130 caixas, sem arquivo inválido, rótulo ausente,
-repetição exata de imagem ou caixa duplicada. Isso não certifica que toda fruta
-esteja anotada nem que cada caixa esteja visualmente correta — para isso existe
-a revisão imagem a imagem:
+Ela passa para as 130 imagens e 2.130 caixas, sem arquivo inválido, rótulo
+ausente, repetição exata de imagem ou caixa duplicada. Isso não certifica que
+toda fruta esteja anotada, nem que cada caixa esteja visualmente correta. Para
+revisar imagem a imagem:
 
 ```bash
 .venv/bin/python scripts/audit_dataset.py \
@@ -228,11 +282,12 @@ a revisão imagem a imagem:
   --output artifacts/auditoria/manual_full_train.jsonl --port 8770
 ```
 
-Teclas 1–6 marcam `ok`, `faltando`, `caixa-frouxa`, `duplicada`,
-`oclusao-extrema` e `nao-e-fruta`; Enter salva e avança. Com `--checkpoint`, a
-fila começa pelas imagens em que detector e gabarito mais discordam, que é onde
-o erro de anotação se concentra. Com `--resumo`, conta as marcas de um arquivo
-já preenchido. A ferramenta registra julgamento e não muda coordenada.
+As teclas de 1 a 6 marcam `ok`, `faltando`, `caixa-frouxa`, `duplicada`,
+`oclusao-extrema` e `nao-e-fruta`. Enter salva e avança. Para começar a fila
+pelas imagens em que detector e gabarito mais discordam, use `--checkpoint`,
+porque o erro de anotação se concentra ali. Para contar as marcas de um arquivo
+já preenchido, use `--resumo`. A ferramenta registra julgamento e não muda
+coordenada.
 
 ## Reproduzir
 
@@ -246,7 +301,21 @@ done
 .venv/bin/python scripts/plot_confirmatory_results.py
 ```
 
-`train_grid.py` e `select_models.py` aceitam `--model` para rodar uma
-arquitetura de cada vez e consolidar depois; `select_models.py` exige todas as
+Para reproduzir a seleção do caso extremo e as figuras de exemplos:
+
+```bash
+.venv/bin/python scripts/find_detection_gap.py
+.venv/bin/python scripts/render_detection_examples.py --dataset manual_full_val --model yolo26s --seed 41 --image-stem img_2056
+.venv/bin/python scripts/render_synthetic_examples.py
+.venv/bin/python scripts/build_example_sheets.py
+```
+
+O ranking completo de acertos fica em
+[`gap-audit.json`](figures/results/examples/manual-full-val/yolo26s/gap-audit.json).
+As oito cenas sintéticas têm imagens, rótulos e hashes registrados no
+[manifesto dos exemplos](figures/results/synthetic-examples/provenance.json).
+
+Para rodar uma arquitetura de cada vez e consolidar depois, passe `--model` a
+`train_grid.py` e a `select_models.py`. O `select_models.py` exige todas as
 sementes de cada arquitetura que entrar. O protocolo, as receitas e a curadoria
 dos conjuntos estão em [DATASETS.md](DATASETS.md).

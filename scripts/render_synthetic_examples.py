@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Exporta cenas existentes, selecionadas por quantis de contagem de caixas."""
+"""Exporta cenas existentes com o gabarito desenhado, por quantis de contagem.
+
+Oito quantis cobrem a faixa inteira que a receita produz, da copa com uma fruta
+à cena cheia. A cena sem caixa não é exportada: sozinha ela não mostra nada que
+a folha de comparação com o pomar real já não mostre.
+"""
 
 import argparse
 import json
@@ -23,13 +28,14 @@ def main():
     output = ROOT / "docs/figures/results/synthetic-examples"
     output.mkdir(parents=True, exist_ok=True)
     examples = []
-    for index, quantile in enumerate((0.25, 0.5, 0.75, 0.97), 1):
+    for index, quantile in enumerate(
+        (0.04, 0.17, 0.30, 0.43, 0.56, 0.69, 0.82, 0.95), 1
+    ):
         row = rows[round(quantile * (len(rows) - 1))]
         source = dataset / row["image"]
         label = dataset / row["label"]
         with Image.open(source) as image:
             shown = resize(image.convert("RGB"))
-        shown.save(output / f"scene-{index}.jpg", quality=95, subsampling=0)
         boxes = read_boxes(label)
         assert len(boxes) == row["annotations"]
         draw_boxes(shown, boxes, width=5).save(
