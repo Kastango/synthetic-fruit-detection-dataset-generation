@@ -70,16 +70,17 @@ outra coleta intocada.
 
 ## Resultados e limites da interpretação
 
-**A grade está interrompida para revisão do dataset.** O gerador passou a exigir que toda fruta
-composta renda um rótulo que uma pessoa consiga verificar na imagem: nenhuma
-fruta é desenhada sem anotação, e nenhum rótulo fica abaixo dos pisos que a
-receita declara. A verificação vale sobre a cena final, depois de todas as
-oclusões, e não apenas no momento da inserção.
+O gerador exige que toda fruta composta renda um rótulo que uma pessoa consiga
+verificar na imagem: nenhuma fruta é desenhada sem anotação, e nenhum rótulo
+fica abaixo dos pisos que a receita declara. A verificação vale sobre a cena
+final, depois de todas as oclusões, e não apenas no momento da inserção.
 
-Isso muda os conjuntos sintéticos, então os números anteriores descreviam um
-gerador que não existe mais e foram retirados em vez de mantidos com ressalva.
-Os detalhes do protocolo e dos conjuntos de avaliação seguem em
-[docs/RESULTS.md](docs/RESULTS.md).
+Na coleta externa, treinar em cena composta empata com treinar nas 104 fotos
+anotadas à mão: 0,163 contra 0,174 de mAP@.50:.95 no YOLO26s e 0,172 contra
+0,149 no YOLOv8s. Na validação da própria coleta o dado real abre 0,19, mas
+ali ele é avaliado no mesmo pomar, mesma câmera e mesmo anotador do seu treino.
+O ganho por volume sintético satura perto de 5x. As tabelas completas, os
+gráficos e os exemplos estão em [docs/RESULTS.md](docs/RESULTS.md).
 
 
 - O gerador foi calibrado com estatísticas de caixas e aparência da coleta

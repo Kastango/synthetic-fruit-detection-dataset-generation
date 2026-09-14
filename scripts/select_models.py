@@ -14,9 +14,23 @@ def main() -> None:
     )
     parser.add_argument("--config", default="configs/confirmatory.yaml")
     parser.add_argument("--pipeline-config", default="configs/pipeline.yaml")
+    parser.add_argument(
+        "--model",
+        action="append",
+        help="seleciona só estas arquiteturas; repita para várias. "
+        "Todas as sementes de cada uma continuam obrigatórias.",
+    )
     args = parser.parse_args()
     experiment = load_yaml(project_path(args.config))
     pipeline = load_yaml(project_path(args.pipeline_config))
+    if args.model:
+        experiment["models"] = [
+            model
+            for model in experiment["models"]
+            if model["name"] in args.model or model["checkpoint"] in args.model
+        ]
+        if not experiment["models"]:
+            raise SystemExit(f"nenhuma arquitetura casa com {args.model}")
     report = select_by_validation(
         experiment,
         scoped_experiment_root(

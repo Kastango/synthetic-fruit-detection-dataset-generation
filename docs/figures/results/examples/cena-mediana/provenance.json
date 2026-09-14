@@ -1,0 +1,57 @@
+{
+  "confidence": 0.25,
+  "dataset": "oranges_field",
+  "ground_truth_boxes": 8,
+  "image": "data/external_tests/oranges_field/images/test/ac014_2025-01-20_01.jpg",
+  "image_sha256": "18f641051b158f9813464a2d983f38b4e6514ab41b89d011d1b544aec88722b6",
+  "imgsz": 960,
+  "label_sha256": "88a39ff53ce674c2dd8a42245d75686efc06bca9759507a6fc859adc878303cb",
+  "max_det": 1000,
+  "model": "yolo26s",
+  "runs": [
+    {
+      "checkpoint_sha256": "6ed78c579c52a6ca9b06da0e64c4f84e1a6b1d11978a87ee45444354b4d3c5b0",
+      "condition": "manual-full",
+      "detections": 8,
+      "run_id": "manual-full__yolo26s__s41__5f85d62c2d"
+    },
+    {
+      "checkpoint_sha256": "c33c7cfb6cc974fb3e45a5005f5b79c6d8bb93337f269b4481cf3952eb72011a",
+      "condition": "controlled",
+      "detections": 0,
+      "run_id": "controlled__yolo26s__s41__dfead72217"
+    },
+    {
+      "checkpoint_sha256": "4b747401affb585fbff0f7873f10caf8ed2c42313935f690c8434f11110d3bb9",
+      "condition": "synthetic-1x",
+      "detections": 3,
+      "run_id": "synthetic-1x__yolo26s__s41__485a2289d1"
+    },
+    {
+      "checkpoint_sha256": "24109e4bd68075272a77ccbf35f6621f80e19687cac993c22926db8568bd7402",
+      "condition": "synthetic-2x",
+      "detections": 3,
+      "run_id": "synthetic-2x__yolo26s__s41__1460e7b1b1"
+    },
+    {
+      "checkpoint_sha256": "11f46f5f095409fad0a478788846a018943f7ba1f2ca70aa7c65d7d66316e3d5",
+      "condition": "synthetic-3x",
+      "detections": 4,
+      "run_id": "synthetic-3x__yolo26s__s41__783f36cbf6"
+    },
+    {
+      "checkpoint_sha256": "a3cc3a4e0be6e358df9e2a72d819ac5aab66bc0bdcff9159ae92a9dbcd803a20",
+      "condition": "synthetic-5x",
+      "detections": 6,
+      "run_id": "synthetic-5x__yolo26s__s41__7f31189d40"
+    },
+    {
+      "checkpoint_sha256": "8baeb605001247c7a6f16153c8d0be31cee8a828c83e7864f016d854e7bc9ba5",
+      "condition": "synthetic-10x",
+      "detections": 7,
+      "run_id": "synthetic-10x__yolo26s__s41__fa5a9d4dd6"
+    }
+  ],
+  "seed": 41,
+  "selection_sha256": "c6fc1ebc0a157fc45fef3692ebd59c5ce5a4feb4238493b25896b839ee419efe"
+}

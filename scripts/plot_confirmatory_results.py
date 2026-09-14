@@ -63,6 +63,12 @@ BASELINE = "#c3c2b7"
 SURFACE = "#fcfcfb"
 
 
+def detectores_presentes(*summaries: dict) -> list[str]:
+    """Só as arquiteturas com resultado, na ordem canônica: a grade pode ser
+    rodada uma arquitetura de cada vez e consolidada depois."""
+    return [d for d in DETECTOR_ORDER if any(s.get(d) for s in summaries)]
+
+
 def load_results(name: str, directory: Path) -> dict:
     path = directory / f"test_results_{name}.json"
     return json.loads(path.read_text(encoding="utf-8"))["summary"]
@@ -75,7 +81,7 @@ def markdown_table(name: str, summary: dict) -> str:
         "| Detector | Condição | P | R | F1 | mAP@.50 | mAP@.75 | mAP@.50:.95 | Count MAE |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|",
     ]
-    for detector in DETECTOR_ORDER:
+    for detector in detectores_presentes(summary):
         best_condition = max(
             (c for c in CONDITION_ORDER if c in summary.get(detector, {})),
             key=lambda c: summary[detector][c]["map50_95_mean"],
@@ -134,7 +140,7 @@ def build_trend_chart(
         for spine in ("left", "bottom"):
             ax.spines[spine].set_color(BASELINE)
         ax.tick_params(colors=INK_SECONDARY, labelsize=9)
-        for detector in DETECTOR_ORDER:
+        for detector in detectores_presentes(summary):
             color = DETECTOR_COLOR[detector]
             xs = [TRAIN_IMAGES[c] for c in SYNTHETIC_CONDITIONS]
             ys = [summary[detector][c][f"{metric}_mean"] for c in SYNTHETIC_CONDITIONS]
@@ -172,7 +178,7 @@ def build_trend_chart(
     axes[0].set_ylabel(labels[metric], fontsize=10)
     model_handles = [
         plt.Line2D([0], [0], color=DETECTOR_COLOR[d], linewidth=2, marker="o", label=d)
-        for d in DETECTOR_ORDER
+        for d in detectores_presentes(*results_by_test.values())
     ]
     style_handles = [
         plt.Line2D([0], [0], color=INK_SECONDARY, linewidth=1.4, label="synthetic-Nx"),

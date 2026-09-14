@@ -117,7 +117,7 @@ def main():
 
     save(
         detection_sheet(base / "examples", 4, args.cell_width),
-        base / "sheets/externo-cena-esparsa.jpg",
+        base / "sheets/externo-cena-densa.jpg",
     )
     save(
         detection_sheet(base / "examples/cena-mediana", 4, args.cell_width),
