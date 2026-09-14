@@ -15,16 +15,16 @@ paths:
 
 real_dataset:
   expected_images: 130
-  expected_boxes: 2093
+  expected_boxes: 2130
   train_images: 104
   val_images: 26
   output: data/real_yolo_confirmatory
   artifact: real_split_confirmatory.json
   source:
-    download_url: https://drive.usercontent.google.com/download?id=1wonaftsf0E_KzMJ3O1-a-79ik-PcsICy&export=download&authuser=0
-    archive_name: datanotation.zip
-    expected_bytes: 526759500
-    sha256: 28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3
+    download_url: https://drive.usercontent.google.com/download?id=1UGsuLJcQT_S3WDVFvM5o0MbAJl7RLFqu&export=download&authuser=0
+    archive_name: manual-full-reviewed.zip
+    expected_bytes: 732891712
+    sha256: 4e8c9891fa1e714a6c69829bda27f09be17f886d0bfcf9b2ebcfc7372cda2c47
 
 controlled_split:
   train_ratio: 0.8
@@ -90,7 +90,7 @@ external_datasets:
     archive_name: null
     annotation_format: yolo
     expected_images: 26
-    expected_boxes: 451
+    expected_boxes: 463
     collapse_to_single_class: true
 
 # Os 42 checkpoints da fase confirmatória (`best.pt` de cada execução) e o

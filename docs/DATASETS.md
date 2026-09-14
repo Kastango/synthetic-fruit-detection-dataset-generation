@@ -9,7 +9,7 @@ configuração. As caixas sintéticas dependem da regeneração com a receita vi
 
 | Conjunto | Papel | Treino | Validação | Teste | Caixas conhecidas |
 |---|---|---:|---:|---:|---:|
-| `manual-full` | referência com anotação humana | 104 | 26 | — | 2.093 |
+| `manual-full` | referência com anotação humana | 104 | 26 | — | 2.130 |
 | `controlled` | controle sem composição | 284 | 71 | — | 127 |
 | `synthetic-1x` | síntese no tamanho da base real | 104 | 26 | — | a gerar |
 | `synthetic-2x` | síntese | 208 | 52 | — | a gerar |
@@ -42,20 +42,22 @@ cítrico; as imagens dela não contêm poncã.
 
 ## Base real anotada (`manual-full`)
 
-A referência supervisionada vem de `datanotation.zip`: 130 fotografias de
-poncãs em pomar, com 2.093 caixas delimitadoras anotadas manualmente.
+A referência supervisionada vem de `manual-full-reviewed.zip`: 130 fotografias
+de poncãs em pomar, com 2.130 caixas delimitadoras anotadas manualmente. O
+pacote traz o registro da revisão em `review.jsonl` e um `CHECKSUMS.sha256`
+por arquivo.
 
 | Verificação do arquivo original | Resultado |
 |---|---:|
 | Integridade ZIP/CRC | válida |
 | Imagens com rótulo correspondente | 130 |
-| Caixas YOLO válidas | 2.093 |
+| Caixas YOLO válidas | 2.130 |
 | Fotografias com iPhone 13 mini | 82 |
 | Fotografias com Google Pixel 6a | 48 |
 | Duplicatas exatas | 0 |
 | Duplicatas com dHash idêntico | 0 |
 | Linhas de anotação inválidas | 0 |
-| SHA-256 | `28308d791546a72deb2033e3c4fca6db1e830bf1108b5afe0c9db46eac2500e3` |
+| SHA-256 | `4e8c9891fa1e714a6c69829bda27f09be17f886d0bfcf9b2ebcfc7372cda2c47` |
 
 Na importação, `ImageOps.exif_transpose` materializa a orientação registrada
 pela câmera. Isso apenas alinha os pixels à orientação em que as caixas foram
@@ -66,8 +68,8 @@ dos dois aparelhos:
 
 | Split | Imagens | iPhone | Pixel | Caixas |
 |---|---:|---:|---:|---:|
-| treino | 104 | 66 | 38 | 1.642 |
-| validação | 26 | 16 | 10 | 451 |
+| treino | 104 | 66 | 38 | 1.667 |
+| validação | 26 | 16 | 10 | 463 |
 
 O manifesto `artifacts/real_split_confirmatory.json` congela os IDs, a origem e
 as contagens. O ZIP não é versionado; a pipeline valida tamanho e SHA-256 antes

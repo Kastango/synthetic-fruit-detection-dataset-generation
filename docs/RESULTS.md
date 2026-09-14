@@ -24,7 +24,7 @@ imagens/anotações contra o manifesto importado:
 .venv/bin/python scripts/validate_data.py --stage real
 ```
 
-A primeira passou para as 130 imagens e 2.093 caixas. O perfil também decodificou
+A primeira passou para as 130 imagens e 2.130 caixas. O perfil também decodificou
 todas as imagens: nenhum arquivo inválido, rótulo ausente, repetição exata de
 imagem ou caixa duplicada na base manual. Isso não certifica que todas as
 frutas estejam anotadas nem que cada caixa esteja visualmente correta.

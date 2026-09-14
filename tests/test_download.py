@@ -37,7 +37,7 @@ def test_canonical_dataset_download_urls_are_frozen() -> None:
 
     assert manual["download_url"] == (
         "https://drive.usercontent.google.com/download?"
-        "id=1wonaftsf0E_KzMJ3O1-a-79ik-PcsICy&export=download&authuser=0"
+        "id=1UGsuLJcQT_S3WDVFvM5o0MbAJl7RLFqu&export=download&authuser=0"
     )
     assert externo["download_url"] == (
         "https://data.mendeley.com/public-api/zip/93f32zgkxz/download/1"
@@ -67,7 +67,7 @@ def test_manual_download_uses_configured_google_drive_url(
                     "https://drive.usercontent.google.com/download?"
                     "id=manual-drive-id&export=download"
                 ),
-                "archive_name": "datanotation.zip",
+                "archive_name": "manual-full-reviewed.zip",
                 "expected_bytes": len(payload),
                 "sha256": hashlib.sha256(payload).hexdigest(),
             }

@@ -11,7 +11,7 @@ from fruit_pipeline.real_data import import_real_dataset
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Importa a base real anotada em YOLO, COCO ou CVAT e audita 130/2093."
+        description="Importa a base real anotada em YOLO, COCO ou CVAT e audita 130/2130."
     )
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument(
