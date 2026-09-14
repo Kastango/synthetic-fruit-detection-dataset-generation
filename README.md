@@ -75,12 +75,15 @@ verificar na imagem: nenhuma fruta é desenhada sem anotação, e nenhum rótulo
 fica abaixo dos pisos que a receita declara. A verificação vale sobre a cena
 final, depois de todas as oclusões, e não apenas no momento da inserção.
 
-Na coleta externa, treinar em cena composta empata com treinar nas 104 fotos
-anotadas à mão: 0,163 contra 0,174 de mAP@.50:.95 no YOLO26s e 0,172 contra
-0,149 no YOLOv8s. Na validação da própria coleta o dado real abre 0,19, mas
-ali ele é avaliado no mesmo pomar, mesma câmera e mesmo anotador do seu treino.
-O ganho por volume sintético satura perto de 5x. As tabelas completas, os
-gráficos e os exemplos estão em [docs/RESULTS.md](docs/RESULTS.md).
+Na coleta externa, treinar em cena composta supera treinar nas 104 fotos
+anotadas à mão nas três arquiteturas: 0,193 contra 0,149 de mAP@.50:.95 no
+YOLOv8s, 0,197 contra 0,149 no RT-DETR-L e 0,193 contra 0,174 no YOLO26s. Na
+validação da própria coleta o quadro inverte e por margem maior — o dado real
+abre de 0,16 a 0,20 —, mas ali ele é avaliado no mesmo pomar, mesma câmera e
+mesmo anotador do seu treino. O ganho por volume sintético satura entre 3x e
+5x. São duas sementes por condição: o sinal é consistente, a promoção pede
+quatro. As tabelas completas, os gráficos e os exemplos estão em
+[docs/RESULTS.md](docs/RESULTS.md).
 
 
 - O gerador foi calibrado com estatísticas de caixas e aparência da coleta

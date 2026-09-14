@@ -48,12 +48,12 @@ O mapa de profundidade acompanha o fundo. A receita exporta
 
 A receita inicial está em `configs/synthesis/studio.yaml`, a mesma composição
 aprovada para o pool oficial. Os sliders leem seus valores desse arquivo.
-O padrão inclui 1% de cenas vazias, centro de escala 0,018–0,15, dispersão
-por cena 2,24, visibilidade 15% e piso de 60 pixels de máscara visível.
+O padrão inclui 1% de cenas vazias, centro de escala 0,022–0,098, dispersão
+por cena 1,85, visibilidade 15% e piso de 60 pixels de máscara visível.
 
-Receitas antigas com `objects.dense` conservam a amostragem anterior, mas
-`depth_scale`, `dense.scale_with_count` e `require_vegetation` foram aposentados
-e precisam ser removidos antes de usar o gerador atual.
+O gerador recusa `depth_scale`, `dense.scale_with_count` e
+`require_vegetation`, indicando a chave equivalente. Uma receita que as
+contenha precisa ser migrada antes de abrir no Studio.
 
 ## Sementes e reprodução
 

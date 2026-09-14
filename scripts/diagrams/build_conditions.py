@@ -41,7 +41,7 @@ TRAIN_MAX_DECK, VAL_MAX_DECK = 520, 288
 # Cada grupo começa no mesmo X. As setas preenchem o espaço até o próximo grupo.
 ARROW = 40  # comprimento mínimo no maior volume
 GUTTER = 14  # folga entre baralho e seta
-TEST_CARDS_WIDTH = 140  # o teste não escala: são sempre as mesmas 119 imagens
+TEST_CARDS_WIDTH = 140  # o teste é o mesmo nas sete condições e não escala
 
 DECK_Y, LABEL_Y = 18, 102
 HEIGHT = 120
@@ -111,15 +111,18 @@ CONDITIONS = [
 
 TEST_IMAGES = PIPELINE["external_datasets"]["oranges_field"]["expected_images"]
 
-# O teste usa a mesma escala de cartas e permanece igual nas sete condições.
-TEST_CARDS = round(2 * TEST_IMAGES / 26)
-
-
 # Uma unidade só para as duas colunas: 26 imagens (a validação do `1x`, o menor
 # conjunto do experimento) valem 2 cartas. Medir treino e validação contra bases
 # diferentes fazia os dois baralhos empatarem, escondendo que a validação é um
 # quarto do treino.
 UNIT_IMAGES, UNIT_CARDS = 26, 2
+
+
+# O baralho do teste é o mesmo nas sete condições, então seu tamanho não
+# carrega comparação nenhuma — quem informa o volume é o rótulo abaixo dele.
+# A escala de duas cartas por 26 imagens daria 96 cartas num slot de 140 px,
+# que vira um borrão sólido; o teto é o que ainda se lê como baralho.
+TEST_CARDS = min(22, round(UNIT_CARDS * TEST_IMAGES / UNIT_IMAGES))
 
 
 def deck_size(count: int) -> int:
@@ -213,7 +216,8 @@ def build(name: str, train: int, val: int, slug: str) -> tuple[str, set[str]]:
     desc = (
         f"From left to right: {thousands(train)} training images, {val} validation "
         f"images and the same {TEST_IMAGES} external test images for every condition. "
-        "Each group uses two cards per 26 images, rounded to the nearest integer. "
+        "Train and validation use two cards per 26 images, rounded to the nearest "
+        "integer; the test deck is capped and its size carries no comparison. "
         "Photos illustrate data types. Card spacing compresses in larger groups. "
         "All diagrams have equal width and fixed group starting positions."
     )

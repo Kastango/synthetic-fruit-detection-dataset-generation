@@ -43,9 +43,10 @@ Saídas:
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
 O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
-Todos os grupos usam duas cartas por 26 imagens, com arredondamento.
-O teste tem nove cartas para 119 imagens. O espaçamento diminui nas pilhas
-maiores; a largura não é uma escala linear. Os SVGs têm 1.116 px de largura.
+Treino e validação usam duas cartas por 26 imagens, com arredondamento. O
+baralho do teste é idêntico nas sete condições, então seu tamanho não compara
+nada: ele tem teto de 22 cartas e quem informa o volume é o rótulo abaixo.
+O espaçamento diminui nas pilhas maiores; a largura não é uma escala linear. Os SVGs têm 1.116 px de largura.
 Treino, validação e teste começam no mesmo X em todas as condições.
 As setas ocupam o intervalo entre o fim de cada pilha e o grupo seguinte.
 Os rótulos dos diagramas estão em inglês.
@@ -87,17 +88,20 @@ intercala positivos e negativos de `controlled` usando seus rótulos e registra
 nome e SHA-256 das imagens em `cell_sources.json`. Repita os comandos de build
 e verificação após mudar as miniaturas.
 
-### Proveniência da versão publicada
+### Proveniência das miniaturas publicadas
 
-As miniaturas sintéticas desta revisão foram produzidas com a configuração
-atual, alterando apenas `images.total` para 80. São 64 cenas de treino e 16 de
-validação em um preview ilustrativo, separado do pool dos 42 treinamentos.
-Como o total integra o hash da configuração, não são prefixos do pool de 1.300.
-Não use esse preview como evidência de desempenho ou das caixas daquele pool.
-`provenance.json` registra a configuração do fluxograma e a inserção ilustrada;
-`cell_sources.json` registra as cenas mostradas nas condições.
+As miniaturas das condições vêm dos conjuntos materializados em disco:
+`data/real_yolo_confirmatory`, `data/real_controlled`,
+`data/generated/confirmatory_pool` e `data/external_tests/oranges_field`.
+`cell_sources.json` registra nome e SHA-256 de cada cena mostrada;
+`provenance.json` registra a configuração do fluxograma e a inserção ilustrada.
+Elas representam tipos de dado e não certificam a identidade dos arquivos de
+cada split nem constituem evidência de desempenho.
 
-Para reproduzir esse preview com os ativos já preparados:
+As faixas do laço do fluxograma vêm de um preview ilustrativo, gerado com a
+receita vigente e `images.total` reduzido. Como o total integra o hash da
+configuração, esse preview não é um prefixo do pool. Para reproduzi-lo com os
+ativos já preparados:
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -117,20 +121,10 @@ PY
   --dataset synthetic=artifacts/diagrams/preview-80
 ```
 
-As miniaturas manuais e controladas foram obtidas de `data/real_yolo` e dos
-ativos de campo, antes da materialização dos splits confirmatórios. As do
-teste externo ainda vêm da coleta que saiu do protocolo e **precisam ser
-regeneradas** com o comando acima. Elas representam tipos de dados; não
-certificam a identidade dos arquivos de cada split.
-
 As imagens de campo seguem os termos registrados em [DATASETS.md](DATASETS.md).
-As miniaturas de teste externo ainda em disco são recortes e
-redimensionamentos do dataset de
-[James et al.](https://robotic-vision-lab.github.io/citdet/), sob
-[CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/), e a
-licença vale enquanto elas existirem. Depois de regeneradas, passam a vir da
-coleta de [Carella et al.](https://data.mendeley.com/datasets/93f32zgkxz/1),
-sob [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/).
+As miniaturas do teste externo são recortes e redimensionamentos da coleta de
+[Carella et al.](https://data.mendeley.com/datasets/93f32zgkxz/1), sob
+[CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/).
 As fontes vieram de [Google Fonts](https://github.com/google/fonts/tree/main/ofl),
 nos diretórios `geist`, `geistmono` e `instrumentserif`; as licenças acompanham
 os arquivos. A licença do código não substitui os termos desses recursos.
@@ -142,8 +136,10 @@ os arquivos. A licença do código não substitui os termos desses recursos.
 ```
 
 Esse comando lê os JSONs por execução em `artifacts/confirmatory`, gerados pela
-avaliação. Gera quatro SVGs e tabelas intermediárias, mas não reescreve a
-interpretação em `RESULTS.md`.
+avaliação. Gera quatro gráficos de tendência (mAP, precision, recall, F1), uma
+folha de ranking por conjunto de teste e tabelas intermediárias, mas não
+reescreve a interpretação em `RESULTS.md`. Detector sem resultado é ignorado,
+então a grade pode ser rodada uma arquitetura de cada vez e consolidada depois.
 
 Os exemplos de detecção usam `scripts/render_detection_examples.py`, que
 requer checkpoints e o conjunto escolhido preparado. Use `--dataset`,

@@ -171,7 +171,7 @@ Parâmetros que definem o pool confirmatório:
 | resolução gerada | 720×960, retrato |
 | cenas sem fruta | probabilidade 1% |
 | objetos solicitados nas demais | 1–60, beta(0,90471226; 3,06598030) |
-| escala por cena | centro 0,018–0,15 do menor lado do canvas, log-uniforme; dispersão 2,24 |
+| escala por cena | centro 0,022–0,098 do menor lado do canvas, log-uniforme; dispersão 1,85 |
 | rotação | até ±180° |
 | visibilidade mínima da fruta | 15%, verificada sobre a cena final |
 | piso de fruta visível | 60 pixels de máscara |
@@ -307,7 +307,14 @@ extensões normalizadas das caixas e a densidade medidas são:
 | | p5 | mediana | p95 | caixas/imagem |
 |---|---:|---:|---:|---:|
 | `oranges_field` | 0,0187 | 0,0437 | 0,1281 | 12,8 |
-| `manual-full` | 0,0201 | 0,0365 | 0,0893 | 16,1 |
+| `manual-full` | 0,0200 | 0,0364 | 0,0893 | 16,4 |
+| pool sintético | 0,0194 | 0,0403 | 0,0889 | 14,0 |
+
+A escala do pool acompanha `manual-full`, que é o pomar onde o detector será
+usado e de onde saem os recortes e fundos do compositor. A coleta externa tem
+fruta sistematicamente maior porque foi fotografada mais de perto; ajustar o
+gerador a ela inflaria o tamanho aparente e ainda tornaria a avaliação
+circular.
 
 ### Como interpretar o resultado externo
 
@@ -350,28 +357,31 @@ variância 123,207 da mistura 50/50 dos dois cenários reais. O mínimo 1 é o
 mínimo observado; o teto 60 foi definido pelo usuário. O sorteio é arredondado
 para inteiro. Cenas negativas têm probabilidade independente de 1%.
 
-O centro da escala vai de 0,018 a 0,15 do menor lado do canvas. Foram mantidos
-25% de maturação, 12% de podridão, z −7, chão liberado, luz por cena,
-espelhamento 50% e gradação com variação por cena. Os pisos agora são 15%
-de visibilidade e 60 pixels de máscara visível, inclusive na cena final.
+O centro da escala vai de 0,022 a 0,098 do menor lado do canvas, com dispersão
+1,85 em torno dele. A faixa é calibrada contra a distribuição de lado de caixa
+do pomar de poncã — p50 0,0367, p90 0,0761, 5,6% acima de 0,09 —, que é o
+domínio de aplicação. Medir contra a coleta externa tornaria a avaliação
+circular e produziria fruta grande demais: ela é laranja doce fotografada mais
+de perto. A receita ainda usa 25% de maturação, 12% de podridão, z −7, chão
+liberado, luz por cena, espelhamento 50% e gradação com variação por cena, e
+os pisos são 15% de visibilidade e 60 pixels de máscara visível, verificados
+sobre a cena final.
 
-Foram removidas as opções experimentais `objects.depth_scale`,
-`objects.dense.scale_with_count` e `placement.require_vegetation`. Receitas
-que as contenham agora falham com orientação de migração, em vez de serem
-interpretadas silenciosamente de outra forma. `scene_scale` continua ativo.
+O gerador aceita `objects.count_distribution` e `objects.scene_scale`. As
+chaves `objects.depth_scale`, `objects.dense.scale_with_count` e
+`placement.require_vegetation` são recusadas com orientação de migração, em vez
+de interpretadas silenciosamente de outra forma.
 
 ### Reprodutibilidade
 
-A receita e o código mudaram. O pool anterior não representa esta versão:
-seus manifestos preservam a configuração e o hash que realmente o produziram.
-A pipeline recusa retomá-lo com uma configuração diferente. Regere o pool e
-os subconjuntos explicitamente antes de treinar; não edite hashes históricos
-para simular uma geração nova.
+Cada pool grava no seu manifesto a configuração e o hash que realmente o
+produziram, e a pipeline recusa retomá-lo sob uma configuração diferente.
+Mudou a receita, regere o pool e os subconjuntos antes de treinar; não edite
+hashes para simular uma geração que não aconteceu. A impressão do manifesto
+entra no identificador de cada execução, então um treino feito sobre outro
+pool deixa de casar com o plano e é refeito.
 
-O treino continua sem congelamento. As rodadas exploratórias e a grade
-aposentada foram apagadas a pedido do usuário; seus números não constituem
-resultados atuais. Foram preservadas as fontes, o pool oficial e a revisão
-humana de anotações.
+O treino ajusta todas as camadas, sem congelamento.
 
 ## Rastreabilidade
 

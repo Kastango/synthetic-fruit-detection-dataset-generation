@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import base64
 import html
+import math
 from itertools import pairwise
 from pathlib import Path
 
@@ -490,14 +491,26 @@ def panel_acquisition() -> Canvas:
 # ====================================================================================
 # Geração das cenas e dos rótulos
 # ====================================================================================
+def _regra_de_base() -> str:
+    """A receita pode proibir a faixa inferior do quadro ou não.
+
+    Fruta cai, e foto de copa costuma pegar o chão; com a trava em zero o
+    diagrama não pode afirmar que a base é excluída.
+    """
+    fracao = float(CONFIG["placement"].get("exclude_bottom_fraction", 0.0) or 0.0)
+    return f"Exclude the bottom {fracao:.0%}" if fracao else "Uniform over the canvas"
+
+
 def panel_generation() -> Canvas:
     c = Canvas(
         "geracao",
         "Depth-guided composition and nested datasets",
-        "Para cada cena, um fundo, seu mapa e os recortes são amostrados do catálogo completo; cada "
-        "fruta é inserida por tentativa e erro guiada pela profundidade; encerrada a inserção, "
-        "as caixas são extraídas, as 1.300 cenas são divididas em train/val e delas saem os "
-        "subconjuntos aninhados synthetic-1x, 2x, 3x, 5x e 10x.",
+        "Cada cena sorteia um fundo com seu mapa de profundidade e uma distância de câmera, que "
+        "fixa o tamanho aparente da fruta ali; a contagem vem de uma Beta e uma fração das cenas "
+        "sai sem fruta nenhuma. Cada fruta é inserida por tentativa e erro guiada pela "
+        "profundidade; encerrada a inserção, as caixas são extraídas, as 1.300 cenas são "
+        "divididas em train/val e delas saem os subconjuntos aninhados synthetic-1x, 2x, 3x, "
+        "5x e 10x.",
         1740,
     )
     CENTER = W // 2
@@ -630,9 +643,13 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_escala",
-        ["Sample size and rotation"],
+        ["Size from scene distance"],
         [
-            f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} / rotation ±{CONFIG['objects']['rotation_degrees']}°"
+            # Faixa do centro de escala da cena, fator por fruta em torno dele
+            # e giro. A distância é da cena; a variação, de cada fruta.
+            f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} "
+            f"×/÷{math.sqrt(CONFIG['objects']['scene_scale']['spread']):.2f} · "
+            f"±{CONFIG['objects']['rotation_degrees']}°"
         ],
     )
     illustrated(
@@ -643,7 +660,7 @@ def panel_generation() -> Canvas:
         RH,
         "loop_xy",
         ["Sample X, Y"],
-        ["Exclude the bottom 15%"],
+        [_regra_de_base()],
     )
     illustrated(
         c,
@@ -653,7 +670,7 @@ def panel_generation() -> Canvas:
         RH,
         "loop_profundidade",
         ["Apply local depth"],
-        ["Depth scaling and Z jitter"],
+        [f"Z offset {CONFIG['placement']['z_offset']} ± {CONFIG['placement']['z_offset_jitter']}"],
     )
     diamond(
         c,
@@ -674,7 +691,7 @@ def panel_generation() -> Canvas:
         RH,
         "loop_aparencia",
         ["Adjust fruit appearance"],
-        ["Hue, light and shadows"],
+        ["Ripeness, rot, hue, exposure"],
     )
     illustrated(
         c,
@@ -789,12 +806,13 @@ def panel_generation() -> Canvas:
         ],
     )
     arrow(c, [(CENTER, 216), (CENTER, 248)])
-    diamond(c, CENTER, 304, 128, 56, ["Dense scene?"], bg=DECISION)
+    diamond(c, CENTER, 304, 128, 56, ["Empty canopy?"], bg=DECISION)
     arrow(c, [(448, 304), (280, 304), (280, 384)])
     arrow(c, [(704, 304), (872, 304), (872, 384)])
-    probability = CONFIG["objects"]["dense"]["probability"]
-    arrow_label(c, 338, 284, f"No ({1 - probability:.0%})")
-    arrow_label(c, 814, 284, f"Yes ({probability:.0%})")
+    vazia = CONFIG["objects"]["empty_probability"]
+    arrow_label(c, 338, 284, f"No ({1 - vazia:.0%})")
+    arrow_label(c, 814, 284, f"Yes ({vazia:.0%})")
+    contagem = CONFIG["objects"]["count_distribution"]
     node(
         c,
         128,
@@ -802,7 +820,10 @@ def panel_generation() -> Canvas:
         304,
         80,
         ["Sample fruit count"],
-        [f"{CONFIG['objects']['min']} to {CONFIG['objects']['max']} fruit"],
+        [
+            f"Beta({contagem['alpha']:.2f}, {contagem['beta']:.2f}) over "
+            f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']}"
+        ],
     )
     node(
         c,
@@ -810,10 +831,8 @@ def panel_generation() -> Canvas:
         384,
         304,
         80,
-        ["Sample fruit count"],
-        [
-            f"{CONFIG['objects']['dense']['min']} to {CONFIG['objects']['dense']['max']} fruit"
-        ],
+        ["Fruit count = 0"],
+        ["Foliage with nothing to find"],
     )
     for x in (280, 872):
         c.add(
@@ -907,10 +926,10 @@ def combined_svg(panels: list[Canvas], css: str) -> str:
 
     return (
         f'<svg viewBox="0 0 {W} {height}" role="img" '
-        'aria-labelledby="fluxograma-sintese-v3-title fluxograma-sintese-v3-desc" '
+        'aria-labelledby="fluxograma-sintese-title fluxograma-sintese-desc" '
         'xmlns="http://www.w3.org/2000/svg">\n'
-        f'<title id="fluxograma-sintese-v3-title">{esc(PAGE_TITLE)}</title>\n'
-        '<desc id="fluxograma-sintese-v3-desc">Prepare source assets, compose scenes using depth, '
+        f'<title id="fluxograma-sintese-title">{esc(PAGE_TITLE)}</title>\n'
+        '<desc id="fluxograma-sintese-desc">Prepare source assets, compose scenes using depth, '
         "split generated scenes and materialize "
         "nested synthetic-1x to synthetic-10x datasets.</desc>\n"
         "<defs>\n<style>" + css + "</style>\n"

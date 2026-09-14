@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Monta folhas de contato das figuras de resultados.
 
-Cada folha reúne num único arquivo o que antes eram vários. A página de
-resultados passa a fazer poucas requisições grandes em vez de dezenas
-pequenas, o que a torna menos sensível a falhas intermitentes da CDN.
+Cada folha reúne numa imagem só o que seria uma dezena de arquivos soltos. A
+página de resultados faz poucas requisições grandes em vez de muitas pequenas,
+o que a torna menos sensível a falhas intermitentes da CDN.
 """
 
 from __future__ import annotations
@@ -103,6 +103,62 @@ def heatmap_sheet(folder: Path, columns: int, cell_width: int):
     return sheet(tiles, columns, cell_width)
 
 
+def _com_caixas(imagem: Path, rotulo: Path):
+    img = Image.open(imagem).convert("RGB")
+    desenho = ImageDraw.Draw(img)
+    largura = max(2, round(min(img.size) / 260))
+    for linha in rotulo.read_text().splitlines():
+        if not linha.strip():
+            continue
+        cx, cy, w, h = (float(v) for v in linha.split()[1:5])
+        desenho.rectangle(
+            [
+                (cx - w / 2) * img.width, (cy - h / 2) * img.height,
+                (cx + w / 2) * img.width, (cy + h / 2) * img.height,
+            ],
+            outline="#00E0FF", width=largura,
+        )
+    return img
+
+
+def _medianas(imagens: Path, rotulos: Path, quantas: int):
+    """As `quantas` cenas com contagem mais próxima da mediana da coleção.
+
+    Escolher pela mediana, e não pelas primeiras do alfabeto, evita montar a
+    comparação com as cenas mais fáceis ou mais cheias de qualquer um dos dois
+    lados.
+    """
+    contagem = {}
+    for r in sorted(rotulos.glob("*.txt")):
+        alvo = next((p for p in imagens.glob(f"{r.stem}.*")), None)
+        if alvo is not None:
+            contagem[r] = sum(1 for l in r.read_text().splitlines() if l.strip())
+    if not contagem:
+        return []
+    mediana = sorted(contagem.values())[len(contagem) // 2]
+    melhores = sorted(contagem, key=lambda r: (abs(contagem[r] - mediana), r.stem))
+    return [
+        (next(imagens.glob(f"{r.stem}.*")), r, contagem[r]) for r in melhores[:quantas]
+    ]
+
+
+def comparison_sheet(cell_width: int, por_lado: int = 4):
+    """Pomar real e cena composta lado a lado, ambos com o gabarito desenhado."""
+    colecoes = [
+        ("pomar real", ROOT / "data/real_yolo_confirmatory/images/train",
+         ROOT / "data/real_yolo_confirmatory/labels/train"),
+        ("cena composta", ROOT / "data/generated/confirmatory_pool/images/train",
+         ROOT / "data/generated/confirmatory_pool/labels/train"),
+    ]
+    tiles = []
+    for legenda, imagens, rotulos in colecoes:
+        for caminho, rotulo, n in _medianas(imagens, rotulos, por_lado):
+            tiles.append((f"{legenda} · {n} frutas", _com_caixas(caminho, rotulo)))
+    if not tiles:
+        raise SystemExit("coleções ausentes para a comparação real x sintético")
+    return sheet(tiles, por_lado, cell_width)
+
+
 def save(image, path: Path):
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, "JPEG", quality=82, optimize=True, progressive=True, subsampling=1)
@@ -131,6 +187,7 @@ def main():
                 base / f"sheets/manual-full-val-{model}.jpg",
             )
     save(heatmap_sheet(base / "heatmaps", 3, 300), base / "sheets/mapas-de-anotacoes.jpg")
+    save(comparison_sheet(args.cell_width), base / "sheets/real-x-sintetico.jpg")
 
     scenes = base / "synthetic-examples"
     tiles = []

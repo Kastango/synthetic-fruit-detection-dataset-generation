@@ -21,7 +21,7 @@ if __name__ == "__main__":
         "split": a.split,
         "images": len(synthetic["count"]),
         "boxes": len(synthetic["size"]),
-        "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. A coleta externa não participou do desenvolvimento.",
+        "interpretation": "Descritores em caixas incluem folhagem; sem nota de realismo. A coleta externa orientou a calibração da receita, então a proximidade com ela não é evidência independente.",
     }
     for name, root, split in [
         ("manual_train", ROOT / "data/real_yolo_confirmatory", "train"),

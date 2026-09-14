@@ -99,7 +99,7 @@ external_datasets:
 # gráficos sem retreinar. Ver docs/RESULTS.md.
 confirmatory_checkpoints:
   download_url: https://github.com/Kastango/synthetic-fruit-detection-dataset-generation/releases/download/confirmatory-checkpoints/confirmatory_checkpoints.zip
-  expected_bytes: 1529134218
-  sha256: 8587a39e0a6d2787a96642301a05017694825f558d3e091dc825d4e09c44c586
+  expected_bytes: 1529133562
+  sha256: 7146cf4058d03b40203c1c4440341f479c25aab9470bb63f91446c65340db487
   checkpoints: 42
   license: interno (coleta própria do projeto)

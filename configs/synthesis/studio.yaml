@@ -24,16 +24,21 @@ objects:
     mode: beta
     alpha: 0.90471226
     beta: 3.06598030
-  # Negativos deliberados, em fluxo aleatório independente.
+  # Copas sem fruta nenhuma, em fluxo aleatório independente: sem elas o
+  # detector nunca vê folhagem que não esconde nada. Um em cem basta para
+  # marcar a categoria sem gastar orçamento de cena em quadro vazio.
   empty_probability: 0.01
-  # Centro de escala por cena, relativo ao menor lado do canvas.
-  # Faixa ampliada para frutas maiores e mais variedade entre enquadramentos.
-  min_scale: 0.018
-  max_scale: 0.15
+  # Centro de escala por cena, relativo ao menor lado do canvas. Calibrado
+  # contra a distribuição de lado de caixa do pomar de poncã, que é o domínio
+  # de aplicação: p50 0,0367, p90 0,0761, 5,6% das caixas acima de 0,09. Medir
+  # contra a coleta externa tornaria a avaliação circular e produz fruta grande
+  # demais — ela é laranja doce fotografada mais de perto.
+  min_scale: 0.022
+  max_scale: 0.098
   scale_distribution: log-uniform
   scene_scale:
     # Mantém moderada a variação entre frutas da mesma cena.
-    spread: 2.24
+    spread: 1.85
   rotation_degrees: 180
 
 placement:
