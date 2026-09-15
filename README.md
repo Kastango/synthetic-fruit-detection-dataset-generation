@@ -13,7 +13,16 @@ dois em duas coletas reais.
 O DepthPro estima a profundidade de cada foto de árvore. O compositor usa esse
 mapa para esconder parte das frutas atrás da vegetação. O tamanho da fruta varia
 ao redor de um centro sorteado por cena, que representa a distância da câmera.
-Depois da última inserção, o compositor calcula as caixas das partes visíveis.
+Depois da última inserção, o compositor recompõe as frutas do fundo para a
+frente e verifica os pisos de 15% de visibilidade, 60 pixels visíveis de máscara
+e 2 pixels por lado da caixa. Frutas que não passam são removidas da imagem;
+a cena é recomposta e verificada novamente antes de extrair as caixas.
+
+O ramo de 1% representa a probabilidade de solicitar uma cena sem frutas:
+ele pula a composição de frutas e salva o fundo com um TXT vazio. Rejeições
+no ramo de 99% podem reduzir a quantidade sorteada e também produzir cenas
+vazias. O split de cenas é fixado antes da geração; ao final, os arquivos são
+reunidos em subconjuntos aninhados.
 
 [![Processo de preparação dos ativos, composição e divisão dos dados](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)](docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg)
 

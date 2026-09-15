@@ -498,7 +498,7 @@ def _regra_de_base() -> str:
     diagrama não pode afirmar que a base é excluída.
     """
     fracao = float(CONFIG["placement"].get("exclude_bottom_fraction", 0.0) or 0.0)
-    return f"Exclude the bottom {fracao:.0%}" if fracao else "Uniform over the canvas"
+    return f"Exclude the bottom {fracao:.0%}" if fracao else "Uniform; keep cutout in frame"
 
 
 def panel_generation() -> Canvas:
@@ -511,10 +511,10 @@ def panel_generation() -> Canvas:
         "profundidade; encerrada a inserção, as caixas são extraídas, as 1.300 cenas são "
         "divididas em train/val e delas saem os subconjuntos aninhados synthetic-1x, 2x, 3x, "
         "5x e 10x.",
-        1740,
+        1756,
     )
     CENTER = W // 2
-    N_Y, N_H = 96, 120
+    N_Y, N_H = 96, 144
     # O contêiner é centrado na zona (32..1120) e as colunas deixam 32 px de folga
     # em cada lado, com os canais de retorno em 80 e 1072 — o laço fica simétrico.
     IN_X, IN_Y, IN_W, IN_H = 48, 264, 1056, 480
@@ -523,11 +523,11 @@ def panel_generation() -> Canvas:
     RA_Y, RB_Y, RH = 392, 568, 144
     RA_CY, RB_CY = RA_Y + RH // 2, RB_Y + RH // 2
     DIA_CX, DIA_HW, DIA_HH = C3 + CW // 2, CW // 2, RH // 2
-    SAVE_X, SAVE_Y, SAVE_W, SAVE_H = 176, 812, 456, 112
-    CARD_Y, CARD_W, CARD_H = 800, 84, 108
+    SAVE_X, SAVE_Y, SAVE_W, SAVE_H = 176, 972, 456, 112
+    CARD_Y, CARD_W, CARD_H = 960, 84, 108
     STACK_X = (688, 808, 928)
-    SPLIT_X, SPLIT_Y, SPLIT_W, SPLIT_H = 296, 1056, 560, 80
-    FINAL_Y, FINAL_W, FINAL_H = 1216, 184, 96
+    SPLIT_X, SPLIT_Y, SPLIT_W, SPLIT_H = 296, 1168, 560, 96
+    FINAL_Y, FINAL_W, FINAL_H = 1296, 184, 96
     FINAL_X = (48, 266, 484, 702, 920)
 
     zone(
@@ -535,12 +535,12 @@ def panel_generation() -> Canvas:
         ZX,
         32,
         ZW,
-        1272,
+        1320,
         f"Generate {CONFIG['images']['total']:,} scenes".replace(",", ","),
         loop=True,
     )
-    zone(c, ZX, 32 + 1272 + SECTION_GAP, ZW, 328, "Scene split and nested subsets")
-    c.add('<g transform="translate(0 320)">')
+    zone(c, ZX, 32 + 1320 + SECTION_GAP, ZW, 296, "Scene split and nested subsets")
+    c.add('<g transform="translate(0 256)">')
     frame(c, IN_X, IN_Y, IN_W, IN_H, "For each sampled fruit", loop=True)
 
     arrow(
@@ -584,17 +584,26 @@ def panel_generation() -> Canvas:
         c,
         [
             (CENTER, IN_Y + IN_H),
-            (CENTER, 792),
-            (save_center, 792),
-            (save_center, SAVE_Y),
+            (CENTER, 784),
         ],
     )
+    node(
+        c, 232, 784, 688, 128,
+        ["Recompose back to front; enforce final labels"],
+        [
+            f"Visible area ≥ {CONFIG['placement']['min_visible_pixels']} px; "
+            f"visibility ≥ {CONFIG['placement']['min_visibility']:.0%}",
+            f"Box sides ≥ {CONFIG['annotation']['min_box_pixels']} px",
+            "Remove failing fruit; recompose and recheck",
+        ],
+    )
+    arrow(c, [(CENTER, 912), (CENTER, 928), (save_center, 928), (save_center, SAVE_Y)])
     arrow(
         c,
         [
             (save_center, SAVE_Y + SAVE_H),
-            (save_center, 996),
-            (544, 996),
+            (save_center, 1132),
+            (544, 1132),
             (544, SPLIT_Y),
         ],
     )
@@ -602,19 +611,19 @@ def panel_generation() -> Canvas:
     # contêiner visual dentro da seção.
     stack_centers = tuple(x + CARD_W / 2 for x in STACK_X)
     c.add(
-        f'<path d="{ortho([(SAVE_X + SAVE_W, SAVE_Y + SAVE_H / 2), (656, SAVE_Y + SAVE_H / 2), (656, 784), (stack_centers[-1], 784)])}" '
+        f'<path d="{ortho([(SAVE_X + SAVE_W, SAVE_Y + SAVE_H / 2), (656, SAVE_Y + SAVE_H / 2), (656, 944), (stack_centers[-1], 944)])}" '
         f'fill="none" stroke="{MUTED}" stroke-width="1.6" stroke-dasharray="6,5"/>'
     )
     for center in stack_centers:
-        arrow(c, [(center, 784), (center, CARD_Y)], dashed=True)
+        arrow(c, [(center, 944), (center, CARD_Y)], dashed=True)
 
     # O split consome os três artefatos efetivamente gravados, não o bloco de
     # salvamento de forma abstrata. As guias descem dos rótulos até um único
     # barramento no vão entre as seções, que entra no centro da célula.
-    artifact_bus_y = 996
+    artifact_bus_y = 1132
     for center in stack_centers:
         c.add(
-            f'<path d="M {center:g} 952 L {center:g} {artifact_bus_y}" '
+            f'<path d="M {center:g} 1112 L {center:g} {artifact_bus_y}" '
             f'fill="none" stroke="{MUTED}" stroke-width="1.6" stroke-dasharray="6,5"/>'
         )
     c.add(
@@ -624,7 +633,7 @@ def panel_generation() -> Canvas:
     arrow(c, [(CENTER, artifact_bus_y), (CENTER, SPLIT_Y)], dashed=True)
 
     final_centers = tuple(x + FINAL_W // 2 for x in FINAL_X)
-    final_bus_y = 1192
+    final_bus_y = 1272
     c.add(
         f'<path d="M {CENTER} {SPLIT_Y + SPLIT_H} L {CENTER} {final_bus_y}" '
         f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
@@ -643,7 +652,7 @@ def panel_generation() -> Canvas:
         CW,
         RH,
         "loop_escala",
-        ["Size from scene distance"],
+        ["Select, mirror and size fruit"],
         [
             # Faixa do centro de escala da cena, fator por fruta em torno dele
             # e giro. A distância é da cena; a variação, de cada fruta.
@@ -681,6 +690,7 @@ def panel_generation() -> Canvas:
         [
             f"Proximity ≥ {CONFIG['placement']['min_depth']}?",
             f"Visibility ≥ {CONFIG['placement']['min_visibility']:.0%}?",
+            f"Area ≥ {CONFIG['placement']['min_visible_pixels']} px?",
         ],
     )
     illustrated(
@@ -691,14 +701,14 @@ def panel_generation() -> Canvas:
         RH,
         "loop_aparencia",
         ["Adjust fruit appearance"],
-        ["Ripeness, rot, hue, exposure"],
+        ["Ripeness, rot, hue, exposure", "Contact and cast shadows"],
     )
     illustrated(
         c,
         C1,
         RB_Y,
         CW,
-        RH + 16,
+        RH,
         "loop_compor",
         ["Composite the fruit"],
         ["Update visibility masks", "of previously placed fruit"],
@@ -711,7 +721,7 @@ def panel_generation() -> Canvas:
         SAVE_W,
         SAVE_H,
         ["Extract final boxes and save"],
-        ["After all insertions, omit boxes below 2 px"],
+        ["Visible masks → normalized YOLO boxes", "Empty scene → empty TXT"],
     )
     photo(
         c,
@@ -746,8 +756,8 @@ def panel_generation() -> Canvas:
         SPLIT_Y,
         SPLIT_W,
         SPLIT_H,
-        [f"Split {CONFIG['images']['total']:,} scenes".replace(",", ",")],
-        ["80% train, 20% validation, shared source assets"],
+        [f"Collect {CONFIG['images']['total']:,} scenes by frozen split"],
+        ["80% train / 20% val; assigned before rendering", "Nested prefixes; shared source assets"],
         radius=20,
         bg=PAPER,
     )
@@ -783,7 +793,7 @@ def panel_generation() -> Canvas:
 
     legend(
         c,
-        1360,
+        1440,
         [
             (g_step, "process"),
             (g_decision, "decision"),
@@ -801,22 +811,22 @@ def panel_generation() -> Canvas:
         120,
         ["Prepare the scene"],
         [
-            "Sample background and map; grade and smooth",
-            "RNG: seed, recipe hash, assets, scene index",
+            "Sample / mirror pair; grade RGB; smooth depth",
+            "Scene RNG: seed, assets, index (paired-v1)",
         ],
     )
     arrow(c, [(CENTER, 216), (CENTER, 248)])
     diamond(c, CENTER, 304, 128, 56, ["Empty canopy?"], bg=DECISION)
-    arrow(c, [(448, 304), (280, 304), (280, 384)])
-    arrow(c, [(704, 304), (872, 304), (872, 384)])
+    arrow(c, [(CENTER, 360), (CENTER, 416)])
+    arrow(c, [(704, 304), (936, 304), (936, 384)])
     vazia = CONFIG["objects"]["empty_probability"]
-    arrow_label(c, 338, 284, f"No ({1 - vazia:.0%})")
+    arrow_label(c, 650, 394, f"No ({1 - vazia:.0%})")
     arrow_label(c, 814, 284, f"Yes ({vazia:.0%})")
     contagem = CONFIG["objects"]["count_distribution"]
     node(
         c,
-        128,
-        384,
+        424,
+        416,
         304,
         80,
         ["Sample fruit count"],
@@ -827,21 +837,19 @@ def panel_generation() -> Canvas:
     )
     node(
         c,
-        720,
+        792,
         384,
-        304,
+        288,
         80,
-        ["Fruit count = 0"],
-        ["Foliage with nothing to find"],
+        ["Save empty scene"],
+        ["JPG + empty TXT + JSON"],
     )
-    for x in (280, 872):
-        c.add(
-            f'<path d="{ortho([(x, 464), (x, 520), (CENTER, 520)])}" '
-            f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
-        )
-    dot(c, CENTER, 520)
+    # Empty scenes are already saved; join the collected dataset directly.
+    arrow(c, [(936, 464), (936, 504), (1136, 504),
+              (1136, SPLIT_Y + 256 + SPLIT_H / 2),
+              (SPLIT_X + SPLIT_W, SPLIT_Y + 256 + SPLIT_H / 2)])
     c.add(
-        f'<path d="M {CENTER} 520 L {CENTER} 536" '
+        f'<path d="M {CENTER} 496 L {CENTER} 536" '
         f'fill="none" stroke="{MUTED}" stroke-width="1.6"/>'
     )
 
