@@ -1,8 +1,8 @@
 # Editar as figuras do README
 
 Os geradores Python são a fonte editável dos fluxogramas. Os SVGs publicados
-embutem fotos e fontes e abrem sem rede. Não edite o SVG exportado à mão, pois
-a próxima geração sobrescreve essas mudanças.
+embutem fotos e fontes. Para alterar uma figura, edite seu gerador e exporte
+o SVG novamente.
 
 ## Alterar texto, cores ou disposição
 
@@ -16,11 +16,10 @@ python3.11 -m venv .venv
 .venv/bin/python scripts/diagrams/check.py
 ```
 
-Se `.venv` já existe, use o ambiente existente. A instalação inicial requer
-rede; a geração dos fluxogramas usa apenas os arquivos versionados e não
-requer GPU, datasets completos, uma skill instalada ou a antiga pasta externa
-`diagrama/`. Os caminhos internos são relativos ao repositório, independentemente
-da pasta em que o script é chamado.
+Se `.venv` já existe, use esse ambiente. A instalação inicial requer rede.
+A geração usa os arquivos versionados, com caminhos relativos ao repositório.
+
+Edite os arquivos conforme a mudança desejada:
 
 | Arquivo | O que editar |
 |---|---|
@@ -32,26 +31,23 @@ da pasta em que o script é chamado.
 
 As contagens das condições vêm de `configs/pipeline.yaml`. O fluxograma lê
 densidade, escala, rotação e limiares de `configs/synthesis/confirmatory_pool.yaml`.
-A geometria acomoda os cinco multiplicadores atuais; adicionar condições ou
+A geometria acomoda os cinco multiplicadores atuais. Adicionar condições ou
 alongar rótulos exige rever a disposição. Alterações na ordem das operações
 precisam ser conferidas contra `fruit_pipeline/synthesis.py`.
 
-Saídas:
+Os comandos geram os seguintes arquivos:
 
 - `docs/figures/fluxograma-geracao-conjuntos-sinteticos.svg`;
 - `docs/figures/condicoes/condicao-*.svg`, um arquivo por condição;
 - `artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html`, preview local.
 
-O fluxograma usa rótulos em inglês e mostra as etapas do compositor.
-Treino e validação usam duas cartas por 26 imagens, com arredondamento. O
-baralho do teste é idêntico nas sete condições, então seu tamanho não compara
-nada: ele tem teto de 22 cartas e quem informa o volume é o rótulo abaixo.
-O espaçamento diminui nas pilhas maiores; a largura não é uma escala linear. Os SVGs têm 1.116 px de largura.
-Treino, validação e teste começam no mesmo X em todas as condições.
-As setas ocupam o intervalo entre o fim de cada pilha e o grupo seguinte.
-Os rótulos dos diagramas estão em inglês.
-As setas entre treino e validação representam a avaliação entre épocas.
-A validação não atualiza os pesos.
+Os diagramas usam rótulos em inglês. As pilhas de treino e validação usam duas
+cartas por 26 imagens, com arredondamento. A pilha de teste tem teto de 22
+cartas. Os rótulos informam as contagens exatas.
+
+Os SVGs têm 1.116 pixels de largura. O espaçamento diminui nas pilhas maiores.
+Treino, validação e teste começam na mesma posição horizontal em todas as
+condições. As setas entre treino e validação representam a avaliação entre épocas.
 
 ## Atualizar as miniaturas
 
@@ -60,7 +56,7 @@ dados locais preparados pela pipeline. Para as pilhas e faixas do fluxograma:
 
 ```bash
 .venv/bin/python scripts/diagrams/build_assets.py \
-  --preview data/generated/confirmatory_pool
+	--preview data/generated/confirmatory_pool
 ```
 
 O argumento deve apontar para um dataset com `images/train`, `labels/train`
@@ -69,18 +65,17 @@ e `metadata/train`. O script também usa `data/raw/fruits` e
 As três fotos de frutas têm recortes correspondentes; as três árvores têm seus
 próprios mapas DepthPro `_depth.png`. As cinco faixas do laço usam a mesma
 tentativa de inserção, com oclusão parcial escolhida para tornar o processo
-visível. A faixa de escala e giro amplia o recorte para facilitar a leitura;
-sua dimensão desenhada não representa a escala no canvas. Essa seleção é
-didática, não uma amostra aleatória de qualidade.
+visível. A faixa de escala e giro mostra uma ampliação do recorte para
+facilitar a leitura.
 
 Para atualizar os microfluxogramas a partir dos splits materializados:
 
 ```bash
 .venv/bin/python scripts/diagrams/build_conditions_assets.py \
-  --dataset manual=data/real_yolo_confirmatory \
-  --dataset controlled=data/real_controlled \
-  --dataset synthetic=data/generated/confirmatory_pool \
-  --dataset test=data/external_tests/oranges_field
+	--dataset manual=data/real_yolo_confirmatory \
+	--dataset controlled=data/real_controlled \
+	--dataset synthetic=data/generated/confirmatory_pool \
+	--dataset test=data/external_tests/oranges_field
 ```
 
 Cada `--dataset` é independente. O script amostra arquivos em ordem estável,
@@ -95,13 +90,11 @@ As miniaturas das condições vêm dos conjuntos materializados em disco:
 `data/generated/confirmatory_pool` e `data/external_tests/oranges_field`.
 `cell_sources.json` registra nome e SHA-256 de cada cena mostrada;
 `provenance.json` registra a configuração do fluxograma e a inserção ilustrada.
-Elas representam tipos de dado e não certificam a identidade dos arquivos de
-cada split nem constituem evidência de desempenho.
+As miniaturas ilustram os tipos de imagem de cada condição.
 
-As faixas do laço do fluxograma vêm de um preview ilustrativo, gerado com a
-receita vigente e `images.total` reduzido. Como o total integra o hash da
-configuração, esse preview não é um prefixo do pool. Para reproduzi-lo com os
-ativos já preparados:
+As faixas do fluxograma vêm de um preview com 80 cenas, cuja procedência está
+em `provenance.json`. Para gerar um preview com a receita atual e os ativos
+preparados, execute:
 
 ```bash
 .venv/bin/python - <<'PY'
@@ -114,20 +107,20 @@ config['images']['total'] = 80
 (directory / 'preview.yaml').write_text(yaml.safe_dump(config))
 PY
 .venv/bin/python scripts/generate_synthetic.py \
-  --synthesis-config artifacts/diagrams/preview.yaml \
-  --output artifacts/diagrams/preview-80 --workers 4
+	--synthesis-config artifacts/diagrams/preview.yaml \
+	--output artifacts/diagrams/preview-80 --workers 4
 .venv/bin/python scripts/diagrams/build_assets.py --preview artifacts/diagrams/preview-80
 .venv/bin/python scripts/diagrams/build_conditions_assets.py \
-  --dataset synthetic=artifacts/diagrams/preview-80
+	--dataset synthetic=data/generated/confirmatory_pool
 ```
 
-As imagens de campo seguem os termos registrados em [DATASETS.md](DATASETS.md).
+As imagens de campo seguem os [termos dos dados](../README.md#avaliação-e-fontes).
 As miniaturas do teste externo são recortes e redimensionamentos da coleta de
 [Carella et al.](https://data.mendeley.com/datasets/93f32zgkxz/1), sob
 [CC BY-NC 3.0](https://creativecommons.org/licenses/by-nc/3.0/).
 As fontes vieram de [Google Fonts](https://github.com/google/fonts/tree/main/ofl),
 nos diretórios `geist`, `geistmono` e `instrumentserif`; as licenças acompanham
-os arquivos. A licença do código não substitui os termos desses recursos.
+os arquivos. Cada recurso segue sua respectiva licença.
 
 ## Gráfico e exemplos de resultados
 
@@ -136,23 +129,21 @@ os arquivos. A licença do código não substitui os termos desses recursos.
 ```
 
 Esse comando lê os JSONs por execução em `artifacts/confirmatory`, gerados pela
-avaliação. Gera quatro gráficos de tendência (mAP, precision, recall, F1), uma
-folha de ranking por conjunto de teste e tabelas intermediárias, mas não
-reescreve a interpretação em `RESULTS.md`. Detector sem resultado é ignorado,
-então a grade pode ser rodada uma arquitetura de cada vez e consolidada depois.
+avaliação. Gera quatro gráficos de tendência, para mAP, precision, recall e F1,
+uma folha de ranking por conjunto e tabelas intermediárias. O script consolida
+as arquiteturas com resultados disponíveis.
 
 Os exemplos de detecção usam `scripts/render_detection_examples.py`, que
 requer checkpoints e o conjunto escolhido preparado. Use `--dataset`,
-`--model`, `--image-stem` e `--seed`; `--device cpu` permite executar sem GPU.
+`--model`, `--image-stem` e `--seed`. `--device cpu` executa a inferência na CPU.
 Os comandos e exemplos sintéticos estão em [RESULTS.md](RESULTS.md).
 Preserve a mesma imagem e limiar entre condições e informe
-esses valores na legenda. Uma imagem escolhida para ilustração não demonstra
-desempenho médio.
+esses valores na legenda. Informe também o critério de seleção da imagem.
 
 ## Conferir e exportar
 
 Abra o HTML de preview em um navegador e confira também o README renderizado.
-O verificador estrutural não detecta sobreposição visual. Antes de versionar:
+Antes de versionar, faça a conferência visual:
 
 - Confira textos, setas, pontas, legendas e margens na largura do README.
 - Confirme que as fotos carregam e que as faixas usam a mesma inserção.
@@ -165,14 +156,14 @@ Para extrair um SVG do HTML ou exportar PNG opcionalmente:
 
 ```bash
 .venv/bin/python scripts/diagrams/export_diagram.py \
-  artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html --format svg
+	artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html --format svg
 
 # Somente para exportar PNG, instale o renderizador uma vez:
 .venv/bin/python -m pip install playwright
 .venv/bin/python -m playwright install chromium
 .venv/bin/python scripts/diagrams/export_diagram.py \
-  artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html --format png --scale 2
+	artifacts/diagrams/fluxograma-geracao-conjuntos-sinteticos.html --format png --scale 2
 ```
 
 As exportações ficam junto do HTML em `artifacts/diagrams/`. O README usa os
-SVGs de `docs/figures/`; não é necessário versionar os previews HTML ou PNG.
+SVGs de `docs/figures/`. Guarde os previews HTML e PNG em `artifacts/diagrams/`.
