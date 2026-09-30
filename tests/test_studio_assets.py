@@ -4,6 +4,7 @@ import zipfile
 from hashlib import sha256
 
 import pytest
+
 from fruit_pipeline import studio_assets
 
 
@@ -28,7 +29,7 @@ def bundle(tmp_path, monkeypatch):
 
 
 def test_download_validates_and_installs_without_overwriting(tmp_path, monkeypatch):
-    resources, payload = bundle(tmp_path, monkeypatch)
+    _resources, payload = bundle(tmp_path, monkeypatch)
     monkeypatch.setattr(
         studio_assets.urllib.request, "urlopen", lambda *a, **k: io.BytesIO(payload)
     )

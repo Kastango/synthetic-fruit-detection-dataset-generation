@@ -25,8 +25,6 @@ OUT = ROOT / "docs/figures/condicoes"
 # Cartão e moldura branca em volta da foto. O deslocamento é só horizontal: o
 # baralho cresce para a direita, sem cascata na diagonal.
 CARD_W, CARD_H, CARD_PAD = 64, 64, 2
-# Vão largo o bastante para a seta ler como seta ao lado de um baralho de 176 px.
-GAP = 88
 FS = 12
 
 # O baralho ocupa exatamente o que suas cartas pedem, com a folga fixa em MAX_OFF,

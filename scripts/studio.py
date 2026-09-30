@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
+
 from fruit_pipeline.studio import serve
 
 if __name__ == "__main__":

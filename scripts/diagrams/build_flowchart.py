@@ -364,13 +364,6 @@ def g_decision(x, y):
     )
 
 
-def g_file(x, y):
-    return (
-        f'<path d="M {x} {y - 11} L {x + 20} {y - 11} L {x + 28} {y - 3} L {x + 28} {y + 9} '
-        f'L {x} {y + 9} Z" fill="{WHITE}" stroke="{INK}" stroke-width="1.2"/>'
-    )
-
-
 def g_terminal(x, y):
     return (
         f'<rect x="{x}" y="{y - 11}" width="28" height="20" rx="10" fill="{WHITE}" '
@@ -591,8 +584,10 @@ def panel_generation() -> Canvas:
         c, 232, 784, 688, 128,
         ["Recompose back to front; enforce final labels"],
         [
-            f"Visible area ≥ {CONFIG['placement']['min_visible_pixels']} px; "
-            f"visibility ≥ {CONFIG['placement']['min_visibility']:.0%}",
+            (
+                f"Visible area ≥ {CONFIG['placement']['min_visible_pixels']} px; "
+                f"visibility ≥ {CONFIG['placement']['min_visibility']:.0%}"
+            ),
             f"Box sides ≥ {CONFIG['annotation']['min_box_pixels']} px",
             "Remove failing fruit; recompose and recheck",
         ],
@@ -656,9 +651,11 @@ def panel_generation() -> Canvas:
         [
             # Faixa do centro de escala da cena, fator por fruta em torno dele
             # e giro. A distância é da cena; a variação, de cada fruta.
-            f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} "
-            f"×/÷{math.sqrt(CONFIG['objects']['scene_scale']['spread']):.2f} · "
-            f"±{CONFIG['objects']['rotation_degrees']}°"
+            (
+                f"{number(CONFIG['objects']['min_scale'])}–{number(CONFIG['objects']['max_scale'])} "
+                f"×/÷{math.sqrt(CONFIG['objects']['scene_scale']['spread']):.2f} · "
+                f"±{CONFIG['objects']['rotation_degrees']}°"
+            )
         ],
     )
     illustrated(
@@ -831,8 +828,10 @@ def panel_generation() -> Canvas:
         80,
         ["Sample fruit count"],
         [
-            f"Beta({contagem['alpha']:.2f}, {contagem['beta']:.2f}) over "
-            f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']}"
+            (
+                f"Beta({contagem['alpha']:.2f}, {contagem['beta']:.2f}) over "
+                f"{CONFIG['objects']['min']}–{CONFIG['objects']['max']}"
+            )
         ],
     )
     node(

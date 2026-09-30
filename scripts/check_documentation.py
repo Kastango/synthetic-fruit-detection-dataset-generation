@@ -98,7 +98,7 @@ def main() -> None:
     parser.add_argument("--results-dir", type=Path,
                         help="diretório com os dois test_results_*.json da rodada")
     args = parser.parse_args()
-    docs = [ROOT / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
+    docs = [ROOT / "README.md", ROOT / "scripts/README.md", *sorted((ROOT / "docs").glob("*.md"))]
     links = sum(check_links(path) for path in docs)
     experiment = load_yaml(ROOT / "configs/confirmatory.yaml")
     pipeline = load_yaml(ROOT / "configs/pipeline.yaml")

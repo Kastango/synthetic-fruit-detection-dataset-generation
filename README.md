@@ -161,6 +161,11 @@ compatíveis e retoma cada treino pelo último checkpoint. Os resultados ficam
 em `artifacts/confirmatory/`. Os comandos para avaliar `manual_full_val`,
 consolidar as tabelas e reproduzir as figuras estão em
 [Reproduzir os resultados](docs/RESULTS.md#reproduzir-os-resultados).
+O [índice dos scripts](scripts/README.md) descreve a função de cada etapa.
+
+Cada cena gerada registra o SHA-256 de `fruit_pipeline/synthesis.py`. Uma
+edição nesse arquivo, mesmo em comentários, faz a pipeline recusar o pool
+existente. Regenerá-lo altera os manifestos e os identificadores das execuções.
 
 Para conferir o código e a documentação, execute:
 

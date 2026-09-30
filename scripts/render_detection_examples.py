@@ -8,7 +8,8 @@ import json
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageOps
-from fruit_pipeline.common import ROOT, sha256_file, atomic_write_json
+
+from fruit_pipeline.common import ROOT, atomic_write_json, sha256_file
 
 CONDITION_ORDER = [
     "manual-full",
@@ -71,9 +72,7 @@ def main():
     if args.dataset == "oranges_field":
         root = ROOT / "data/external_tests/oranges_field"
         split = "test"
-        stem = args.image_stem or sorted(
-            p.stem for p in (root / "images" / split).glob("*.jpg")
-        )[0]
+        stem = args.image_stem or min(p.stem for p in (root / "images" / split).glob("*.jpg"))
         output = ROOT / "docs/figures/results/examples"
         if args.output_name:
             output = output / args.output_name
@@ -82,7 +81,7 @@ def main():
         split = "val"
         # Primeira imagem em ordem lexicográfica: seleção independente das predições.
         stem = (
-            args.image_stem or sorted((root / "images" / split).glob("*.jpg"))[0].stem
+            args.image_stem or min((root / "images" / split).glob("*.jpg")).stem
         )
         output = ROOT / "docs/figures/results/examples/manual-full-val" / args.model
     image_path = root / "images" / split / f"{stem}.jpg"
@@ -97,20 +96,20 @@ def main():
     )
     selection_path = ROOT / "artifacts/confirmatory/model_selection.json"
     selection = json.loads(selection_path.read_text())
-    provenance = dict(
-        dataset=args.dataset,
-        image=image_path.relative_to(ROOT).as_posix(),
-        image_sha256=sha256_file(image_path),
-        label_sha256=sha256_file(label_path),
-        ground_truth_boxes=len(gt),
-        model=args.model,
-        seed=args.seed,
-        confidence=0.25,
-        imgsz=960,
-        max_det=1000,
-        selection_sha256=sha256_file(selection_path),
-        runs=[],
-    )
+    provenance = {
+        "dataset": args.dataset,
+        "image": image_path.relative_to(ROOT).as_posix(),
+        "image_sha256": sha256_file(image_path),
+        "label_sha256": sha256_file(label_path),
+        "ground_truth_boxes": len(gt),
+        "model": args.model,
+        "seed": args.seed,
+        "confidence": 0.25,
+        "imgsz": 960,
+        "max_det": 1000,
+        "selection_sha256": sha256_file(selection_path),
+        "runs": [],
+    }
     for condition in args.condition or CONDITION_ORDER:
         runs = selection["selected"][args.model][condition]["runs"]
         run = next(r for r in runs if r["seed"] == args.seed)
@@ -130,12 +129,12 @@ def main():
             output / f"{condition}.jpg", quality=95, subsampling=0
         )
         provenance["runs"].append(
-            dict(
-                condition=condition,
-                run_id=run["run_id"],
-                checkpoint_sha256=run["checkpoint_sha256"],
-                detections=len(boxes),
-            )
+            {
+                "condition": condition,
+                "run_id": run["run_id"],
+                "checkpoint_sha256": run["checkpoint_sha256"],
+                "detections": len(boxes),
+            }
         )
         print(args.dataset, args.model, condition, len(boxes))
     atomic_write_json(output / "provenance.json", provenance)

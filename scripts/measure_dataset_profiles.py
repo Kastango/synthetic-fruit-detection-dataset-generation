@@ -8,13 +8,13 @@ A mistura dá peso total igual a cada domínio e peso igual a cada imagem.
 from __future__ import annotations
 
 import argparse
-from collections import Counter, defaultdict
 import csv
 import hashlib
 import json
-from pathlib import Path
 import re
 import zipfile
+from collections import Counter, defaultdict
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
@@ -129,25 +129,25 @@ def scan(root, splits, name):
                 edge += int(
                     min(x - w / 2, y - h / 2, 1 - x - w / 2, 1 - y - h / 2) <= 1e-5
                 )
-                b = dict(
-                    dataset=name,
-                    image=key,
-                    index=i,
-                    width_norm=w,
-                    height_norm=h,
-                    max_side_norm=max(w, h),
-                    long_side_short_image=max(w * width, h * height)
+                b = {
+                    "dataset": name,
+                    "image": key,
+                    "index": i,
+                    "width_norm": w,
+                    "height_norm": h,
+                    "max_side_norm": max(w, h),
+                    "long_side_short_image": max(w * width, h * height)
                     / min(width, height),
-                    area_norm=w * h,
-                    aspect_ratio=w * width / (h * height),
-                    width_px=w * width,
-                    height_px=h * height,
-                    sqrt_area_960=np.sqrt(w * width * h * height)
+                    "area_norm": w * h,
+                    "aspect_ratio": w * width / (h * height),
+                    "width_px": w * width,
+                    "height_px": h * height,
+                    "sqrt_area_960": np.sqrt(w * width * h * height)
                     * 960
                     / max(width, height),
-                    center_x=x,
-                    center_y=y,
-                )
+                    "center_x": x,
+                    "center_y": y,
+                }
                 local.append(b)
             boxes.extend(local)
             sides = [b["max_side_norm"] for b in local]
@@ -165,26 +165,26 @@ def scan(root, splits, name):
                 else path.stem
             )
             rows.append(
-                dict(
-                    dataset=name,
-                    image=key,
-                    split=split,
-                    condition=condition,
-                    source_photo=source,
-                    width=width,
-                    height=height,
-                    boxes=len(local),
-                    median_max_side=float(np.median(sides)) if sides else None,
-                    within_p90_p10=float(q90 / q10) if q10 else None,
-                    sum_box_area=sum(b["area_norm"] for b in local),
-                    edge_boxes=edge,
-                    duplicate_boxes=duplicate_boxes,
-                    brightness=float(gray.mean()),
-                    contrast=float(gray.std()),
-                    saturation=float(sat.mean()),
-                    image_sha256=image_hash,
-                    label_sha256=label_hash,
-                )
+                {
+                    "dataset": name,
+                    "image": key,
+                    "split": split,
+                    "condition": condition,
+                    "source_photo": source,
+                    "width": width,
+                    "height": height,
+                    "boxes": len(local),
+                    "median_max_side": float(np.median(sides)) if sides else None,
+                    "within_p90_p10": float(q90 / q10) if q10 else None,
+                    "sum_box_area": sum(b["area_norm"] for b in local),
+                    "edge_boxes": edge,
+                    "duplicate_boxes": duplicate_boxes,
+                    "brightness": float(gray.mean()),
+                    "contrast": float(gray.std()),
+                    "saturation": float(sat.mean()),
+                    "image_sha256": image_hash,
+                    "label_sha256": label_hash,
+                }
             )
 
     def summarize(selected):

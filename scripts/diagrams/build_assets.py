@@ -93,24 +93,6 @@ def stack(images: list[Image.Image], name: str, mirror: bool = False) -> None:
     print(f"{name}.png {canvas.size} (exibido a {span // SS}px)")
 
 
-def single(image: Image.Image, name: str, width: int, height: int) -> None:
-    """Cartão retangular isolado, para as saídas da pipeline."""
-    inner = (width * SS - 2 * FRAME, height * SS - 2 * FRAME)
-    card = Image.new("RGBA", (width * SS, height * SS), (255, 255, 255, 255))
-    card.paste(
-        ImageOps.fit(image.convert("RGB"), inner, Image.Resampling.LANCZOS),
-        (FRAME, FRAME),
-    )
-    ImageDraw.Draw(card).rectangle(
-        [0, 0, width * SS - 1, height * SS - 1],
-        outline=(*INK, 90),
-        width=max(1, SS // 2),
-    )
-    out = card.resize((width * EXPORT, height * EXPORT), Image.Resampling.LANCZOS)
-    out.save(OUT / f"{name}.png", optimize=True)
-    print(f"{name}.png {out.size} (exibido a {width}×{height})")
-
-
 def portrait_stack(images: list[Image.Image], name: str) -> None:
     """Empilha cenas verticais preservando a proporção 720 × 960 do canvas."""
     width, height, offset = 88 * SS, 118 * SS, 10 * SS

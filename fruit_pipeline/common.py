@@ -163,7 +163,3 @@ def extract_zip_atomic(
         shutil.rmtree(temporary, ignore_errors=True)
         raise
 
-
-def require_empty_or_force(path: Path, force: bool) -> None:
-    if path.exists() and any(path.iterdir()) and not force:
-        raise FileExistsError(f"diretório não vazio: {path}; use --force")

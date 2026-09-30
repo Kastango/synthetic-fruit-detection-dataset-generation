@@ -10,9 +10,9 @@ import argparse
 import json
 
 from PIL import Image
+from render_detection_examples import draw_boxes, read_boxes, resize
 
 from fruit_pipeline.common import ROOT, atomic_write_json, sha256_file
-from render_detection_examples import draw_boxes, read_boxes, resize
 
 
 def main():
