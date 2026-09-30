@@ -3,35 +3,41 @@
 from __future__ import annotations
 
 import base64
-from copy import deepcopy
-from functools import lru_cache
-from io import BytesIO
 import json
 import multiprocessing
 import os
-from pathlib import Path
-import threading
-import zipfile
+import platform
 import re
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+import shutil
+import threading
+import traceback
+import zipfile
 from collections import OrderedDict
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from copy import deepcopy
+from functools import lru_cache
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
+from pathlib import Path
 from urllib.parse import urlparse
+
+import numpy as np
+import PIL
 import yaml
 from PIL import Image, ImageDraw, ImageOps
-from .common import ROOT, load_yaml, stable_hash, sha256_file, atomic_write_json
+
+from .common import ROOT, atomic_write_json, load_yaml, sha256_file, stable_hash
+from .similarity import FEATURES, image_features, merge_features, read_boxes
+from .studio_assets import install_demo_assets
 from .synthesis import (
-    create_asset_catalog,
-    _render_preview,
     _initialize_worker,
+    _open_background_pair,
+    _render_preview,
+    create_asset_catalog,
+    generate_dataset,
     scene_seed,
     validate_synthesis_config,
-    generate_dataset,
-    _open_background_pair,
 )
-from .studio_assets import install_demo_assets
-from .similarity import read_boxes, image_features, merge_features, FEATURES
-import numpy as np
 
 # Controles de pesquisa. Os detalhes mecânicos continuam explícitos no YAML
 # exportado; restringir a superfície de ajuste não apaga sua existência.
@@ -391,7 +397,7 @@ def controls_from_recipe(recipe: dict) -> dict:
     editada à mão fora dos limites não deixe a interface num estado inválido.
     """
     if not isinstance(recipe, dict):
-        raise ValueError("Receita inválida")
+        raise TypeError("Receita inválida")
     objects = recipe.get("objects") or {}
     placement = recipe.get("placement") or {}
     appearance = recipe.get("appearance") or {}
@@ -517,15 +523,15 @@ def illustration(image: Image.Image, boxes: list, name: str) -> dict:
                 )
             )
         )
-    return dict(
-        name=name,
-        image=picture(image),
-        annotated=picture(annotated),
-        crops=crops,
-        count=len(boxes),
-        width=w,
-        height=h,
-    )
+    return {
+        "name": name,
+        "image": picture(image),
+        "annotated": picture(annotated),
+        "crops": crops,
+        "count": len(boxes),
+        "width": w,
+        "height": h,
+    }
 
 
 class Studio:
@@ -655,9 +661,6 @@ class Studio:
             (root / "recipe.yaml").write_text(
                 yaml.safe_dump(config, sort_keys=False, allow_unicode=True)
             )
-            import platform
-            import PIL
-
             atomic_write_json(
                 root / "provenance.json",
                 {
@@ -700,9 +703,7 @@ class Studio:
                 download=f"/api/jobs/{job_id}/download",
             )
             atomic_write_json(root / "job.json", self.jobs[job_id])
-        except Exception as error:
-            import traceback
-
+        except Exception as error:  # noqa: BLE001 - o erro vira estado do job
             traceback.print_exc()
             self.jobs[job_id].update(
                 status="error", error=f"Não foi possível gerar o dataset: {error}"
@@ -764,35 +765,33 @@ class Studio:
                         features.append(image_features(im, boxes))
                 self.cache[key] = (views, merge_features(features))
                 # Arquivos da prévia são efêmeros; o YAML exportado reproduz as cenas.
-                import shutil
-
                 shutil.rmtree(output)
                 while len(self.cache) > 4:
                     self.cache.popitem(last=False)
             views, features = self.cache[key]
             metrics = [
-                dict(
-                    key=key,
-                    label=label,
-                    quantiles=(
-                        (np.quantile(features[key], [0.1, 0.5, 0.9]) * scale).tolist()
-                        if features[key]
+                {
+                    "key": name,
+                    "label": label,
+                    "quantiles": (
+                        (np.quantile(features[name], [0.1, 0.5, 0.9]) * scale).tolist()
+                        if features[name]
                         else None
                     ),
-                )
-                for key, (label, scale) in FEATURES.items()
+                }
+                for name, (label, scale) in FEATURES.items()
             ]
-            return dict(
-                synthetic=views,
-                metrics=metrics,
-                config=config,
-                config_hash=stable_hash(config, 24),
-                generator_sha256=code_hash,
-                asset_fingerprint=self.fingerprint,
-                yaml=yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
-                sample_images=SAMPLE_SCENES,
-                sample_boxes=sum(v["count"] for v in views),
-            )
+            return {
+                "synthetic": views,
+                "metrics": metrics,
+                "config": config,
+                "config_hash": stable_hash(config, 24),
+                "generator_sha256": code_hash,
+                "asset_fingerprint": self.fingerprint,
+                "yaml": yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
+                "sample_images": SAMPLE_SCENES,
+                "sample_boxes": sum(v["count"] for v in views),
+            }
 
 
 def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
@@ -833,30 +832,15 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                     409, b'{"error":"Prepare os dados primeiro."}', "application/json"
                 )
             if path == "/api/controls":
-                value = dict(
-                    controls=[
-                        dict(
-                            zip(
-                                [
-                                    "key",
-                                    "group",
-                                    "label",
-                                    "min",
-                                    "max",
-                                    "step",
-                                    "help",
-                                ],
-                                r,
-                            )
-                        )
-                        for r in CONTROLS
-                    ],
-                    defaults=DEFAULTS,
-                    essential=SIMPLE,
-                    range_pairs=RANGE_PAIRS,
-                    spread_pairs=SPREAD_PAIRS,
-                    linked_pairs=LINKED_PAIRS,
-                )
+                fields = ("key", "group", "label", "min", "max", "step", "help")
+                value = {
+                    "controls": [dict(zip(fields, row)) for row in CONTROLS],
+                    "defaults": DEFAULTS,
+                    "essential": SIMPLE,
+                    "range_pairs": RANGE_PAIRS,
+                    "spread_pairs": SPREAD_PAIRS,
+                    "linked_pairs": LINKED_PAIRS,
+                }
                 return self.send(200, json.dumps(value).encode(), "application/json")
             if path.startswith("/api/jobs/"):
                 try:
@@ -924,20 +908,20 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                     raise ValueError("Requisição inválida")
                 body = json.loads(self.rfile.read(length))
                 if not isinstance(body, dict):
-                    raise ValueError("Requisição deve ser um objeto")
+                    raise TypeError("Requisição deve ser um objeto")
                 if self.path == "/api/import":
-                    texto = body.get("recipe")
-                    if not isinstance(texto, str) or not texto.strip():
+                    text = body.get("recipe")
+                    if not isinstance(text, str) or not text.strip():
                         raise ValueError("Envie o conteúdo do YAML da receita")
-                    receita = yaml.safe_load(texto)
-                    valores = controls_from_recipe(receita)
-                    semente = receita.get("seed") if isinstance(receita, dict) else None
-                    if not (isinstance(semente, int) and not isinstance(semente, bool)
-                            and 0 <= semente <= 2**31 - 1):
-                        semente = None
+                    recipe = yaml.safe_load(text)
+                    controls = controls_from_recipe(recipe)
+                    seed = recipe.get("seed")
+                    if not (isinstance(seed, int) and not isinstance(seed, bool)
+                            and 0 <= seed <= 2**31 - 1):
+                        seed = None
                     return self.send(
                         200,
-                        json.dumps({"controls": valores, "seed": semente}).encode(),
+                        json.dumps({"controls": controls, "seed": seed}).encode(),
                         "application/json",
                     )
                 if self.path == "/api/assets":
@@ -962,9 +946,7 @@ def serve(host="127.0.0.1", port=8765, asset_root=None, output=None,
                 self.send(
                     400, json.dumps({"error": str(error)}).encode(), "application/json"
                 )
-            except Exception:
-                import traceback
-
+            except Exception:  # noqa: BLE001 - qualquer falha vira resposta 500
                 traceback.print_exc()
                 self.send(
                     500,

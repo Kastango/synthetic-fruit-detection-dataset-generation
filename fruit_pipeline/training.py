@@ -4,6 +4,7 @@ import csv
 import json
 import math
 import platform
+import random
 import shutil
 import statistics
 import subprocess
@@ -358,8 +359,6 @@ def run_grid(
             if spec["model"] in model_filters or spec["model_name"] in model_filters
         ]
     # Evita confundir condição/arquitetura com ordem térmica ou temporal da GPU.
-    import random
-
     random.Random(2027).shuffle(specs)
     if max_runs is not None:
         specs = specs[:max_runs]

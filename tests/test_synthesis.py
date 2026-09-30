@@ -12,8 +12,8 @@ from PIL import Image, ImageOps
 from fruit_pipeline.real_data import validate_yolo_text
 from fruit_pipeline.synthesis import (
     _apply_appearance_hsv_cast,
-    _sample_object_count,
     _finish_placement,
+    _sample_object_count,
     create_asset_catalog,
     create_scene_split,
     generate_dataset,
@@ -65,7 +65,7 @@ def test_count_requires_integers(value):
 
 
 def test_mirroring_keeps_background_depth_and_cutout_alpha_aligned(tmp_path, monkeypatch):
-    import fruit_pipeline.synthesis as synthesis
+    from fruit_pipeline import synthesis
 
     assets = tmp_path / "assets"
     build_assets(assets)
@@ -925,6 +925,7 @@ def test_enforce_labels_devolve_apenas_instancias_publicaveis(tmp_path):
     rótulo — que é a garantia que este teste protege.
     """
     from PIL import Image
+
     from fruit_pipeline.synthesis import _enforce_labels, _publishable
 
     lado, canvas_lado = 20, 64

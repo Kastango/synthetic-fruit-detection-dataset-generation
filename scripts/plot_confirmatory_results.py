@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Consolida test_results_{oranges_field,manual_full_val}.json num Markdown único
-com tabelas comparativas e um gráfico de tendência (volume de dados sintéticos
-x mAP), para a coleta externa e a validação manual reutilizada na avaliação.
+"""Consolida test_results_{oranges_field,manual_full_val}.json em tabelas e figuras.
+
+Gera os gráficos de volume sintético contra mAP, F1, precision e recall, um
+ranking por conjunto avaliado e as tabelas Markdown intermediárias.
 
 Não participa do pipeline reprodutível (`run_pipeline.sh`); é um script de
 análise executado manualmente sobre artefatos já gerados.
@@ -10,6 +11,7 @@ análise executado manualmente sobre artefatos já gerados.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import shutil
 from pathlib import Path
@@ -181,7 +183,7 @@ def build_trend_chart(
         baixo, alto = ax.get_ylim()
         folga_rotulo = (alto - baixo) * 0.045
         rotulos.sort()
-        for anterior, atual in zip(rotulos, rotulos[1:]):
+        for anterior, atual in itertools.pairwise(rotulos):
             if atual[0] - anterior[0] < folga_rotulo:
                 atual[0] = anterior[0] + folga_rotulo
         for altura, detector, color in rotulos:

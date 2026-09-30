@@ -1,4 +1,4 @@
-"""Refresh selected decks from explicit YOLO datasets; record each source image."""
+"""Atualiza as miniaturas das condições a partir de datasets YOLO e registra cada imagem."""
 
 import argparse
 import hashlib

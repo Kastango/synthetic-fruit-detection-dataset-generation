@@ -27,10 +27,10 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
-from pathlib import Path
 import random
 import shutil
+from collections import defaultdict
+from pathlib import Path
 
 
 def maior_lado(texto: str) -> float:

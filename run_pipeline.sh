@@ -31,7 +31,7 @@ case "${stage}" in
   preprocess|materialize-controlled|prepare|all)
     requirements="requirements-preprocess.txt"
     ;;
-  train|select|test|all)
+  train|select|test)
     requirements="requirements.txt"
     ;;
   *)

@@ -1,4 +1,4 @@
-"""Check portable SVGs, embedded images and accessible labels without a browser."""
+"""Confere, sem navegador, se os SVGs são portáteis, embutem as imagens e têm rótulos acessíveis."""
 
 import base64
 import io

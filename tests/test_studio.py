@@ -1,13 +1,21 @@
-from copy import deepcopy
 import json
+from copy import deepcopy
 from pathlib import Path
+
 import pytest
 from PIL import Image
-from fruit_pipeline.common import ROOT, load_yaml, sha256_file
-from fruit_pipeline.studio import resolve_recipe, DEFAULTS, SIMPLE, Studio, SAMPLE_SCENES
-from fruit_pipeline.synthesis import generate_dataset, scene_seed, create_asset_catalog
-from fruit_pipeline.similarity import image_features, compare_features
 from test_synthesis import build_assets, tiny_config
+
+from fruit_pipeline.common import ROOT, load_yaml, sha256_file
+from fruit_pipeline.similarity import FEATURES, image_features
+from fruit_pipeline.studio import (
+    DEFAULTS,
+    SAMPLE_SCENES,
+    SIMPLE,
+    Studio,
+    resolve_recipe,
+)
+from fruit_pipeline.synthesis import create_asset_catalog, generate_dataset, scene_seed
 
 
 def test_paired_appearance_preserves_geometry_and_changes_pixels(tmp_path):
@@ -107,14 +115,14 @@ def test_recipe_limits_and_removes_effects():
         resolve_recipe(base, {}, "reference", -1)
 
 
-def test_empty_boxes_and_identical_distribution():
+def test_image_features_with_and_without_boxes():
     image = Image.new("RGB", (20, 20), "green")
     features = image_features(image, [])
-    rows = compare_features(features, features)
-    assert rows[0]["distance"] == 0
-    assert all(row["distance"] is None for row in rows[1:])
+    assert features["count"] == [0]
+    assert all(features[key] == [] for key in FEATURES if key != "count")
     features = image_features(image, [[0.5, 0.5, 0.3, 0.3]])
-    assert all(row["distance"] == 0 for row in compare_features(features, features))
+    assert features["count"] == [1]
+    assert all(len(features[key]) == 1 for key in FEATURES)
 
 
 def test_stale_generator_marker_rejected(tmp_path):
@@ -149,6 +157,7 @@ def test_content_hash_catches_same_size_asset_change(tmp_path):
 def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
     import time
     import zipfile
+
     import yaml
 
     assets = tmp_path / "assets"
@@ -209,6 +218,7 @@ def test_studio_needs_only_synthetic_assets_and_exports_zip(tmp_path):
 
 def test_preview_matches_generation_by_scene_index(tmp_path):
     import json
+
     from fruit_pipeline.studio import picture
 
     assets = tmp_path / "assets"
@@ -239,16 +249,16 @@ def test_preview_matches_generation_by_scene_index(tmp_path):
 
 def test_controls_expose_variability_and_map_to_recipe():
     """Os controles de variação viram faixas simétricas na receita."""
-    controls = dict(
-        mirror_probability=30,
-        light_angle=120,
-        light_spread=75,
-        brightness_spread=10,
-        contrast_spread=25,
-        saturation_spread=0,
-        sharpness=40,
-        sharpness_spread=50,
-    )
+    controls = {
+        "mirror_probability": 30,
+        "light_angle": 120,
+        "light_spread": 75,
+        "brightness_spread": 10,
+        "contrast_spread": 25,
+        "saturation_spread": 0,
+        "sharpness": 40,
+        "sharpness_spread": 50,
+    }
     c = resolve_recipe(load_yaml(ROOT / "configs/synthesis/studio.yaml"), controls, "reference", 7)
     assert c["augmentation"]["horizontal_flip"] == 0.3
     cast = c["occlusion"]["cast_shadow"]
@@ -286,16 +296,16 @@ def test_import_recovers_control_positions():
     """Importar a receita exportada devolve os mesmos controles."""
     from fruit_pipeline.studio import controls_from_recipe
 
-    escolhidos = dict(
-        fruit_min=20,
-        fruit_max=80,
-        contrast_spread=25,
-        light_angle=120,
-        light_spread=70,
-        mirror_probability=30,
-        min_visible_pixels=150,
-        ripeness_strength=60,
-    )
+    escolhidos = {
+        "fruit_min": 20,
+        "fruit_max": 80,
+        "contrast_spread": 25,
+        "light_angle": 120,
+        "light_spread": 70,
+        "mirror_probability": 30,
+        "min_visible_pixels": 150,
+        "ripeness_strength": 60,
+    }
     base = load_yaml(ROOT / "configs/synthesis/studio.yaml")
     receita = resolve_recipe(base, escolhidos, "reference", 7)
     voltou = controls_from_recipe(receita)
@@ -306,7 +316,7 @@ def test_import_recovers_control_positions():
 
 def test_import_clamps_values_outside_the_control_range():
     """Receita editada à mão não pode deixar a interface fora dos limites."""
-    from fruit_pipeline.studio import controls_from_recipe, CONTROLS
+    from fruit_pipeline.studio import CONTROLS, controls_from_recipe
 
     limites = {row[0]: (row[3], row[4]) for row in CONTROLS}
     receita = {

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import numpy as np
-from PIL import Image, ImageOps
-from .common import image_files
+from PIL import Image
 
 FEATURES = {
     "count": ("Caixas por imagem", 1),
@@ -73,44 +73,3 @@ def image_features(
 
 def merge_features(items: list[dict]) -> dict:
     return {key: [v for item in items for v in item[key]] for key in FEATURES}
-
-
-def dataset_features(images: Path, labels: Path, limit: int | None = None) -> dict:
-    paths = image_files(images)
-    if not paths:
-        raise FileNotFoundError(f"Nenhuma imagem encontrada em {images}")
-    if limit is not None:
-        paths = paths[:limit]
-    features = []
-    for path in paths:
-        boxes = read_boxes(labels / f"{path.stem}.txt")
-        with Image.open(path) as source:
-            features.append(
-                image_features(ImageOps.exif_transpose(source).convert("RGB"), boxes)
-            )
-    return merge_features(features)
-
-
-def compare_features(synthetic: dict, real: dict) -> list[dict]:
-    rows = []
-    for key, (label, scale) in FEATURES.items():
-        a, b = synthetic[key], real[key]
-        if not a or not b:
-            rows.append(
-                dict(key=key, label=label, synthetic=None, real=None, distance=None)
-            )
-            continue
-        # Distância entre quantis em unidades da própria variável; menor é
-        # mais próximo. Sem soma de escalas incompatíveis nem "nota de realismo".
-        q = np.linspace(0, 1, 101)
-        distance = float(np.mean(np.abs(np.quantile(a, q) - np.quantile(b, q)))) * scale
-        rows.append(
-            dict(
-                key=key,
-                label=label,
-                synthetic=(np.quantile(a, [0.1, 0.5, 0.9]) * scale).tolist(),
-                real=(np.quantile(b, [0.1, 0.5, 0.9]) * scale).tolist(),
-                distance=distance,
-            )
-        )
-    return rows

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fruit_pipeline.common import ROOT, automatic_workers, load_yaml, project_path
 from fruit_pipeline.progress import run_stage
+from fruit_pipeline.training import scoped_experiment_root
 
 
 class Workflow:
@@ -30,8 +31,12 @@ class Workflow:
             else project_path(self.pipeline["paths"]["assets"])
         )
 
-    def command(self, script: str, *values: str) -> list[str]:
-        return [sys.executable, str(ROOT / "scripts" / script), *values]
+    def command(self, script: str, *values: str, force: bool = False) -> list[str]:
+        """Monta a chamada; `force=True` repassa `--force` quando ele foi pedido."""
+        command = [sys.executable, str(ROOT / "scripts" / script), *values]
+        if force and self.args.force:
+            command.append("--force")
+        return command
 
     def run(self, title: str, command: list[str]) -> None:
         print(f"\n== {title} ==\n{' '.join(command)}", flush=True)
@@ -39,11 +44,8 @@ class Workflow:
             run_stage(title, command, cwd=ROOT, state_path=self.state_path)
 
     def download(self, source: str) -> None:
-        command = self.command("download_data.py", source)
-        if self.args.accept_data_terms:
-            command.append("--accept-data-terms")
-        if self.args.force:
-            command.append("--force")
+        terms = ["--accept-data-terms"] if self.args.accept_data_terms else []
+        command = self.command("download_data.py", source, *terms, force=True)
         self.run(f"Obter dados ({source})", command)
 
     def import_real(self) -> None:
@@ -57,11 +59,8 @@ class Workflow:
                 return
             if not self.args.accept_data_terms and not self.args.dry_run:
                 raise SystemExit("confirme os termos dos dados com --accept-data-terms")
-            download = self.command("download_real.py")
-            if self.args.accept_data_terms:
-                download.append("--accept-data-terms")
-            if self.args.force:
-                download.append("--force")
+            terms = ["--accept-data-terms"] if self.args.accept_data_terms else []
+            download = self.command("download_real.py", *terms, force=True)
             self.run("Baixar base real anotada", download)
             configured_source = self.pipeline["real_dataset"]["source"]
             source = (
@@ -72,37 +71,34 @@ class Workflow:
             "import_real_dataset.py",
             "--source",
             str(source.expanduser().resolve()),
+            force=True,
         )
-        if self.args.force:
-            command.append("--force")
         self.run("Importar e auditar base real original", command)
 
     def split_real(self) -> None:
-        command = self.command("split_real.py")
-        if self.args.force:
-            command.append("--force")
-        self.run("Congelar split real", command)
+        self.run("Congelar split real", self.command("split_real.py", force=True))
 
     def materialize_controlled(self) -> None:
-        command = self.command("materialize_controlled.py")
-        if self.args.force:
-            command.append("--force")
-        self.run("Materializar condição controlled", command)
+        self.run(
+            "Materializar condição controlled",
+            self.command("materialize_controlled.py", force=True),
+        )
 
     def preprocess(self) -> None:
         command = self.command(
-            "preprocess_assets.py", "--stage", "all", "--device", self.args.device
+            "preprocess_assets.py",
+            "--stage",
+            "all",
+            "--device",
+            self.args.device,
+            force=True,
         )
-        if self.args.force:
-            command.append("--force")
         self.run("Regenerar recortes e profundidade", command)
 
     def catalog_assets(self) -> None:
         command = self.command(
-            "catalog_assets.py", "--asset-root", str(self.asset_root)
+            "catalog_assets.py", "--asset-root", str(self.asset_root), force=True
         )
-        if self.args.force:
-            command.append("--force")
         self.run("Catalogar todos os ativos da síntese", command)
 
     def synthesis_configs(self) -> list[Path]:
@@ -120,16 +116,15 @@ class Workflow:
                 str(self.asset_root),
                 "--workers",
                 str(self.workers),
+                force=True,
             )
-            if self.args.force:
-                command.append("--force")
             self.run(f"Gerar dataset sintético ({config.stem})", command)
 
     def materialize_subsets(self) -> None:
-        command = self.command("materialize_nx_subsets.py")
-        if self.args.force:
-            command.append("--force")
-        self.run("Materializar subconjuntos sintéticos aninhados 1x–10x", command)
+        self.run(
+            "Materializar subconjuntos sintéticos aninhados 1x–10x",
+            self.command("materialize_nx_subsets.py", force=True),
+        )
 
     def validate(self, stage: str = "all") -> None:
         command = self.command(
@@ -173,21 +168,20 @@ class Workflow:
     def prepare_external(self) -> None:
         name = self.external_name
         artifacts = project_path(self.pipeline["paths"]["artifacts"])
-        subdir = self.experiment["protocol"].get("artifact_subdir")
         selection = (
-            artifacts / str(subdir) if subdir else artifacts
-        ) / "model_selection.json"
+            scoped_experiment_root(artifacts, self.experiment, "artifact")
+            / "model_selection.json"
+        )
         if not selection.exists() and not self.args.dry_run:
             raise FileNotFoundError(
                 "teste externo permanece bloqueado até model_selection.json ser congelado"
             )
-        download = self.command("download_external.py", name)
-        if self.args.external_source:
-            download.extend(
-                ["--source", str(self.args.external_source.expanduser().resolve())]
-            )
-        if self.args.force:
-            download.append("--force")
+        source = (
+            ["--source", str(self.args.external_source.expanduser().resolve())]
+            if self.args.external_source
+            else []
+        )
+        download = self.command("download_external.py", name, *source, force=True)
         self.run(f"Obter teste externo ({name})", download)
         dataset = self.pipeline["external_datasets"][name]
         archive = (
@@ -196,10 +190,8 @@ class Workflow:
             / dataset["archive_name"]
         )
         command = self.command(
-            "import_external_test.py", name, "--source", str(archive)
+            "import_external_test.py", name, "--source", str(archive), force=True
         )
-        if self.args.force:
-            command.append("--force")
         self.run(f"Importar teste externo ({name})", command)
 
     def test(self) -> None:
@@ -216,9 +208,8 @@ class Workflow:
             "--device",
             self.args.device,
             "--unlock-test",
+            force=True,
         )
-        if self.args.force:
-            command.append("--force")
         self.run("Avaliação final no teste real", command)
 
     def report(self) -> None:
@@ -260,34 +251,32 @@ class Workflow:
             )
 
 
+STAGES = {
+    "download-raw": lambda workflow: workflow.download("raw"),
+    "download-real": Workflow.import_real,
+    "preprocess": Workflow.preprocess,
+    "import-real": lambda workflow: (workflow.import_real(), workflow.split_real()),
+    "split-real": Workflow.split_real,
+    "materialize-controlled": Workflow.materialize_controlled,
+    "catalog-assets": Workflow.catalog_assets,
+    "synthesize": Workflow.synthesize,
+    "materialize-subsets": Workflow.materialize_subsets,
+    "validate": Workflow.validate,
+    "train": Workflow.train,
+    "select": Workflow.select,
+    "test": Workflow.test,
+    "prepare-test": Workflow.prepare_external,
+    "report": Workflow.report,
+    "prepare": Workflow.prepare,
+    "all": Workflow.all,
+}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Orquestrador da reprodução do experimento."
     )
-    parser.add_argument(
-        "stage",
-        choices=(
-            "help",
-            "download-raw",
-            "download-real",
-            "preprocess",
-            "import-real",
-            "split-real",
-            "materialize-controlled",
-            "catalog-assets",
-            "split-assets",
-            "synthesize",
-            "materialize-subsets",
-            "validate",
-            "train",
-            "select",
-            "test",
-            "prepare-test",
-            "report",
-            "prepare",
-            "all",
-        ),
-    )
+    parser.add_argument("stage", choices=("help", *STAGES))
     parser.add_argument("--pipeline-config", default="configs/pipeline.yaml")
     parser.add_argument("--experiment-config", default="configs/confirmatory.yaml")
     parser.add_argument("--real-source", type=Path)
@@ -306,31 +295,10 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
-    workflow = Workflow(args)
-    actions = {
-        "download-raw": lambda: workflow.download("raw"),
-        "download-real": workflow.import_real,
-        "preprocess": workflow.preprocess,
-        "import-real": lambda: (workflow.import_real(), workflow.split_real()),
-        "split-real": workflow.split_real,
-        "materialize-controlled": workflow.materialize_controlled,
-        "catalog-assets": workflow.catalog_assets,
-        "split-assets": workflow.catalog_assets,
-        "synthesize": workflow.synthesize,
-        "materialize-subsets": workflow.materialize_subsets,
-        "validate": workflow.validate,
-        "train": workflow.train,
-        "select": workflow.select,
-        "test": workflow.test,
-        "prepare-test": workflow.prepare_external,
-        "report": workflow.report,
-        "prepare": workflow.prepare,
-        "all": workflow.all,
-    }
     if args.stage == "help":
         parser.print_help()
         return
-    actions[args.stage]()
+    STAGES[args.stage](Workflow(args))
 
 
 if __name__ == "__main__":

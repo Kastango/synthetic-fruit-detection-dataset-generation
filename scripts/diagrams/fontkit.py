@@ -1,4 +1,4 @@
-"""Embed the versioned fonts. Diagram builds never fetch fonts from the network."""
+"""Embute as fontes versionadas. A geração dos diagramas nunca baixa fontes da rede."""
 
 import base64
 import io
